@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Polymesh DART WASM - Key Generation Example</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #170072;
+            padding-bottom: 10px;
+        }
+
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        button {
+            background-color: #170072;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 10px 5px 10px 0;
+        }
+
+        button:hover {
+            background-color: #2a00b3;
+        }
+
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+
+        .output {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .label {
+            font-weight: bold;
+            color: #555;
+            margin-top: 15px;
+            margin-bottom: 5px;
+        }
+
+        .success {
+            color: #28a745;
+        }
+
+        .error {
+            color: #dc3545;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Polymesh DART WASM - Key Generation Example</h1>
+
+        <div>
+            <button id="generateSeed">Generate Random Seed</button>
+            <button id="createKeys" disabled>Create Account Keys</button>
+            <button id="exportKeys" disabled>Export Keys</button>
+            <button id="importKeys" disabled>Re-import Keys</button>
+        </div>
+
+        <div class="label">Status:</div>
+        <div id="status" class="output">Click "Generate Random Seed" to begin...</div>
+
+        <div class="label">Generated Seed (32 bytes hex):</div>
+        <div id="seed" class="output"></div>
+
+        <div class="label">Public Keys JSON:</div>
+        <div id="publicKeys" class="output"></div>
+
+        <div class="label">Account Public Key JSON:</div>
+        <div id="accountPubKey" class="output"></div>
+
+        <div class="label">Encryption Public Key JSON:</div>
+        <div id="encryptionPubKey" class="output"></div>
+
+        <div class="label">Exported Key Bytes (hex):</div>
+        <div id="keyBytes" class="output"></div>
+    </div>
+
+    <script type="module">
+        import init, {
+            AccountKeys,
+            generateRandomSeed
+        } from '../pkg-web/polymesh_dart_wasm.js';
+
+        let wasmInitialized = false;
+        let currentSeed = null;
+        let currentKeys = null;
+        let exportedBytes = null;
+
+        // Initialize WASM
+        async function initializeWasm() {
+            try {
+                await init();
+                wasmInitialized = true;
+                updateStatus('✓ WASM module initialized successfully!', 'success');
+                document.getElementById('generateSeed').disabled = false;
+            } catch (error) {
+                updateStatus('✗ Failed to initialize WASM: ' + error.message, 'error');
+            }
+        }
+
+        function updateStatus(message, type = '') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = 'output ' + type;
+        }
+
+        function updateOutput(id, content) {
+            document.getElementById(id).textContent = content;
+        }
+
+        // Generate random seed
+        document.getElementById('generateSeed').addEventListener('click', () => {
+            try {
+                currentSeed = generateRandomSeed();
+                updateOutput('seed', currentSeed);
+                updateStatus('✓ Random seed generated!', 'success');
+                document.getElementById('createKeys').disabled = false;
+            } catch (error) {
+                updateStatus('✗ Error generating seed: ' + error.message, 'error');
+            }
+        });
+
+        // Create account keys
+        document.getElementById('createKeys').addEventListener('click', () => {
+            try {
+                currentKeys = new AccountKeys(currentSeed);
+                const publicKeys = currentKeys.publicKeys();
+
+                // Display public keys
+                updateOutput('publicKeys', publicKeys.toJson());
+
+                // Display account public key
+                const accountPubKey = publicKeys.accountPublicKey();
+                updateOutput('accountPubKey', accountPubKey.toJson());
+
+                // Display encryption public key
+                const encryptionPubKey = publicKeys.encryptionPublicKey();
+                updateOutput('encryptionPubKey', encryptionPubKey.toJson());
+
+                updateStatus('✓ Account keys created!', 'success');
+                document.getElementById('exportKeys').disabled = false;
+            } catch (error) {
+                updateStatus('✗ Error creating keys: ' + error.message, 'error');
+            }
+        });
+
+        // Export keys
+        document.getElementById('exportKeys').addEventListener('click', () => {
+            try {
+                exportedBytes = currentKeys.toBytes();
+
+                // Convert to hex for display
+                const hexString = Array.from(exportedBytes)
+                    .map(b => b.toString(16).padStart(2, '0'))
+                    .join('');
+
+                updateOutput('keyBytes', hexString + '\n\nLength: ' + exportedBytes.length + ' bytes');
+                updateStatus('✓ Keys exported as bytes!', 'success');
+                document.getElementById('importKeys').disabled = false;
+            } catch (error) {
+                updateStatus('✗ Error exporting keys: ' + error.message, 'error');
+            }
+        });
+
+        // Re-import keys
+        document.getElementById('importKeys').addEventListener('click', () => {
+            try {
+                const reimportedKeys = AccountKeys.fromBytes(exportedBytes);
+                const reimportedPublicKeys = reimportedKeys.publicKeys();
+
+                // Verify they match
+                const originalJson = currentKeys.publicKeys().toJson();
+                const reimportedJson = reimportedPublicKeys.toJson();
+
+                if (originalJson === reimportedJson) {
+                    updateStatus('✓ Keys successfully re-imported and verified! They match the original keys.', 'success');
+                } else {
+                    updateStatus('✗ Warning: Re-imported keys do not match original keys!', 'error');
+                }
+            } catch (error) {
+                updateStatus('✗ Error importing keys: ' + error.message, 'error');
+            }
+        });
+
+        // Initialize on page load
+        initializeWasm();
+    </script>
+</body>
+
+</html>

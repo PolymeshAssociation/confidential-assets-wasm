@@ -1,0 +1,38 @@
+{
+    "name": "@polymesh/dart-wasm",
+    "version": "0.1.0",
+    "description": "WebAssembly bindings for Polymesh DART (Decentralized, Anonymous and Regulation-Friendly Tokenization)",
+    "main": "index.js",
+    "types": "index.d.ts",
+    "files": [
+        "polymesh_dart_wasm_bg.wasm",
+        "polymesh_dart_wasm.js",
+        "polymesh_dart_wasm.d.ts",
+        "index.js",
+        "index.d.ts"
+    ],
+    "scripts": {
+        "build": "./build.sh",
+        "test": "wasm-pack test --headless --firefox",
+        "clean": "rm -rf pkg pkg-web pkg-node target"
+    },
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/PolymeshAssociation/polymesh-dart.git"
+    },
+    "keywords": [
+        "polymesh",
+        "dart",
+        "wasm",
+        "blockchain",
+        "privacy",
+        "zero-knowledge",
+        "confidential-assets"
+    ],
+    "author": "Polymesh Labs",
+    "license": "GPL-3.0",
+    "bugs": {
+        "url": "https://github.com/PolymeshAssociation/polymesh-dart/issues"
+    },
+    "homepage": "https://github.com/PolymeshAssociation/polymesh-dart#readme"
+}

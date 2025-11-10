@@ -1,0 +1,80 @@
+[package]
+name = "polymesh-dart-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "WebAssembly bindings for Polymesh DART"
+authors = ["Polymesh Labs"]
+license = "GPL-3.0"
+repository = "https://github.com/PolymeshAssociation/polymesh-dart"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[patch.crates-io]
+# Curve tree dependencies
+#bulletproofs = { path = "../curve-trees/bulletproofs" }
+#curve_tree_relations = { package = "relations", path = "../curve-trees/relations" }
+# If want to pull code for curve-trees from git, comment above 2 relations and uncomment below 2
+bulletproofs = { git = "https://github.com/PolymeshAssociation/curve-trees", branch = "polymesh" }
+curve_tree_relations = { package = "relations", git = "https://github.com/PolymeshAssociation/curve-trees", branch = "polymesh" }
+
+#dock_crypto_utils = { path = "../crypto/utils" }
+#schnorr_pok = { path = "../crypto/schnorr_pok" }
+dock_crypto_utils = { git = "https://github.com/PolymeshAssociation/crypto" }
+schnorr_pok = { git = "https://github.com/PolymeshAssociation/crypto" }
+
+#polymesh-dart = { path = "../polymesh-dart" }
+#polymesh-dart-bp = { path = "../polymesh-dart/dart-bp" }
+#polymesh-dart-common = { path = "../polymesh-dart/dart-common" }
+polymesh-dart = { git = "https://github.com/PolymeshAssociation/polymesh-dart", branch = "main" }
+polymesh-dart-bp = { git = "https://github.com/PolymeshAssociation/polymesh-dart", branch = "main" }
+polymesh-dart-common = { git = "https://github.com/PolymeshAssociation/polymesh-dart", branch = "main" }
+
+# Polymesh changes.
+#ark-serialize = { path = "../arkworks-algebra/serialize" }
+#ark-ec = { path = "../arkworks-algebra/ec" }
+#ark-ff = { path = "../arkworks-algebra/ff" }
+#ark-pallas = { path = "../arkworks-algebra/curves/pallas" }
+#ark-vesta = { path = "../arkworks-algebra/curves/vesta" }
+ark-serialize = { git = "https://github.com/PolymeshAssociation/arkworks-algebra.git", branch = "polymesh-master" }
+ark-ec = { git = "https://github.com/PolymeshAssociation/arkworks-algebra.git", branch = "polymesh-master" }
+ark-ff = { git = "https://github.com/PolymeshAssociation/arkworks-algebra.git", branch = "polymesh-master" }
+ark-pallas = { git = "https://github.com/PolymeshAssociation/arkworks-algebra.git", branch = "polymesh-master" }
+ark-vesta = { git = "https://github.com/PolymeshAssociation/arkworks-algebra.git", branch = "polymesh-master" }
+
+[dependencies]
+polymesh-dart = { version = "0.1.0", default-features = false, features = ["backend_bp", "serde", "alloc"] }
+
+wasm-bindgen = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde-wasm-bindgen = "0.6"
+js-sys = "0.3"
+console_error_panic_hook = { version = "0.1", optional = true }
+getrandom = { version = "0.2", features = ["js"] }
+
+# Ark dependencies
+ark-ff = { version = "0.5.0", default-features = false }
+ark-ec = { version = "0.5.0", default-features = false }
+ark-serialize = { version = "0.5.0", default-features = false, features = ["derive"] }
+ark-std = { version = "0.5", default-features = false }
+
+# Other dependencies
+codec = { package = "parity-scale-codec", version = "3.2.2", default-features = false }
+rand_core = { version = "0.6", default-features = false }
+rand_chacha = { version = "0.3", default-features = false }
+hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[features]
+default = ["std"]
+std = [
+    "polymesh-dart/std",
+]
+
+[profile.release]
+# Optimize for small code size
+opt-level = "s"
+lto = true

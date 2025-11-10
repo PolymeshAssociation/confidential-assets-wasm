@@ -1,0 +1,22 @@
+# Rust
+target/
+
+# WASM build outputs
+pkg/
+pkg-web/
+pkg-node/
+
+# Node
+node_modules/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
