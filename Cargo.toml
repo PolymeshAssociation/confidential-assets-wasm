@@ -56,6 +56,7 @@ polymesh-dart = { version = "0.1.0", default-features = false, features = [
 async-trait = "0.1"
 
 wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde-wasm-bindgen = "0.6"
@@ -83,7 +84,7 @@ polymesh-api-client = { version = "3.10.0" }
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 polymesh-api = { version = "3.6", default-features = false, features = ["polymesh_v7", "wasm", "serde"] }
-polymesh-api-client = { version = "3.10.0", default-features = false }
+polymesh-api-client = { version = "3.10.0", default-features = false, features = [ "wasm" ] }
 
 [features]
 default = ["download_metadata"]

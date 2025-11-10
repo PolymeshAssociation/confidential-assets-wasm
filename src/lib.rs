@@ -5,7 +5,7 @@ pub use error::*;
 
 mod account;
 mod asset;
-mod curve_tree;
+mod client;
 mod keys;
 mod settlement;
 mod utils;
@@ -13,7 +13,7 @@ mod utils;
 // Re-export main types
 pub use account::*;
 pub use asset::*;
-pub use curve_tree::*;
+pub use client::*;
 pub use keys::*;
 pub use settlement::*;
 

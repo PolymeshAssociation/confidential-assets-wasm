@@ -1,10 +1,14 @@
 // Node.js example for using Polymesh DART WASM
 // Run with: node examples/node-example.js
 
+//const WebSocket = require('ws');
+Object.assign(global, { WebSocket: require('ws') });
+
 const {
     AccountKeys,
     generateRandomSeed,
-    AssetState
+    AssetState,
+    PolymeshClient
 } = require('../pkg-node/polymesh_dart_wasm.js');
 
 console.log('=== Polymesh DART WASM Node.js Example ===\n');
@@ -62,7 +66,7 @@ console.log('');
 
 // 7. Create an asset state
 console.log('7. Creating an asset state...');
-const assetId = 42;
+const assetId = 0;
 const mediators = []; // Array of EncryptionPublicKey bytes
 const auditors = [];  // Array of EncryptionPublicKey bytes
 
@@ -88,9 +92,48 @@ const registrationProof = accountKeys.registerAccountProof(did);
 console.log('   Registration proof bytes length:', registrationProof.toBytes().length);
 
 // Generate account asset registration.
-console.log('9. Generating account asset registration...');
-const assetRegistration = accountKeys.registerAccountAssetProof(assetId, did);
+//console.log('9. Generating account asset registration...');
+//const assetRegistration = accountKeys.registerAccountAssetProof(assetId, did);
+//
+//console.log('   Account asset registration proof bytes length:', assetRegistration.getProofBytes().length);
 
-console.log('   Account asset registration proof bytes length:', assetRegistration.getProofBytes().length);
+// Connect to Polymesh node.
+console.log('10. Connecting to Polymesh node...');
+(new PolymeshClient("ws://localhost:9944")).then(client => {
+    console.log('   ✓ Connected to Polymesh node');
+    console.log('   Client:', client);
+    console.log('');
 
-console.log('=== Example Complete ===');
+    // Get the asset curve tree.
+    console.log('11. Getting asset curve tree...');
+    client.getAssetCurveTree(assetId).then(assetCurveTree => {
+        console.log('   ✓ Retrieved asset curve tree');
+        console.log('   Asset Curve Tree:', assetCurveTree);
+        console.log('');
+
+        // Create an asset leaf path builder.
+        console.log('12. Creating asset leaf path builder...');
+        assetCurveTree.buildAssetLeafPaths().then(assetLeafPathBuilder => {
+            console.log('   ✓ Created asset leaf path builder');
+            console.log('   Asset Leaf Path Builder:', assetLeafPathBuilder);
+            console.log('');
+
+            // Track an asset and get it's current state.
+            console.log('13. Tracking asset state...');
+            assetLeafPathBuilder.trackAsset(assetId).then(assetState => {
+                console.log('   ✓ Tracked asset state');
+                console.log('   Asset State:', assetState);
+                console.log('');
+
+                console.log('=== Example Complete ===');
+                // Exit process
+                process.exit(0);
+            });
+        });
+    })
+
+}).catch(error => {
+    console.error('   ✗ Failed to connect:', error);
+    console.log('');
+    console.log('=== Example Complete (with connection error) ===');
+});

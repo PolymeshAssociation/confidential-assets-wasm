@@ -60,7 +60,7 @@ pub fn node_location_to_chain<const L: usize>(location: NodeLocation<L>) -> Chai
 /// Asset Curve Tree Storage backend.
 #[derive(Clone)]
 pub struct AssetCurveTreeChainStorage {
-    api: Api,
+    pub(crate) api: Api,
 }
 
 impl AssetCurveTreeChainStorage {
@@ -352,7 +352,7 @@ impl CurveTreeLookup<ASSET_TREE_L, ASSET_TREE_M, AssetTreeConfig> for AssetLeafP
 /// Account Curve Tree Storage backend.
 #[derive(Clone)]
 pub struct AccountCurveTreeChainStorage {
-    api: Api,
+    pub(crate) api: Api,
 }
 
 impl AccountCurveTreeChainStorage {
@@ -528,7 +528,7 @@ impl AccountCurveTree {
 /// Fee Account Curve Tree Storage backend.
 #[derive(Clone)]
 pub struct FeeAccountCurveTreeChainStorage {
-    api: Api,
+    pub(crate) api: Api,
 }
 
 impl FeeAccountCurveTreeChainStorage {
