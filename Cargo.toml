@@ -43,21 +43,27 @@ ark-pallas = { git = "https://github.com/PolymeshAssociation/arkworks-algebra.gi
 ark-vesta = { git = "https://github.com/PolymeshAssociation/arkworks-algebra.git", branch = "polymesh-master" }
 
 [dependencies]
-polymesh-dart = { version = "0.1.0", default-features = false, features = ["backend_bp", "serde", "alloc"] }
+# DART Assets
+polymesh-dart = { version = "0.1.0", default-features = false, features = [
+	"std",
+  "asm",
+	"serde",
+  "parallel",
+  "backend_bp",
+  "async_tree",
+] }
+
+async-trait = "0.1"
 
 wasm-bindgen = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde-wasm-bindgen = "0.6"
+
 js-sys = "0.3"
 console_error_panic_hook = { version = "0.1", optional = true }
-getrandom = { version = "0.2", features = ["js"] }
-
-# Ark dependencies
-ark-ff = { version = "0.5.0", default-features = false }
-ark-ec = { version = "0.5.0", default-features = false }
-ark-serialize = { version = "0.5.0", default-features = false, features = ["derive"] }
-ark-std = { version = "0.5", default-features = false }
+getrandom = { version = "0.3", features = ["wasm_js"] }
+thiserror = "1.0"
 
 # Other dependencies
 codec = { package = "parity-scale-codec", version = "3.2.2", default-features = false }
@@ -68,10 +74,22 @@ hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
 
+# native:
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+polymesh-api = { version = "3.6", features = ["serde"] }
+polymesh-api-client = { version = "3.10.0" }
+
+# web:
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+polymesh-api = { version = "3.6", default-features = false, features = ["polymesh_v7", "wasm", "serde"] }
+polymesh-api-client = { version = "3.10.0", default-features = false }
+
 [features]
-default = ["std"]
-std = [
-    "polymesh-dart/std",
+default = ["download_metadata"]
+
+# Enable this feature to compile against a dev-chain.
+download_metadata = [
+	"polymesh-api/download_metadata",
 ]
 
 [profile.release]
