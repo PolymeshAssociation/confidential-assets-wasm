@@ -3244,6 +3244,7 @@ dependencies = [
  "polymesh-api",
  "polymesh-api-client",
  "polymesh-dart",
+ "rand",
  "rand_chacha",
  "rand_core",
  "serde",

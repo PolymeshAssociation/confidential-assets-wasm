@@ -9,8 +9,15 @@ use wasm_bindgen::prelude::*;
 
 /// Account state for a specific asset
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct AccountAssetState {
     pub(crate) inner: NativeAccountAssetState,
+}
+
+impl AccountAssetState {
+    pub fn new(inner: NativeAccountAssetState) -> Self {
+        AccountAssetState { inner }
+    }
 }
 
 #[wasm_bindgen]
@@ -54,6 +61,12 @@ impl AccountAssetState {
 #[wasm_bindgen]
 pub struct AccountState {
     pub(crate) inner: NativeAccountState,
+}
+
+impl AccountState {
+    pub fn new(inner: NativeAccountState) -> Self {
+        AccountState { inner }
+    }
 }
 
 #[wasm_bindgen]

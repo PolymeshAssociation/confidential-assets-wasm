@@ -80,4 +80,17 @@ try {
 }
 console.log('');
 
+// Generate account registration proof.
+console.log('8. Generating account registration proof...');
+const did = new Uint8Array(32);
+const registrationProof = accountKeys.registerAccountProof(did);
+
+console.log('   Registration proof bytes length:', registrationProof.toBytes().length);
+
+// Generate account asset registration.
+console.log('9. Generating account asset registration...');
+const assetRegistration = accountKeys.registerAccountAssetProof(assetId, did);
+
+console.log('   Account asset registration proof bytes length:', assetRegistration.getProofBytes().length);
+
 console.log('=== Example Complete ===');

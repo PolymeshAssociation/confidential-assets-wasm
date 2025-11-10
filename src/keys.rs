@@ -1,13 +1,18 @@
 use codec::{Decode, Encode};
 use polymesh_dart::{
-    AccountKeys as NativeAccountKeys, AccountPublicKeys as NativeAccountPublicKeys,
+    curve_tree::get_account_curve_tree_parameters,
+    AccountAssetRegistrationProof as NativeAccountAssetRegistrationProof,
+    AccountKeys as NativeAccountKeys, AccountPublicKey as NativeAccountPublicKey,
+    AccountPublicKeys as NativeAccountPublicKeys,
+    AccountRegistrationProof as NativeAccountRegistrationProof,
+    EncryptionPublicKey as NativeEncryptionPublicKey,
 };
-use polymesh_dart::{
-    AccountPublicKey as NativeAccountPublicKey, EncryptionPublicKey as NativeEncryptionPublicKey,
-};
+use rand::RngCore as _;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
 use wasm_bindgen::prelude::*;
+
+use crate::AccountAssetState;
 
 /// Account keys containing both the account secret key and encryption secret key.
 /// This type is used for operations requiring the private keys.
@@ -70,6 +75,100 @@ impl AccountKeys {
         AccountPublicKeys {
             inner: self.inner.public_keys(),
         }
+    }
+
+    /// Generate an account registration proof for the account keys.  The proof needs the identity id that the account keys will be linked to.
+    #[wasm_bindgen(js_name = registerAccountProof)]
+    pub fn register_account_proof(&self, did: &[u8]) -> Result<AccountRegistrationProof, JsValue> {
+        let mut rng = rand::rngs::OsRng;
+        if did.len() != 32 {
+            return Err(JsValue::from_str(
+                "Identity ID must be 32 bytes (64 hex characters)",
+            ));
+        }
+        let proof = NativeAccountRegistrationProof::<()>::new(&mut rng, &[self.inner.clone()], did)
+            .map_err(|e| {
+                JsValue::from_str(&format!("Failed to generate registration proof: {}", e))
+            })?;
+        Ok(AccountRegistrationProof { inner: proof })
+    }
+
+    /// Generate an account asset registration proof for the account keys and a specific asset.  The proof needs the asset id and identity id.
+    #[wasm_bindgen(js_name = registerAccountAssetProof)]
+    pub fn register_account_asset_proof(
+        &self,
+        asset_id: u32,
+        did: &[u8],
+    ) -> Result<AccountAssetRegistration, JsValue> {
+        let mut rng = rand::rngs::OsRng;
+        if did.len() != 32 {
+            return Err(JsValue::from_str(
+                "Identity ID must be 32 bytes (64 hex characters)",
+            ));
+        }
+
+        let account = self.inner.acct.clone();
+        let params = get_account_curve_tree_parameters();
+
+        let (proof, state) =
+            NativeAccountAssetRegistrationProof::new(&mut rng, &account, asset_id, 0, did, &params)
+                .map_err(|e| {
+                    JsValue::from_str(&format!(
+                        "Failed to generate account asset registration proof: {}",
+                        e
+                    ))
+                })?;
+
+        let state = AccountAssetState::new(state);
+
+        Ok(AccountAssetRegistration { proof, state })
+    }
+}
+
+/// An account registration proof.
+#[wasm_bindgen]
+pub struct AccountRegistrationProof {
+    pub(crate) inner: NativeAccountRegistrationProof<()>,
+}
+
+#[wasm_bindgen]
+impl AccountRegistrationProof {
+    /// Export proof as a SCALE-encoded byte array
+    #[wasm_bindgen(js_name = toBytes)]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.inner.encode()
+    }
+
+    /// Import proof from a SCALE-encoded byte array
+    #[wasm_bindgen(js_name = fromBytes)]
+    pub fn from_bytes(bytes: &[u8]) -> Result<AccountRegistrationProof, JsValue> {
+        let inner = NativeAccountRegistrationProof::<()>::decode(&mut &bytes[..]).map_err(|e| {
+            JsValue::from_str(&format!("Failed to decode registration proof: {}", e))
+        })?;
+        Ok(AccountRegistrationProof { inner })
+    }
+}
+
+/// The Account asset registration proof and resulting account asset state
+/// generated when registering an account for a specific asset.
+#[wasm_bindgen]
+pub struct AccountAssetRegistration {
+    pub(crate) proof: NativeAccountAssetRegistrationProof,
+    pub(crate) state: AccountAssetState,
+}
+
+#[wasm_bindgen]
+impl AccountAssetRegistration {
+    /// Get the registration proof as a SCALE-encoded byte array
+    #[wasm_bindgen(js_name = getProofBytes)]
+    pub fn get_proof_bytes(&self) -> Vec<u8> {
+        self.proof.encode()
+    }
+
+    /// Get the resulting account asset state
+    #[wasm_bindgen(js_name = getAccountAssetState)]
+    pub fn get_account_asset_state(&self) -> AccountAssetState {
+        self.state.clone()
     }
 }
 
@@ -185,8 +284,7 @@ impl EncryptionPublicKey {
 /// Returns a hex-encoded string
 #[wasm_bindgen(js_name = generateRandomSeed)]
 pub fn generate_random_seed() -> Result<String, JsValue> {
-    use rand_core::RngCore;
-    let mut rng = ChaChaRng::from_entropy();
+    let mut rng = rand::rngs::OsRng;
     let mut seed = [0u8; 32];
     rng.fill_bytes(&mut seed);
     Ok(hex::encode(seed))
