@@ -3166,7 +3166,7 @@ dependencies = [
 [[package]]
 name = "polymesh-dart"
 version = "0.1.0"
-source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#fdf9dc7c6cb4b44bffa7bcf1f68f15f3a234674d"
+source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#c07f159d70407ad09e86169fc424f3eafc7e06f1"
 dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -3201,7 +3201,7 @@ dependencies = [
 [[package]]
 name = "polymesh-dart-bp"
 version = "0.1.0"
-source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#fdf9dc7c6cb4b44bffa7bcf1f68f15f3a234674d"
+source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#c07f159d70407ad09e86169fc424f3eafc7e06f1"
 dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -3229,17 +3229,19 @@ dependencies = [
 [[package]]
 name = "polymesh-dart-common"
 version = "0.1.0"
-source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#fdf9dc7c6cb4b44bffa7bcf1f68f15f3a234674d"
+source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#c07f159d70407ad09e86169fc424f3eafc7e06f1"
 
 [[package]]
 name = "polymesh-dart-wasm"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bounded-collections 0.1.9",
  "console_error_panic_hook",
  "getrandom 0.3.4",
  "hex",
  "js-sys",
+ "log",
  "parity-scale-codec",
  "polymesh-api",
  "polymesh-api-client",
@@ -3254,6 +3256,7 @@ dependencies = [
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
+ "wasm-logger",
 ]
 
 [[package]]
@@ -5384,6 +5387,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.110",
+]
+
+[[package]]
+name = "wasm-logger"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "074649a66bb306c8f2068c9016395fa65d8e08d2affcbf95acf3c24c3ab19718"
+dependencies = [
+ "log",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

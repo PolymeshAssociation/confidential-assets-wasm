@@ -8,134 +8,169 @@ const {
     AccountKeys,
     generateRandomSeed,
     AssetState,
-    PolymeshClient
+    PolymeshClient,
+    PolymeshSigner,
 } = require('../pkg-node/polymesh_dart_wasm.js');
 
 console.log('=== Polymesh DART WASM Node.js Example ===\n');
 
-// 1. Generate a random seed
-console.log('1. Generating random seed...');
-const seed = generateRandomSeed();
-console.log('   Seed:', seed);
-console.log('');
+async function main() {
+    const client = await new PolymeshClient("ws://localhost:9944");
+    console.log('   ✓ Connected to Polymesh node');
+    console.log('   Client:', client);
+    console.log('');
 
-// 2. Create account keys from seed
-console.log('2. Creating account keys from seed...');
-const accountKeys = new AccountKeys(seed);
-console.log('   ✓ Account keys created');
-console.log('');
+    // Create some test users and onboard them if needed.
+    console.log('Creating and onboarding test issuer...');
+    const issuer = client.newSigner("//TestIssuer");
+    // Check if the signer has an identity
+    const issuer_did = await issuer.identity();
+    if (issuer_did === null) {
+        console.log('   No identity found for signer, onboarding account...');
+        await client.onboardSigner(issuer);
+        console.log('   ✓ Account onboarded');
+    } else {
+        console.log('   Signer identity DID:', issuer_did);
+    }
+    console.log('');
 
-// 3. Get public keys
-console.log('3. Extracting public keys...');
-const publicKeys = accountKeys.publicKeys();
-console.log('   Public keys JSON:');
-console.log('  ', publicKeys.toJson());
-console.log('');
+    // Create and onboard an investor.
+    console.log('Creating and onboarding test investor...');
+    const investor = client.newSigner("//TestInvestor");
+    const investor_did = await investor.identity();
+    if (investor_did === null) {
+        console.log('   No identity found for signer, onboarding account...');
+        await client.onboardSigner(investor);
+        console.log('   ✓ Account onboarded');
+    } else {
+        console.log('   Signer identity DID:', investor_did);
+    }
+    console.log('');
 
-// 4. Get individual key components
-console.log('4. Getting individual key components...');
-const accountPubKey = publicKeys.accountPublicKey();
-const encryptionPubKey = publicKeys.encryptionPublicKey();
-console.log('   Account public key:', accountPubKey.toJson());
-console.log('   Encryption public key:', encryptionPubKey.toJson());
-console.log('');
+    // Create and onboard an mediator (sometimes used as an auditor).
+    console.log('Creating and onboarding test mediator...');
+    const mediator = client.newSigner("//TestMediator");
+    const mediator_did = await mediator.identity();
+    if (mediator_did === null) {
+        console.log('   No identity found for signer, onboarding account...');
+        await client.onboardSigner(mediator);
+        console.log('   ✓ Account onboarded');
+    } else {
+        console.log('   Signer identity DID:', mediator_did);
+    }
+    console.log('');
 
-// 5. Export and import keys
-console.log('5. Testing key export/import...');
-const keyBytes = accountKeys.toBytes();
-console.log('   Exported key bytes length:', keyBytes.length);
+    // Create account keys from seed
+    console.log('Creating account keys for test issuer...');
+    const issuerKeys = AccountKeys.fromSeed("Test-Issuer-seed");
+    const issuerPublicKeys = issuerKeys.publicKeys();
+    console.log('   Public keys JSON:');
+    console.log('  ', issuerPublicKeys.toJson());
+    console.log('');
 
-const reimportedKeys = AccountKeys.fromBytes(keyBytes);
-const reimportedPublicKeys = reimportedKeys.publicKeys();
-console.log('   Re-imported public keys:', reimportedPublicKeys.toJson());
+    // Register the issuer's account keys if not already registered
+    const issuerAccountDid = await client.getAccountIdentity(issuerPublicKeys.accountPublicKey());
+    if (issuerAccountDid === null) {
+        console.log('   No account identity found for issuer keys, registering account keys...');
+        const issuerRegistrationProof = issuerKeys.registerAccountProof(issuer_did);
+        const txHash = await issuer.registerAccount(issuerRegistrationProof);
+        console.log('   ✓ Account keys registered with tx hash:', txHash);
+    } else {
+        console.log('   Account identity DID for issuer keys:', issuerAccountDid);
+    }
 
-// Verify they match
-if (publicKeys.toJson() === reimportedPublicKeys.toJson()) {
-    console.log('   ✓ Keys match after re-import!');
-} else {
-    console.log('   ✗ Error: Keys do not match!');
-}
-console.log('');
+    // Create account keys for test investor
+    console.log('Creating account keys for test investor...');
+    const investorKeys = AccountKeys.fromSeed("Test-Investor-seed");
+    const investorPublicKeys = investorKeys.publicKeys();
+    console.log('   Public keys JSON:');
+    console.log('  ', investorPublicKeys.toJson());
+    console.log('');
 
-// 6. Create keys from a string seed
-console.log('6. Creating keys from a string seed...');
-const stringKeys = AccountKeys.fromSeed('my-secret-password-seed');
-const stringPublicKeys = stringKeys.publicKeys();
-console.log('   Public keys from string seed:', stringPublicKeys.toJson());
-console.log('');
+    // Register the investor's account keys if not already registered
+    const investorAccountDid = await client.getAccountIdentity(investorPublicKeys.accountPublicKey());
+    if (investorAccountDid === null) {
+        console.log('   No account identity found for investor keys, registering account keys...');
+        const investorRegistrationProof = investorKeys.registerAccountProof(investor_did);
+        const txHash = await investor.registerAccount(investorRegistrationProof);
+        console.log('   ✓ Account keys registered with tx hash:', txHash);
+    } else {
+        console.log('   Account identity DID for investor keys:', investorAccountDid);
+    }
+    console.log('');
 
-// 7. Create an asset state
-console.log('7. Creating an asset state...');
-const assetId = 0;
-const mediators = []; // Array of EncryptionPublicKey bytes
-const auditors = [];  // Array of EncryptionPublicKey bytes
+    // Create account keys for test mediator
+    console.log('Creating account keys for test mediator...');
+    const mediatorKeys = AccountKeys.fromSeed("Test-Mediator-seed");
+    const mediatorPublicKeys = mediatorKeys.publicKeys();
+    const mediatorEncryptionKey = mediatorPublicKeys.encryptionPublicKey();
+    console.log('   Public keys JSON:');
+    console.log('  ', mediatorPublicKeys.toJson());
+    console.log('');
 
-try {
-    const assetState = new AssetState(assetId, mediators, auditors);
+    // Register the mediator's account keys if not already registered
+    const mediatorAccountDid = await client.getAccountIdentity(mediatorPublicKeys.accountPublicKey());
+    if (mediatorAccountDid === null) {
+        console.log('   No account identity found for mediator keys, registering account keys...');
+        const mediatorRegistrationProof = mediatorKeys.registerAccountProof(mediator_did);
+        const txHash = await mediator.registerAccount(mediatorRegistrationProof);
+        console.log('   ✓ Account keys registered with tx hash:', txHash);
+    } else {
+        console.log('   Account identity DID for mediator keys:', mediatorAccountDid);
+    }
+    console.log('');
+
+    // 7. Create an asset state
+    console.log('Creating an asset state...');
+    const mediators = [];
+    const auditors = [mediatorEncryptionKey]; // Just use mediator as auditor for this example.
+
+    // Create the asset on-chain using the issuer signer.
+    console.log('Creating confidential asset on-chain...');
+    const assetState = await issuer.createAsset(mediators, auditors, "Test Confidential Asset");
+    const assetId = assetState.assetId();
+    console.log('   ✓ Confidential asset created with Asset ID:', assetId);
     console.log('   ✓ Asset state created');
     console.log('   Asset ID:', assetState.assetId());
     console.log('   Mediators:', assetState.mediatorCount());
     console.log('   Auditors:', assetState.auditorCount());
+    console.log('');
 
-    const assetBytes = assetState.toBytes();
-    console.log('   Asset state bytes length:', assetBytes.length);
-} catch (error) {
-    console.log('   Note: Asset state creation requires encryption keys for mediators/auditors');
-}
-console.log('');
+    // Register the issuer's account with the new asset.
+    console.log('Registering issuer account with the new asset...');
+    const assetRegistration = issuerKeys.registerAccountAssetProof(assetId, issuer_did);
+    const issuerAccountState = assetRegistration.getAccountAssetState();
+    console.log('   Account asset registration proof bytes length:', assetRegistration.getProofBytes().length);
+    const regTxHash = await issuer.registerAccountAssets([assetRegistration.getProof()]);
+    console.log('   ✓ Issuer account registered with asset with tx hash:', regTxHash);
+    console.log('   Account Asset State:', issuerAccountState.toJson());
+    console.log('');
 
-// Generate account registration proof.
-console.log('8. Generating account registration proof...');
-const did = new Uint8Array(32);
-const registrationProof = accountKeys.registerAccountProof(did);
+    // Get the asset curve tree.
+    console.log('Getting asset curve tree...');
+    const assetCurveTree = await client.getAssetCurveTree();
+    console.log('   ✓ Retrieved asset curve tree');
+    console.log('   Asset Curve Tree:', assetCurveTree);
+    console.log('');
 
-console.log('   Registration proof bytes length:', registrationProof.toBytes().length);
+    // Create an asset leaf path builder.
+    console.log('Creating asset leaf path builder...');
+    const assetLeafPathBuilder = await assetCurveTree.buildAssetLeafPaths();
+    console.log('   ✓ Created asset leaf path builder');
+    console.log('   Asset Leaf Path Builder:', assetLeafPathBuilder);
+    console.log('');
 
-// Generate account asset registration.
-//console.log('9. Generating account asset registration...');
-//const assetRegistration = accountKeys.registerAccountAssetProof(assetId, did);
-//
-//console.log('   Account asset registration proof bytes length:', assetRegistration.getProofBytes().length);
+    // Track an asset and get it's current state.
+    console.log('Tracking asset state...');
+    const assetState2 = await assetLeafPathBuilder.trackAsset(assetId);
+    console.log('   ✓ Tracked asset state');
+    console.log('   Asset State:', assetState2);
+    console.log('   Mediators:', assetState2.mediatorCount());
+    console.log('   Auditors:', assetState2.auditorCount());
+    console.log('');
 
-// Connect to Polymesh node.
-console.log('10. Connecting to Polymesh node...');
-
-async function connectAndQuery() {
-    try {
-        const client = await new PolymeshClient("ws://localhost:9944");
-        console.log('   ✓ Connected to Polymesh node');
-        console.log('   Client:', client);
-        console.log('');
-
-        // Get the asset curve tree.
-        console.log('11. Getting asset curve tree...');
-        const assetCurveTree = await client.getAssetCurveTree(assetId);
-        console.log('   ✓ Retrieved asset curve tree');
-        console.log('   Asset Curve Tree:', assetCurveTree);
-        console.log('');
-
-        // Create an asset leaf path builder.
-        console.log('12. Creating asset leaf path builder...');
-        const assetLeafPathBuilder = await assetCurveTree.buildAssetLeafPaths();
-        console.log('   ✓ Created asset leaf path builder');
-        console.log('   Asset Leaf Path Builder:', assetLeafPathBuilder);
-        console.log('');
-
-        // Track an asset and get it's current state.
-        console.log('13. Tracking asset state...');
-        const assetState = await assetLeafPathBuilder.trackAsset(assetId);
-        console.log('   ✓ Tracked asset state');
-        console.log('   Asset State:', assetState);
-        console.log('');
-
-        console.log('=== Example Complete ===');
-        process.exit(0);
-    } catch (error) {
-        console.error('   ✗ Failed to connect:', error);
-        console.log('');
-        console.log('=== Example Complete (with connection error) ===');
-        process.exit(1);
-    }
+    console.log('=== Example Complete ===');
+    process.exit(0);
 }
 
-connectAndQuery();
+main();

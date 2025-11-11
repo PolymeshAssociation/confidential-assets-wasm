@@ -12,13 +12,13 @@ use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
 use wasm_bindgen::prelude::*;
 
-use crate::AccountAssetState;
+use crate::{jsvalue_to_identity_id, AccountAssetRegistrationProof, AccountAssetState};
 
 /// Account keys containing both the account secret key and encryption secret key.
 /// This type is used for operations requiring the private keys.
 #[wasm_bindgen]
 pub struct AccountKeys {
-    inner: NativeAccountKeys,
+    pub(crate) inner: NativeAccountKeys,
 }
 
 #[wasm_bindgen]
@@ -79,17 +79,18 @@ impl AccountKeys {
 
     /// Generate an account registration proof for the account keys.  The proof needs the identity id that the account keys will be linked to.
     #[wasm_bindgen(js_name = registerAccountProof)]
-    pub fn register_account_proof(&self, did: &[u8]) -> Result<AccountRegistrationProof, JsValue> {
+    pub fn register_account_proof(
+        &self,
+        did: JsValue,
+    ) -> Result<AccountRegistrationProof, JsValue> {
         let mut rng = rand::rngs::OsRng;
-        if did.len() != 32 {
-            return Err(JsValue::from_str(
-                "Identity ID must be 32 bytes (64 hex characters)",
-            ));
-        }
-        let proof = NativeAccountRegistrationProof::<()>::new(&mut rng, &[self.inner.clone()], did)
-            .map_err(|e| {
-                JsValue::from_str(&format!("Failed to generate registration proof: {}", e))
-            })?;
+        let did = jsvalue_to_identity_id(&did)?;
+        let proof =
+            NativeAccountRegistrationProof::<()>::new(&mut rng, &[self.inner.clone()], &did.0[..])
+                .map_err(|e| {
+                    JsValue::from_str(&format!("Failed to generate registration proof: {}", e))
+                })?;
+
         Ok(AccountRegistrationProof { inner: proof })
     }
 
@@ -98,26 +99,28 @@ impl AccountKeys {
     pub fn register_account_asset_proof(
         &self,
         asset_id: u32,
-        did: &[u8],
+        did: JsValue,
     ) -> Result<AccountAssetRegistration, JsValue> {
         let mut rng = rand::rngs::OsRng;
-        if did.len() != 32 {
-            return Err(JsValue::from_str(
-                "Identity ID must be 32 bytes (64 hex characters)",
-            ));
-        }
+        let did = jsvalue_to_identity_id(&did)?;
 
         let account = self.inner.acct.clone();
         let params = get_account_curve_tree_parameters();
 
-        let (proof, state) =
-            NativeAccountAssetRegistrationProof::new(&mut rng, &account, asset_id, 0, did, &params)
-                .map_err(|e| {
-                    JsValue::from_str(&format!(
-                        "Failed to generate account asset registration proof: {}",
-                        e
-                    ))
-                })?;
+        let (proof, state) = NativeAccountAssetRegistrationProof::new(
+            &mut rng,
+            &account,
+            asset_id,
+            0,
+            &did.0[..],
+            &params,
+        )
+        .map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to generate account asset registration proof: {}",
+                e
+            ))
+        })?;
 
         let state = AccountAssetState::new(state);
 
@@ -159,6 +162,14 @@ pub struct AccountAssetRegistration {
 
 #[wasm_bindgen]
 impl AccountAssetRegistration {
+    /// Get the registration proof
+    #[wasm_bindgen(js_name = getProof)]
+    pub fn get_proof(&self) -> AccountAssetRegistrationProof {
+        AccountAssetRegistrationProof {
+            inner: self.proof.clone(),
+        }
+    }
+
     /// Get the registration proof as a SCALE-encoded byte array
     #[wasm_bindgen(js_name = getProofBytes)]
     pub fn get_proof_bytes(&self) -> Vec<u8> {
@@ -226,6 +237,21 @@ pub struct AccountPublicKey {
 
 #[wasm_bindgen]
 impl AccountPublicKey {
+    /// New account public key from js value (32 byte array, or hex string)
+    #[wasm_bindgen(constructor)]
+    pub fn new(js_value: JsValue) -> Result<AccountPublicKey, JsValue> {
+        let key = if let Some(js_str) = js_value.as_string() {
+            NativeAccountPublicKey::from_str(&js_str)
+                .map_err(|e| JsValue::from_str(&format!("Failed to decode mediator key: {}", e)))?
+        } else {
+            let bytes = js_sys::Uint8Array::from(js_value).to_vec();
+            NativeAccountPublicKey::decode(&mut &bytes[..])
+                .map_err(|e| JsValue::from_str(&format!("Failed to decode mediator key: {}", e)))?
+        };
+
+        Ok(AccountPublicKey { inner: key })
+    }
+
     /// Export account public key as a SCALE-encoded byte array
     #[wasm_bindgen(js_name = toBytes)]
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -257,6 +283,21 @@ pub struct EncryptionPublicKey {
 
 #[wasm_bindgen]
 impl EncryptionPublicKey {
+    /// New encryption public key from js value (32 byte array, or hex string)
+    #[wasm_bindgen(constructor)]
+    pub fn new(js_value: JsValue) -> Result<EncryptionPublicKey, JsValue> {
+        let key = if let Some(js_str) = js_value.as_string() {
+            NativeEncryptionPublicKey::from_str(&js_str)
+                .map_err(|e| JsValue::from_str(&format!("Failed to decode mediator key: {}", e)))?
+        } else {
+            let bytes = js_sys::Uint8Array::from(js_value).to_vec();
+            NativeEncryptionPublicKey::decode(&mut &bytes[..])
+                .map_err(|e| JsValue::from_str(&format!("Failed to decode mediator key: {}", e)))?
+        };
+
+        Ok(EncryptionPublicKey { inner: key })
+    }
+
     /// Export encryption public key as a SCALE-encoded byte array
     #[wasm_bindgen(js_name = toBytes)]
     pub fn to_bytes(&self) -> Vec<u8> {

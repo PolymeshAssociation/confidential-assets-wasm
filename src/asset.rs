@@ -3,6 +3,8 @@ use polymesh_dart::AssetId;
 use polymesh_dart::AssetState as NativeAssetState;
 use wasm_bindgen::prelude::*;
 
+use crate::keys::EncryptionPublicKey;
+
 /// Asset state (stored in the asset tree)
 #[wasm_bindgen]
 pub struct AssetState {
@@ -15,30 +17,15 @@ impl AssetState {
     #[wasm_bindgen(constructor)]
     pub fn new(
         asset_id: AssetId,
-        mediators: Vec<JsValue>,
-        auditors: Vec<JsValue>,
+        mediators: Vec<EncryptionPublicKey>,
+        auditors: Vec<EncryptionPublicKey>,
     ) -> Result<AssetState, JsValue> {
         // Convert JsValue arrays to EncryptionPublicKey vectors
-        let mediator_keys: Result<Vec<_>, _> = mediators
-            .into_iter()
-            .map(|js_val| {
-                let bytes = js_sys::Uint8Array::from(js_val).to_vec();
-                polymesh_dart::EncryptionPublicKey::decode(&mut &bytes[..]).map_err(|e| {
-                    JsValue::from_str(&format!("Failed to decode mediator key: {}", e))
-                })
-            })
-            .collect();
+        let mediator_keys: Vec<_> = mediators.into_iter().map(|js| js.inner).collect();
 
-        let auditor_keys: Result<Vec<_>, _> = auditors
-            .into_iter()
-            .map(|js_val| {
-                let bytes = js_sys::Uint8Array::from(js_val).to_vec();
-                polymesh_dart::EncryptionPublicKey::decode(&mut &bytes[..])
-                    .map_err(|e| JsValue::from_str(&format!("Failed to decode auditor key: {}", e)))
-            })
-            .collect();
+        let auditor_keys: Vec<_> = auditors.into_iter().map(|js| js.inner).collect();
 
-        let inner = NativeAssetState::new(asset_id, &mediator_keys?, &auditor_keys?);
+        let inner = NativeAssetState::new(asset_id, &mediator_keys, &auditor_keys);
 
         Ok(AssetState { inner })
     }
