@@ -99,41 +99,43 @@ console.log('   Registration proof bytes length:', registrationProof.toBytes().l
 
 // Connect to Polymesh node.
 console.log('10. Connecting to Polymesh node...');
-(new PolymeshClient("ws://localhost:9944")).then(client => {
-    console.log('   ✓ Connected to Polymesh node');
-    console.log('   Client:', client);
-    console.log('');
 
-    // Get the asset curve tree.
-    console.log('11. Getting asset curve tree...');
-    client.getAssetCurveTree(assetId).then(assetCurveTree => {
+async function connectAndQuery() {
+    try {
+        const client = await new PolymeshClient("ws://localhost:9944");
+        console.log('   ✓ Connected to Polymesh node');
+        console.log('   Client:', client);
+        console.log('');
+
+        // Get the asset curve tree.
+        console.log('11. Getting asset curve tree...');
+        const assetCurveTree = await client.getAssetCurveTree(assetId);
         console.log('   ✓ Retrieved asset curve tree');
         console.log('   Asset Curve Tree:', assetCurveTree);
         console.log('');
 
         // Create an asset leaf path builder.
         console.log('12. Creating asset leaf path builder...');
-        assetCurveTree.buildAssetLeafPaths().then(assetLeafPathBuilder => {
-            console.log('   ✓ Created asset leaf path builder');
-            console.log('   Asset Leaf Path Builder:', assetLeafPathBuilder);
-            console.log('');
+        const assetLeafPathBuilder = await assetCurveTree.buildAssetLeafPaths();
+        console.log('   ✓ Created asset leaf path builder');
+        console.log('   Asset Leaf Path Builder:', assetLeafPathBuilder);
+        console.log('');
 
-            // Track an asset and get it's current state.
-            console.log('13. Tracking asset state...');
-            assetLeafPathBuilder.trackAsset(assetId).then(assetState => {
-                console.log('   ✓ Tracked asset state');
-                console.log('   Asset State:', assetState);
-                console.log('');
+        // Track an asset and get it's current state.
+        console.log('13. Tracking asset state...');
+        const assetState = await assetLeafPathBuilder.trackAsset(assetId);
+        console.log('   ✓ Tracked asset state');
+        console.log('   Asset State:', assetState);
+        console.log('');
 
-                console.log('=== Example Complete ===');
-                // Exit process
-                process.exit(0);
-            });
-        });
-    })
+        console.log('=== Example Complete ===');
+        process.exit(0);
+    } catch (error) {
+        console.error('   ✗ Failed to connect:', error);
+        console.log('');
+        console.log('=== Example Complete (with connection error) ===');
+        process.exit(1);
+    }
+}
 
-}).catch(error => {
-    console.error('   ✗ Failed to connect:', error);
-    console.log('');
-    console.log('=== Example Complete (with connection error) ===');
-});
+connectAndQuery();
