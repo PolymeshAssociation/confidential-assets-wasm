@@ -24,11 +24,13 @@ async function main() {
     console.log('Creating and onboarding test issuer...');
     const issuer = client.newSigner("//TestIssuer");
     // Check if the signer has an identity
-    const issuer_did = await issuer.identity();
+    var issuer_did = await issuer.identity();
     if (issuer_did === null) {
         console.log('   No identity found for signer, onboarding account...');
         await client.onboardSigner(issuer);
-        console.log('   ✓ Account onboarded');
+
+        issuer_did = await issuer.identity();
+        console.log('   ✓ Account onboarded DID:', issuer_did);
     } else {
         console.log('   Signer identity DID:', issuer_did);
     }
@@ -37,11 +39,13 @@ async function main() {
     // Create and onboard an investor.
     console.log('Creating and onboarding test investor...');
     const investor = client.newSigner("//TestInvestor");
-    const investor_did = await investor.identity();
+    var investor_did = await investor.identity();
     if (investor_did === null) {
         console.log('   No identity found for signer, onboarding account...');
         await client.onboardSigner(investor);
-        console.log('   ✓ Account onboarded');
+
+        investor_did = await investor.identity();
+        console.log('   ✓ Account onboarded DID:', investor_did);
     } else {
         console.log('   Signer identity DID:', investor_did);
     }
@@ -50,11 +54,13 @@ async function main() {
     // Create and onboard an mediator (sometimes used as an auditor).
     console.log('Creating and onboarding test mediator...');
     const mediator = client.newSigner("//TestMediator");
-    const mediator_did = await mediator.identity();
+    var mediator_did = await mediator.identity();
     if (mediator_did === null) {
         console.log('   No identity found for signer, onboarding account...');
         await client.onboardSigner(mediator);
-        console.log('   ✓ Account onboarded');
+
+        mediator_did = await mediator.identity();
+        console.log('   ✓ Account onboarded DID:', mediator_did);
     } else {
         console.log('   Signer identity DID:', mediator_did);
     }
