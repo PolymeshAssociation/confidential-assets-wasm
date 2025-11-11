@@ -10,7 +10,6 @@ use crate::{identity_id_to_jsvalue, scale_convert, AssetState};
 pub mod curve_tree;
 pub mod signer;
 
-pub use curve_tree::*;
 pub use signer::*;
 
 /// A client connection to a Polymesh node

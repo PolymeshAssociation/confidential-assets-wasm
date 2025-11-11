@@ -7,17 +7,19 @@ use polymesh_api::{
     },
     Api,
 };
-use polymesh_api_client::{AccountId, DefaultSigner, IdentityId, Signer};
+use polymesh_api_client::{
+    AccountId, BlockHash, DefaultSigner, IdentityId, Signer, TransactionResults,
+};
 use polymesh_dart::{AssetState as NativeAssetState, BatchedAccountAssetRegistrationProof};
 use wasm_bindgen::prelude::*;
 
-use crate::scale_convert;
 use crate::{asset::AssetState, identity_id_to_jsvalue};
 use crate::{block_hash_to_jsvalue, error::Error};
 use crate::{
     keys::{AccountRegistrationProof, EncryptionPublicKey},
     AccountAssetRegistrationProof,
 };
+use crate::{scale_convert, AssetMintingProof};
 
 /// Polymesh Signer.
 #[wasm_bindgen]
@@ -158,7 +160,7 @@ impl PolymeshSigner {
         mediators: Vec<EncryptionPublicKey>,
         auditors: Vec<EncryptionPublicKey>,
         data: JsValue,
-    ) -> Result<AssetState, JsValue> {
+    ) -> Result<CreateAssetResult, JsValue> {
         let mediators: BoundedBTreeSet<_, _> = mediators
             .into_iter()
             .map(|k| k.inner)
@@ -196,9 +198,15 @@ impl PolymeshSigner {
             .map_err(|e| JsValue::from_str(&format!("Register account call failed: {}", e)))?;
 
         // Wait for the call to be finalized and get the asset ID from the event.
-        res.wait_finalized().await.map_err(|e| {
-            JsValue::from_str(&format!("Failed to finalize create asset call: {}", e))
-        })?;
+        let block_hash = res
+            .wait_finalized()
+            .await
+            .map_err(|e| {
+                JsValue::from_str(&format!("Failed to finalize create asset call: {}", e))
+            })?
+            .ok_or_else(|| {
+                JsValue::from_str("Create asset transaction finalized without success")
+            })?;
 
         // Process events to find the AssetCreated event.
         let events = res
@@ -212,10 +220,13 @@ impl PolymeshSigner {
                     ..
                 }) = event.event
                 {
-                    // Return the new AssetState
+                    // Return the Create Asset result.
                     let asset_state =
                         NativeAssetState::new_bounded(asset_id, &mediators, &auditors);
-                    return Ok(AssetState { inner: asset_state });
+                    return Ok(CreateAssetResult {
+                        asset_state: AssetState { inner: asset_state },
+                        block_hash,
+                    });
                 }
             }
         }
@@ -227,23 +238,19 @@ impl PolymeshSigner {
     }
 
     /// Register an account with a confidential asset.
-    #[wasm_bindgen(js_name = registerAccountAssets)]
-    pub async fn register_account_assets(
+    #[wasm_bindgen(js_name = registerAccountAsset)]
+    pub async fn register_account_asset(
         &mut self,
-        proof: Vec<AccountAssetRegistrationProof>,
-    ) -> Result<JsValue, JsValue> {
+        proof: AccountAssetRegistrationProof,
+    ) -> Result<AccountStateResult, JsValue> {
         // Wrap the proof in a batched proof.
         let proof = BatchedAccountAssetRegistrationProof::<()> {
-            proofs: proof
-                .into_iter()
-                .map(|p| p.inner)
-                .try_collect()
-                .map_err(|e| {
-                    JsValue::from_str(&format!("Too many account asset registrations: {}", e))
-                })?,
+            proofs: vec![proof.inner]
+                .try_into()
+                .map_err(|_| JsValue::from_str("Too many account asset registration proofs"))?,
         };
 
-        let mut res = self
+        let res = self
             .api
             .call()
             .confidential_assets()
@@ -263,19 +270,123 @@ impl PolymeshSigner {
                 ))
             })?;
 
-        // Check if the transaction was successful
-        res.ok().await.map_err(|e| {
-            JsValue::from_str(&format!("Register account asset call failed: {}", e))
-        })?;
-
-        // Wait for the call to be finalized
-        let hash = res.wait_finalized().await.map_err(|e| {
+        AccountStateResult::from_tx(res).await.map_err(|e| {
             JsValue::from_str(&format!(
-                "Failed to finalize register account asset call: {}",
+                "Failed to process register account asset transaction: {}",
                 e
             ))
-        })?;
+        })
+    }
 
-        Ok(block_hash_to_jsvalue(hash))
+    /// Mint confidential asset tokens to an account.
+    #[wasm_bindgen(js_name = mintAsset)]
+    pub async fn mint_asset(
+        &mut self,
+        proof: AssetMintingProof,
+    ) -> Result<AccountStateResult, JsValue> {
+        let res = self
+            .api
+            .call()
+            .confidential_assets()
+            .mint_asset(scale_convert(&proof.inner))
+            .map_err(|e| JsValue::from_str(&format!("Failed to create mint asset call: {}", e)))?
+            .submit_and_watch(&mut self.signer)
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Failed to submit mint asset call: {}", e)))?;
+
+        AccountStateResult::from_tx(res).await.map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to process register account asset transaction: {}",
+                e
+            ))
+        })
+    }
+}
+
+/// Transaction results for created confidential asset.
+#[wasm_bindgen]
+#[derive(Clone, Debug)]
+pub struct CreateAssetResult {
+    pub(crate) asset_state: AssetState,
+    pub(crate) block_hash: BlockHash,
+}
+
+#[wasm_bindgen]
+impl CreateAssetResult {
+    /// Get the created asset state.
+    #[wasm_bindgen(js_name = assetState)]
+    pub fn asset_state(&self) -> AssetState {
+        self.asset_state.clone()
+    }
+
+    /// Get the asset id.
+    #[wasm_bindgen(js_name = assetId)]
+    pub fn asset_id(&self) -> u32 {
+        self.asset_state.asset_id()
+    }
+
+    /// Get the block hash where the asset was created.
+    #[wasm_bindgen(js_name = blockHash)]
+    pub fn block_hash(&self) -> JsValue {
+        block_hash_to_jsvalue(Some(self.block_hash))
+    }
+}
+
+/// Account state transaction results.
+///
+/// This is returned for transactions that create or modify account states.
+#[wasm_bindgen]
+#[derive(Clone, Debug)]
+pub struct AccountStateResult {
+    pub(crate) block_hash: BlockHash,
+    pub(crate) leaf_index: u64,
+}
+
+impl AccountStateResult {
+    pub async fn from_tx(mut res: TransactionResults<Api>) -> Result<Self, Error> {
+        // Check if the transaction was successful
+        res.ok().await?;
+
+        // Wait for the call to be finalized
+        let block_hash = res
+            .wait_finalized()
+            .await?
+            .ok_or_else(|| Error::other("Account state transaction finalized without success"))?;
+
+        // Process events to find the account state leaf index.
+        let mut leaf_index = u64::MAX;
+        let events = res.events().await?;
+        if let Some(events) = events {
+            for event in &events.0 {
+                if let RuntimeEvent::ConfidentialAssets(
+                    ConfidentialAssetsEvent::AccountStateLeafInserted {
+                        leaf_index: index, ..
+                    },
+                ) = event.event
+                {
+                    leaf_index = index;
+                }
+            }
+        }
+
+        Ok(AccountStateResult {
+            block_hash,
+            leaf_index,
+        })
+    }
+}
+
+#[wasm_bindgen]
+impl AccountStateResult {
+    /// Get the block hash where the account state was modified.
+    #[wasm_bindgen(js_name = blockHash)]
+    pub fn block_hash(&self) -> JsValue {
+        block_hash_to_jsvalue(Some(self.block_hash))
+    }
+
+    /// Get the leaf index of the account state in the account curve tree, if available.
+    #[wasm_bindgen(js_name = leafIndex)]
+    pub fn leaf_index(&self) -> u64 {
+        self.leaf_index
     }
 }

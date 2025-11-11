@@ -12,7 +12,7 @@ use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
 use wasm_bindgen::prelude::*;
 
-use crate::{jsvalue_to_identity_id, AccountAssetRegistrationProof, AccountAssetState};
+use crate::{jsvalue_to_identity_id, AccountAssetRegistration, AccountAssetState};
 
 /// Account keys containing both the account secret key and encryption secret key.
 /// This type is used for operations requiring the private keys.
@@ -149,37 +149,6 @@ impl AccountRegistrationProof {
             JsValue::from_str(&format!("Failed to decode registration proof: {}", e))
         })?;
         Ok(AccountRegistrationProof { inner })
-    }
-}
-
-/// The Account asset registration proof and resulting account asset state
-/// generated when registering an account for a specific asset.
-#[wasm_bindgen]
-pub struct AccountAssetRegistration {
-    pub(crate) proof: NativeAccountAssetRegistrationProof,
-    pub(crate) state: AccountAssetState,
-}
-
-#[wasm_bindgen]
-impl AccountAssetRegistration {
-    /// Get the registration proof
-    #[wasm_bindgen(js_name = getProof)]
-    pub fn get_proof(&self) -> AccountAssetRegistrationProof {
-        AccountAssetRegistrationProof {
-            inner: self.proof.clone(),
-        }
-    }
-
-    /// Get the registration proof as a SCALE-encoded byte array
-    #[wasm_bindgen(js_name = getProofBytes)]
-    pub fn get_proof_bytes(&self) -> Vec<u8> {
-        self.proof.encode()
-    }
-
-    /// Get the resulting account asset state
-    #[wasm_bindgen(js_name = getAccountAssetState)]
-    pub fn get_account_asset_state(&self) -> AccountAssetState {
-        self.state.clone()
     }
 }
 

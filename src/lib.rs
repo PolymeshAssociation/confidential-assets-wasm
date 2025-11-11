@@ -1,3 +1,4 @@
+use polymesh_dart::Balance;
 use wasm_bindgen::prelude::*;
 
 use polymesh_api_client::{BlockHash, IdentityId};
@@ -65,6 +66,24 @@ pub fn block_hash_to_jsvalue(hash: Option<BlockHash>) -> JsValue {
         Some(h) => JsValue::from_str(&h.to_string()),
         None => JsValue::NULL,
     }
+}
+
+/// Convert `JsValue` to `Balance`
+///
+/// Convert js number to u64 Balance.
+pub fn jsvalue_to_balance(value: &JsValue) -> Result<Balance, JsValue> {
+    let num = value
+        .as_f64()
+        .ok_or_else(|| JsValue::from_str("Balance must be a number representable as u64"))?;
+    if num < 0.0 || num > u64::MAX as f64 {
+        return Err(JsValue::from_str("Balance out of range for u64"));
+    }
+    Ok(num as u64)
+}
+
+/// Convert `Balance` to `JsValue`
+pub fn balance_to_jsvalue(balance: Balance) -> JsValue {
+    JsValue::from_f64(balance as f64)
 }
 
 /// Initialize the WASM module. This should be called once when loading the module.

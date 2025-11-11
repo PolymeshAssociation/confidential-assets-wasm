@@ -7,6 +7,7 @@ use crate::keys::EncryptionPublicKey;
 
 /// Asset state (stored in the asset tree)
 #[wasm_bindgen]
+#[derive(Clone, Debug, Encode, Decode)]
 pub struct AssetState {
     pub(crate) inner: NativeAssetState,
 }

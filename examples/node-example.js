@@ -127,24 +127,106 @@ async function main() {
 
     // Create the asset on-chain using the issuer signer.
     console.log('Creating confidential asset on-chain...');
-    const assetState = await issuer.createAsset(mediators, auditors, "Test Confidential Asset");
-    const assetId = assetState.assetId();
-    console.log('   ✓ Confidential asset created with Asset ID:', assetId);
-    console.log('   ✓ Asset state created');
-    console.log('   Asset ID:', assetState.assetId());
-    console.log('   Mediators:', assetState.mediatorCount());
-    console.log('   Auditors:', assetState.auditorCount());
-    console.log('');
+    var assetId = null;
+    try {
+        const results = await issuer.createAsset(mediators, auditors, "Test Confidential Asset");
+        const assetState = results.assetState();
+        assetId = assetState.assetId();
+        console.log('   ✓ Confidential asset created with Asset ID:', assetId);
+        console.log('   ✓ Asset state created block hash:', results.blockHash());
+        console.log('   Asset ID:', assetState.assetId());
+        console.log('   Mediators:', assetState.mediatorCount());
+        console.log('   Auditors:', assetState.auditorCount());
+        console.log('');
+    } catch (e) {
+        console.error('   ✗ Error creating confidential asset:', e);
+        process.exit(1);
+    }
 
     // Register the issuer's account with the new asset.
     console.log('Registering issuer account with the new asset...');
     const assetRegistration = issuerKeys.registerAccountAssetProof(assetId, issuer_did);
-    const issuerAccountState = assetRegistration.getAccountAssetState();
+    var issuerAccountState = assetRegistration.getAccountAssetState();
     console.log('   Account asset registration proof bytes length:', assetRegistration.getProofBytes().length);
-    const regTxHash = await issuer.registerAccountAssets([assetRegistration.getProof()]);
-    console.log('   ✓ Issuer account registered with asset with tx hash:', regTxHash);
-    console.log('   Account Asset State:', issuerAccountState.toJson());
+    try {
+        const results = await issuer.registerAccountAsset(assetRegistration.getProof());
+        // commit pending state to account state
+        const leaf = results.leafIndex();
+        console.log('  Account leaf index from tx results:', leaf);
+        issuerAccountState.commitPendingState(leaf);
+        console.log('   ✓ Issuer account registered with asset with tx hash:', results.blockHash());
+        console.log('   Account Asset State:', issuerAccountState.toJson());
+        console.log('   Issuer Account Leaf Index:', leaf);
+        console.log('');
+    } catch (e) {
+        console.error('   ✗ Error registering issuer account with asset:', e);
+        process.exit(1);
+    }
+
+    // Get the account curve tree.
+    console.log('Getting account curve tree...');
+    const accountCurveTree = await client.getAccountCurveTree();
+    console.log('   ✓ Retrieved account curve tree');
+    console.log('   Account Curve Tree:', accountCurveTree);
     console.log('');
+
+    // Mint some asset to the into the issuer's account.
+    try {
+        const leaf = issuerAccountState.leafIndex();
+        console.log('Get the path to the issuer account leaf: ', leaf);
+        const issuerAccountLeafPath = await accountCurveTree.getAccountLeafPath(leaf);
+
+        // The issuer's account balance before minting
+        console.log('   Issuer Account Asset State before minting:', issuerAccountState.balance());
+
+        // Generate minting proof
+        console.log('Generating asset minting proof for issuer account...');
+        const mintAmount = 1000;
+        const mintingProof = issuerAccountState.assetMintingProof(
+            issuerKeys,
+            issuerAccountLeafPath,
+            mintAmount
+        );
+        console.log('   ✓ Generated asset minting proof');
+        console.log('   Minting Proof Bytes Length:', mintingProof.toBytes().length);
+
+        // Mint the asset
+        console.log('Minting asset to issuer account...');
+        const results = await issuer.mintAsset(mintingProof);
+        // Commit pending state to account state
+        const newLeaf = results.leafIndex();
+        console.log('  New Account leaf index from tx results:', newLeaf);
+        issuerAccountState.commitPendingState(newLeaf);
+
+        // The issuer's account balance after minting
+        console.log('   Issuer Account Asset Balance after minting:', issuerAccountState.balance());
+
+        console.log('   Account Asset State after minting:', issuerAccountState.toJson());
+        console.log('   ✓ Minted asset with tx hash:', results.blockHash());
+        console.log('');
+    } catch (e) {
+        console.error('   ✗ Error getting issuer account leaf path:', e);
+        process.exit(1);
+    }
+
+    // Register the investor's account with the new asset.
+    console.log('Registering investor account with the new asset...');
+    const investorAssetRegistration = investorKeys.registerAccountAssetProof(assetId, investor_did);
+    var investorAccountState = investorAssetRegistration.getAccountAssetState();
+    console.log('   Account asset registration proof bytes length:', investorAssetRegistration.getProofBytes().length);
+    try {
+        const results = await investor.registerAccountAsset(investorAssetRegistration.getProof());
+        // commit pending state to account state
+        const leaf = results.leafIndex();
+        console.log('  Account leaf index from tx results:', leaf);
+        investorAccountState.commitPendingState(leaf);
+        console.log('   ✓ Investor account registered with asset with tx hash:', results.blockHash());
+        console.log('   Account Asset State:', investorAccountState.toJson());
+        console.log('');
+    } catch (e) {
+        console.error('   ✗ Error registering investor account with asset:', e);
+        process.exit(1);
+    }
 
     // Get the asset curve tree.
     console.log('Getting asset curve tree...');
@@ -162,11 +244,11 @@ async function main() {
 
     // Track an asset and get it's current state.
     console.log('Tracking asset state...');
-    const assetState2 = await assetLeafPathBuilder.trackAsset(assetId);
+    const assetState = await assetLeafPathBuilder.trackAsset(assetId);
     console.log('   ✓ Tracked asset state');
-    console.log('   Asset State:', assetState2);
-    console.log('   Mediators:', assetState2.mediatorCount());
-    console.log('   Auditors:', assetState2.auditorCount());
+    console.log('   Asset State:', assetState);
+    console.log('   Mediators:', assetState.mediatorCount());
+    console.log('   Auditors:', assetState.auditorCount());
     console.log('');
 
     console.log('=== Example Complete ===');
