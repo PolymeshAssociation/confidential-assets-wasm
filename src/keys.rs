@@ -72,9 +72,8 @@ impl AccountKeys {
     /// Get the public keys corresponding to these account keys
     #[wasm_bindgen(js_name = publicKeys)]
     pub fn public_keys(&self) -> AccountPublicKeys {
-        AccountPublicKeys {
-            inner: self.inner.public_keys(),
-        }
+        let keys = self.inner.public_keys();
+        AccountPublicKeys::from_native(keys)
     }
 
     /// Generate an account registration proof for the account keys.  The proof needs the identity id that the account keys will be linked to.
@@ -153,9 +152,29 @@ impl AccountRegistrationProof {
 }
 
 /// Public keys for an account (account public key and encryption public key)
-#[wasm_bindgen]
+#[wasm_bindgen(getter_with_clone)]
+#[derive(Clone, Copy)]
 pub struct AccountPublicKeys {
-    inner: NativeAccountPublicKeys,
+    pub encryption: EncryptionPublicKey,
+    pub account: AccountPublicKey,
+}
+
+impl AccountPublicKeys {
+    /// Convert from native AccountPublicKeys
+    pub fn from_native(native: NativeAccountPublicKeys) -> AccountPublicKeys {
+        AccountPublicKeys {
+            encryption: EncryptionPublicKey { inner: native.enc },
+            account: AccountPublicKey { inner: native.acct },
+        }
+    }
+
+    /// Convert to native AccountPublicKeys
+    pub fn to_native(&self) -> NativeAccountPublicKeys {
+        NativeAccountPublicKeys {
+            enc: self.encryption.inner,
+            acct: self.account.inner,
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -163,7 +182,7 @@ impl AccountPublicKeys {
     /// Export public keys as a SCALE-encoded byte array
     #[wasm_bindgen(js_name = toBytes)]
     pub fn to_bytes(&self) -> Vec<u8> {
-        self.inner.encode()
+        self.to_native().encode()
     }
 
     /// Import public keys from a SCALE-encoded byte array
@@ -171,35 +190,33 @@ impl AccountPublicKeys {
     pub fn from_bytes(bytes: &[u8]) -> Result<AccountPublicKeys, JsValue> {
         let inner = NativeAccountPublicKeys::decode(&mut &bytes[..])
             .map_err(|e| JsValue::from_str(&format!("Failed to decode public keys: {}", e)))?;
-        Ok(AccountPublicKeys { inner })
+        Ok(AccountPublicKeys::from_native(inner))
     }
 
     /// Get the account public key component
     #[wasm_bindgen(js_name = accountPublicKey)]
     pub fn account_public_key(&self) -> AccountPublicKey {
-        AccountPublicKey {
-            inner: self.inner.acct.clone(),
-        }
+        self.account
     }
 
     /// Get the encryption public key component
     #[wasm_bindgen(js_name = encryptionPublicKey)]
     pub fn encryption_public_key(&self) -> EncryptionPublicKey {
-        EncryptionPublicKey {
-            inner: self.inner.enc.clone(),
-        }
+        self.encryption
     }
 
     /// Export as JSON string (for debugging)
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner)
+        let native = self.to_native();
+        serde_json::to_string(&native)
             .map_err(|e| JsValue::from_str(&format!("Failed to serialize to JSON: {}", e)))
     }
 }
 
 /// Account public key (used for account commitments and proofs)
 #[wasm_bindgen]
+#[derive(Clone, Copy)]
 pub struct AccountPublicKey {
     pub(crate) inner: NativeAccountPublicKey,
 }
@@ -246,6 +263,7 @@ impl AccountPublicKey {
 
 /// Encryption public key (used for encrypting settlement leg information)
 #[wasm_bindgen]
+#[derive(Clone, Copy)]
 pub struct EncryptionPublicKey {
     pub(crate) inner: NativeEncryptionPublicKey,
 }

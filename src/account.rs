@@ -7,7 +7,7 @@ use polymesh_dart::{
 };
 use wasm_bindgen::prelude::*;
 
-use crate::{balance_to_jsvalue, jsvalue_to_balance, AccountKeys, AccountLeafPath};
+use crate::{balance_to_jsvalue, jsvalue_to_balance, AccountKeys, AccountLeafPathAndRoot};
 
 /// Account state for a specific asset
 #[wasm_bindgen]
@@ -93,7 +93,7 @@ impl AccountAssetState {
     pub fn asset_minting_proof(
         &mut self,
         keys: &AccountKeys,
-        path: &AccountLeafPath,
+        path: &AccountLeafPathAndRoot,
         amount: JsValue,
     ) -> Result<AssetMintingProof, JsValue> {
         let amount = jsvalue_to_balance(&amount)?;
@@ -164,6 +164,34 @@ impl AccountState {
     }
 }
 
+/// Batched account asset registration proof for multiple accounts
+#[wasm_bindgen]
+pub struct BatchedAccountAssetRegistrationProof {
+    pub(crate) proofs: Vec<NativeAccountAssetRegistrationProof>,
+}
+
+#[wasm_bindgen]
+impl BatchedAccountAssetRegistrationProof {
+    /// Export batched proof as a SCALE-encoded byte array
+    #[wasm_bindgen(js_name = toBytes)]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.proofs.encode()
+    }
+
+    /// Import batched proof from a SCALE-encoded byte array
+    #[wasm_bindgen(js_name = fromBytes)]
+    pub fn from_bytes(bytes: &[u8]) -> Result<BatchedAccountAssetRegistrationProof, JsValue> {
+        let proofs =
+            Vec::<NativeAccountAssetRegistrationProof>::decode(&mut &bytes[..]).map_err(|e| {
+                JsValue::from_str(&format!(
+                    "Failed to decode batched registration proof: {}",
+                    e
+                ))
+            })?;
+        Ok(BatchedAccountAssetRegistrationProof { proofs })
+    }
+}
+
 /// Proof of account registration for a specific asset
 #[wasm_bindgen]
 pub struct AccountAssetRegistrationProof {
@@ -220,10 +248,24 @@ impl AccountAssetRegistration {
         }
     }
 
+    /// Get a batched registration proof
+    #[wasm_bindgen(js_name = getBatchedProof)]
+    pub fn get_batched_proof(&self) -> BatchedAccountAssetRegistrationProof {
+        BatchedAccountAssetRegistrationProof {
+            proofs: vec![self.proof.clone()],
+        }
+    }
+
     /// Get the registration proof as a SCALE-encoded byte array
     #[wasm_bindgen(js_name = getProofBytes)]
     pub fn get_proof_bytes(&self) -> Vec<u8> {
         self.proof.encode()
+    }
+
+    /// Get the batched registration proof as a SCALE-encoded byte array
+    #[wasm_bindgen(js_name = getBatchedProofBytes)]
+    pub fn get_batched_proof_bytes(&self) -> Vec<u8> {
+        vec![self.proof.clone()].encode()
     }
 
     /// Get the resulting account asset state

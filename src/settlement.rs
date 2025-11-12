@@ -1,55 +1,119 @@
 use codec::{Decode, Encode};
-use polymesh_dart::{AssetId, Balance, LegId};
 use polymesh_dart::{
-    Leg as NativeLeg, LegEncrypted as NativeLegEncrypted, LegRef as NativeLegRef,
+    AssetId, Balance, LegBuilder as NativeLegBuilder, LegEncrypted as NativeLegEncrypted,
     MediatorAffirmationProof as NativeMediatorAffirmationProof,
     ReceiverAffirmationProof as NativeReceiverAffirmationProof,
     ReceiverClaimProof as NativeReceiverClaimProof,
     SenderAffirmationProof as NativeSenderAffirmationProof,
     SenderCounterUpdateProof as NativeSenderCounterUpdateProof,
-    SenderReversalProof as NativeSenderReversalProof, SettlementRef as NativeSettlementRef,
+    SenderReversalProof as NativeSenderReversalProof, SettlementBuilder as NativeSettlementBuilder,
+    SettlementProof as NativeSettlementProof,
 };
 use wasm_bindgen::prelude::*;
 
-/// A settlement leg containing asset transfer details
+use crate::{
+    bytes_to_jsvalue, jsvalue_to_bytes, AccountPublicKeys, AssetLeafPath, AssetState, AssetTreeRoot,
+};
+
+/// A settlement builder to create settlements
 #[wasm_bindgen]
-pub struct Leg {
-    pub(crate) inner: NativeLeg,
+pub struct SettlementBuilder {
+    pub(crate) inner: NativeSettlementBuilder,
 }
 
 #[wasm_bindgen]
-impl Leg {
-    /// Export leg as a SCALE-encoded byte array
-    #[wasm_bindgen(js_name = toBytes)]
-    pub fn to_bytes(&self) -> Vec<u8> {
-        self.inner.encode()
+impl SettlementBuilder {
+    /// Create a new settlement builder
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        memo: JsValue,
+        block_number: u32,
+        root: AssetTreeRoot,
+    ) -> Result<SettlementBuilder, JsValue> {
+        let memo = jsvalue_to_bytes(&memo)?;
+        Ok(SettlementBuilder {
+            inner: NativeSettlementBuilder::new_root(&memo, block_number, root.root),
+        })
     }
 
-    /// Import leg from a SCALE-encoded byte array
-    #[wasm_bindgen(js_name = fromBytes)]
-    pub fn from_bytes(bytes: &[u8]) -> Result<Leg, JsValue> {
-        let inner = NativeLeg::decode(&mut &bytes[..])
-            .map_err(|e| JsValue::from_str(&format!("Failed to decode leg: {}", e)))?;
-        Ok(Leg { inner })
+    /// Add a leg to the settlement
+    #[wasm_bindgen(js_name = addLeg)]
+    pub fn add_leg(&mut self, leg: &LegBuilder) {
+        self.inner.add_leg(leg.to_native());
     }
 
-    /// Get the asset ID being transferred
-    #[wasm_bindgen(js_name = assetId)]
-    pub fn asset_id(&self) -> AssetId {
-        self.inner.asset_id()
+    /// Add an asset leaf path.
+    #[wasm_bindgen(js_name = addAssetPath)]
+    pub fn add_asset_path(
+        &mut self,
+        asset_id: AssetId,
+        path: AssetLeafPath,
+    ) -> Result<(), JsValue> {
+        let path = path
+            .path
+            .decode()
+            .map_err(|e| JsValue::from_str(&format!("Failed to decode asset leaf path: {}", e)))?;
+        self.inner
+            .add_path(asset_id, path)
+            .map_err(|e| JsValue::from_str(&format!("Failed to add asset leaf path: {}", e)))?;
+
+        Ok(())
     }
 
-    /// Get the transfer amount
-    #[wasm_bindgen(js_name = amount)]
-    pub fn amount(&self) -> Balance {
-        self.inner.amount()
+    /// Build the settlement proof.
+    #[wasm_bindgen(js_name = build)]
+    pub fn build(self) -> Result<SettlementProof, JsValue> {
+        let mut rng = rand::rngs::OsRng;
+        let proof = self
+            .inner
+            .build(&mut rng)
+            .map_err(|e| JsValue::from_str(&format!("Failed to build settlement proof: {}", e)))?;
+        Ok(SettlementProof { inner: proof })
     }
+}
 
-    /// Export as JSON string (for debugging)
-    #[wasm_bindgen(js_name = toJson)]
-    pub fn to_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner)
-            .map_err(|e| JsValue::from_str(&format!("Failed to serialize to JSON: {}", e)))
+/// A settlement leg containing asset transfer details
+#[wasm_bindgen(getter_with_clone)]
+pub struct LegBuilder {
+    pub sender: AccountPublicKeys,
+    pub receiver: AccountPublicKeys,
+    pub asset: AssetState,
+    pub amount: Balance,
+}
+
+impl LegBuilder {
+    pub fn to_native(&self) -> NativeLegBuilder {
+        NativeLegBuilder {
+            sender: self.sender.to_native(),
+            receiver: self.receiver.to_native(),
+            asset: self.asset.inner.clone(),
+            amount: self.amount,
+        }
+    }
+}
+
+#[wasm_bindgen]
+impl LegBuilder {
+    /// Create a leg.
+    ///
+    /// # Arguments
+    /// - `sender`: The sender's account public keys.  Type `AccountPublicKeys`.
+    /// - `receiver`: The receiver's account public keys.  Type `AccountPublicKeys`.
+    /// - `asset`: The asset state.  Type `AssetState`.
+    /// - `amount`: The amount to transfer.  Type `Balance`.
+    #[wasm_bindgen(constructor)]
+    pub fn new(
+        sender: AccountPublicKeys,
+        receiver: AccountPublicKeys,
+        asset: AssetState,
+        amount: Balance,
+    ) -> LegBuilder {
+        LegBuilder {
+            sender,
+            receiver,
+            asset,
+            amount,
+        }
     }
 }
 
@@ -90,76 +154,58 @@ impl LegEncrypted {
     }
 }
 
-/// Reference to a specific leg in a settlement
+/// Settlement proof
 #[wasm_bindgen]
-pub struct LegRef {
-    pub(crate) inner: NativeLegRef,
+pub struct SettlementProof {
+    pub(crate) inner: NativeSettlementProof,
 }
 
 #[wasm_bindgen]
-impl LegRef {
-    /// Create a new leg reference
-    #[wasm_bindgen(constructor)]
-    pub fn new(settlement_ref: &SettlementRef, leg_id: LegId) -> LegRef {
-        LegRef {
-            inner: NativeLegRef::new(settlement_ref.inner.clone(), leg_id as u8),
-        }
-    }
-
-    /// Export leg ref as a SCALE-encoded byte array
+impl SettlementProof {
+    /// Export settlement proof as a SCALE-encoded byte array
     #[wasm_bindgen(js_name = toBytes)]
     pub fn to_bytes(&self) -> Vec<u8> {
         self.inner.encode()
     }
 
-    /// Import leg ref from a SCALE-encoded byte array
+    /// Import settlement proof from a SCALE-encoded byte array
     #[wasm_bindgen(js_name = fromBytes)]
-    pub fn from_bytes(bytes: &[u8]) -> Result<LegRef, JsValue> {
-        let inner = NativeLegRef::decode(&mut &bytes[..])
-            .map_err(|e| JsValue::from_str(&format!("Failed to decode leg ref: {}", e)))?;
-        Ok(LegRef { inner })
-    }
-}
-
-/// Reference to a settlement
-#[wasm_bindgen]
-pub struct SettlementRef {
-    pub(crate) inner: NativeSettlementRef,
-}
-
-#[wasm_bindgen]
-impl SettlementRef {
-    /// Export settlement ref as a SCALE-encoded byte array
-    #[wasm_bindgen(js_name = toBytes)]
-    pub fn to_bytes(&self) -> Vec<u8> {
-        self.inner.0.to_vec()
+    pub fn from_bytes(bytes: &[u8]) -> Result<SettlementProof, JsValue> {
+        let inner = Decode::decode(&mut &bytes[..])
+            .map_err(|e| JsValue::from_str(&format!("Failed to decode settlement proof: {}", e)))?;
+        Ok(SettlementProof { inner })
     }
 
-    /// Import settlement ref from a SCALE-encoded byte array
-    #[wasm_bindgen(js_name = fromBytes)]
-    pub fn from_bytes(bytes: &[u8]) -> Result<SettlementRef, JsValue> {
-        if bytes.len() != 32 {
-            return Err(JsValue::from_str("Settlement ref must be 32 bytes"));
-        }
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(bytes);
-        Ok(SettlementRef {
-            inner: NativeSettlementRef(arr),
-        })
+    /// Get the memo.
+    #[wasm_bindgen(js_name = getMemo)]
+    pub fn get_memo(&self) -> JsValue {
+        bytes_to_jsvalue(&self.inner.memo)
     }
 
-    /// Export as hex string
-    #[wasm_bindgen(js_name = toHex)]
-    pub fn to_hex(&self) -> String {
-        hex::encode(self.to_bytes())
+    /// Get the block number.
+    ///
+    /// This is the block number of the root used for the asset leaf paths.
+    #[wasm_bindgen(js_name = getBlockNumber)]
+    pub fn get_block_number(&self) -> u32 {
+        self.inner.root_block
     }
 
-    /// Import from hex string
-    #[wasm_bindgen(js_name = fromHex)]
-    pub fn from_hex(hex_str: &str) -> Result<SettlementRef, JsValue> {
-        let bytes = hex::decode(hex_str)
-            .map_err(|e| JsValue::from_str(&format!("Invalid hex string: {}", e)))?;
-        Self::from_bytes(&bytes)
+    /// Get the number of legs.
+    #[wasm_bindgen(js_name = getLegCount)]
+    pub fn get_leg_count(&self) -> usize {
+        self.inner.legs.len()
+    }
+
+    /// Get the encrypted legs.
+    #[wasm_bindgen(js_name = getLegs)]
+    pub fn get_legs(&self) -> Vec<LegEncrypted> {
+        self.inner
+            .legs
+            .iter()
+            .map(|proof| LegEncrypted {
+                inner: proof.leg_enc.clone(),
+            })
+            .collect()
     }
 }
 

@@ -13,11 +13,11 @@ use polymesh_api_client::{
 use polymesh_dart::{AssetState as NativeAssetState, BatchedAccountAssetRegistrationProof};
 use wasm_bindgen::prelude::*;
 
-use crate::{asset::AssetState, identity_id_to_jsvalue};
+use crate::{asset::AssetState, identity_id_to_jsvalue, jsvalue_to_bytes};
 use crate::{block_hash_to_jsvalue, error::Error};
 use crate::{
     keys::{AccountRegistrationProof, EncryptionPublicKey},
-    AccountAssetRegistrationProof,
+    AccountAssetRegistrationProof, SettlementProof,
 };
 use crate::{scale_convert, AssetMintingProof};
 
@@ -174,11 +174,7 @@ impl PolymeshSigner {
                 .map_err(|e| JsValue::from_str(&format!("Too many asset auditors: {}", e)))?;
 
         // Conver `data` from a JS string or byte array.
-        let data = if let Some(js_str) = data.as_string() {
-            js_str.into_bytes()
-        } else {
-            js_sys::Uint8Array::from(data).to_vec()
-        };
+        let data = jsvalue_to_bytes(&data)?;
 
         let mut res = self
             .api
@@ -300,6 +296,32 @@ impl PolymeshSigner {
                 e
             ))
         })
+    }
+
+    /// Create a settlement from a settlement proof.
+    #[wasm_bindgen(js_name = createSettlement)]
+    pub async fn create_settlement(&mut self, proof: SettlementProof) -> Result<JsValue, JsValue> {
+        let mut res = self
+            .api
+            .call()
+            .confidential_assets()
+            .create_settlement(scale_convert(&proof.inner))
+            .map_err(|e| JsValue::from_str(&format!("Failed to create settlement call: {}", e)))?
+            .submit_and_watch(&mut self.signer)
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Failed to submit settlement call: {}", e)))?;
+
+        // Check if the transaction was successful
+        res.ok()
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Settlement call failed: {}", e)))?;
+
+        // Wait for the call to be finalized
+        let hash = res.wait_finalized().await.map_err(|e| {
+            JsValue::from_str(&format!("Failed to finalize settlement call: {}", e))
+        })?;
+
+        Ok(block_hash_to_jsvalue(hash))
     }
 }
 

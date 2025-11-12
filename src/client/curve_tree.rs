@@ -1,17 +1,15 @@
-use codec::Encode;
 use core::ops::{Deref, DerefMut};
-use std::collections::BTreeMap;
 
 use polymesh_dart::{
     curve_tree::{
         AccountTreeConfig, AssetTreeConfig, AsyncCurveTreeBackend, AsyncCurveTreeWithBackend,
         CompressedCurveTreeRoot, CompressedInner, CompressedLeafValue, CurveTreeConfig,
-        CurveTreeLookup, CurveTreeParameters, CurveTreePath, DefaultCurveTreeUpdater,
-        FeeAccountTreeConfig, LeafPathAndRoot, NodeLocation, NodePosition,
+        CurveTreeParameters, DefaultCurveTreeUpdater, FeeAccountTreeConfig, NodeLocation,
+        NodePosition,
     },
-    AssetId, AssetState, BlockNumber, Error as DartError, LeafIndex, NodeLevel,
-    ACCOUNT_TREE_HEIGHT, ACCOUNT_TREE_L, ACCOUNT_TREE_M, ASSET_TREE_HEIGHT, ASSET_TREE_L,
-    ASSET_TREE_M, FEE_ACCOUNT_TREE_HEIGHT, FEE_ACCOUNT_TREE_L, FEE_ACCOUNT_TREE_M,
+    BlockNumber, LeafIndex, NodeLevel, ACCOUNT_TREE_HEIGHT, ACCOUNT_TREE_L, ACCOUNT_TREE_M,
+    ASSET_TREE_HEIGHT, ASSET_TREE_L, ASSET_TREE_M, FEE_ACCOUNT_TREE_HEIGHT, FEE_ACCOUNT_TREE_L,
+    FEE_ACCOUNT_TREE_M,
 };
 
 use polymesh_api::{
@@ -24,23 +22,16 @@ use polymesh_api::{
 use crate::{scale_convert, Error, Result};
 
 pub type AssetLeaf = CompressedLeafValue<AssetTreeConfig>;
-pub type AssetLeafPath = LeafPathAndRoot<ASSET_TREE_L, ASSET_TREE_M, AssetTreeConfig>;
 pub type AssetInnerNode = CompressedInner<ASSET_TREE_M, AssetTreeConfig>;
-pub type AssetNodeLocation = NodeLocation<ASSET_TREE_L>;
 pub type AssetTreeRoot = CompressedCurveTreeRoot<ASSET_TREE_L, ASSET_TREE_M, AssetTreeConfig>;
 
 pub type AccountLeaf = CompressedLeafValue<AccountTreeConfig>;
-pub type AccountLeafPath = LeafPathAndRoot<ACCOUNT_TREE_L, ACCOUNT_TREE_M, AccountTreeConfig>;
 pub type AccountInnerNode = CompressedInner<ACCOUNT_TREE_M, AccountTreeConfig>;
-pub type AccountNodeLocation = NodeLocation<ACCOUNT_TREE_L>;
 pub type AccountTreeRoot =
     CompressedCurveTreeRoot<ACCOUNT_TREE_L, ACCOUNT_TREE_M, AccountTreeConfig>;
 
 pub type FeeAccountLeaf = CompressedLeafValue<FeeAccountTreeConfig>;
-pub type FeeAccountLeafPath =
-    LeafPathAndRoot<FEE_ACCOUNT_TREE_L, FEE_ACCOUNT_TREE_M, FeeAccountTreeConfig>;
 pub type FeeAccountInnerNode = CompressedInner<FEE_ACCOUNT_TREE_M, FeeAccountTreeConfig>;
-pub type FeeAccountNodeLocation = NodeLocation<FEE_ACCOUNT_TREE_L>;
 pub type FeeAccountTreeRoot =
     CompressedCurveTreeRoot<FEE_ACCOUNT_TREE_L, FEE_ACCOUNT_TREE_M, FeeAccountTreeConfig>;
 
@@ -230,122 +221,6 @@ impl AssetCurveTree {
         Ok(Self(
             AsyncCurveTreeWithBackend::new_with_backend(backend).await?,
         ))
-    }
-}
-
-/// A syncronous holder for multiple asset leaf paths.
-///
-/// This is used for creating multi-leg settlements that have different assets.
-pub struct AssetLeafPaths {
-    pub track_assets: BTreeMap<AssetId, AssetState>,
-    pub leaf_index: BTreeMap<Vec<u8>, LeafIndex>,
-    pub paths: BTreeMap<LeafIndex, CurveTreePath<ASSET_TREE_L, AssetTreeConfig>>,
-    pub block_number: BlockNumber,
-    pub root: AssetTreeRoot,
-}
-
-impl AssetLeafPaths {
-    pub async fn new(asset_tree: &AssetCurveTreeType) -> Result<Self> {
-        let block_number = asset_tree.get_block_number().await?;
-        let root = asset_tree.fetch_root(Some(block_number)).await?;
-        Ok(Self {
-            track_assets: BTreeMap::new(),
-            leaf_index: BTreeMap::new(),
-            paths: BTreeMap::new(),
-            block_number,
-            root,
-        })
-    }
-
-    async fn update_asset_path(
-        &mut self,
-        asset_id: AssetId,
-        asset_tree: &AssetCurveTreeType,
-        api: &Api,
-    ) -> Result<AssetState> {
-        let leaf_index = asset_id as _;
-        let leaf = asset_tree
-            .get_leaf(leaf_index, Some(self.block_number))
-            .await?
-            .ok_or_else(|| DartError::LeafIndexNotFound(leaf_index))?;
-        let path = asset_tree
-            .get_path_to_leaf(leaf_index, 0, Some(self.block_number))
-            .await?;
-        self.leaf_index.insert(leaf.encode(), leaf_index);
-        self.paths.insert(leaf_index, path);
-
-        // Get DART asset details.
-        let details = api
-            .query()
-            .confidential_assets()
-            .dart_asset_details(asset_id)
-            .await
-            .map_err(|err| Error::from(err))?
-            .ok_or_else(|| Error::not_found("Dart asset doesn't exist"))?;
-        let asset_state = AssetState {
-            asset_id,
-            auditors: scale_convert(&details.auditors),
-            mediators: scale_convert(&details.mediators),
-        };
-        self.track_assets.insert(asset_id, asset_state.clone());
-
-        Ok(asset_state)
-    }
-
-    pub async fn update_root(&mut self, asset_tree: &AssetCurveTreeType) -> Result<()> {
-        self.block_number = asset_tree.get_block_number().await?;
-        self.root = asset_tree.fetch_root(Some(self.block_number)).await?;
-        Ok(())
-    }
-
-    pub async fn track_asset(
-        &mut self,
-        asset_id: AssetId,
-        asset_tree: &AssetCurveTreeType,
-        api: &Api,
-    ) -> Result<AssetState> {
-        if let Some(asset_state) = self.track_assets.get(&asset_id) {
-            Ok(asset_state.clone())
-        } else {
-            return self.update_asset_path(asset_id, asset_tree, api).await;
-        }
-    }
-}
-
-impl CurveTreeLookup<ASSET_TREE_L, ASSET_TREE_M, AssetTreeConfig> for AssetLeafPaths {
-    fn get_path_to_leaf_index(
-        &self,
-        leaf_index: LeafIndex,
-    ) -> Result<CurveTreePath<ASSET_TREE_L, AssetTreeConfig>, DartError> {
-        if let Some(path) = self.paths.get(&leaf_index) {
-            Ok(path.clone())
-        } else {
-            Err(DartError::LeafIndexNotFound(leaf_index))
-        }
-    }
-
-    fn get_path_to_leaf(
-        &self,
-        leaf: AssetLeaf,
-    ) -> Result<CurveTreePath<ASSET_TREE_L, AssetTreeConfig>, DartError> {
-        let leaf_buf = leaf.encode();
-        let leaf_index = self
-            .leaf_index
-            .get(&leaf_buf)
-            .ok_or(DartError::LeafNotFound)?;
-        self.get_path_to_leaf_index(*leaf_index)
-    }
-
-    fn params(&self) -> &CurveTreeParameters<AssetTreeConfig> {
-        AssetTreeConfig::parameters()
-    }
-
-    fn get_block_number(&self) -> Result<BlockNumber, DartError> {
-        Ok(self.block_number)
-    }
-
-    fn root(&self) -> Result<AssetTreeRoot, DartError> {
-        Ok(self.root.clone())
     }
 }
 

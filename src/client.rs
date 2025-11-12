@@ -1,13 +1,13 @@
-use std::ops::Deref;
-
 use polymesh_api::Api;
 use polymesh_api_client::{DefaultSigner, Signer};
+use polymesh_dart::{AssetId, AssetState as NativeAssetState, WrappedCanonical};
 use wasm_bindgen::prelude::*;
 
+use crate::curve_tree::{AccountLeafPathAndRoot, AssetLeafPathAndRoot, FeeAccountLeafPathAndRoot};
 use crate::keys::AccountPublicKey;
-use crate::{identity_id_to_jsvalue, scale_convert, AssetState};
+use crate::{identity_id_to_jsvalue, scale_convert, AssetLeafPath, AssetState, AssetTreeRoot};
 
-pub mod curve_tree;
+mod curve_tree;
 pub mod signer;
 
 pub use signer::*;
@@ -110,19 +110,33 @@ impl PolymeshClient {
             None => Ok(JsValue::NULL),
         }
     }
-}
 
-/// Fee account leaf path and root.
-#[wasm_bindgen]
-pub struct FeeAccountLeafPath {
-    pub(crate) path: curve_tree::FeeAccountLeafPath,
-}
-
-impl Deref for FeeAccountLeafPath {
-    type Target = curve_tree::FeeAccountLeafPath;
-
-    fn deref(&self) -> &Self::Target {
-        &self.path
+    /// Get an asset's `AssetState` by its Asset ID.
+    #[wasm_bindgen(js_name = getAssetState)]
+    pub async fn get_asset_state(&self, asset_id: AssetId) -> Result<AssetState, JsValue> {
+        // Get DART asset details.
+        let details = self
+            .api
+            .query()
+            .confidential_assets()
+            .dart_asset_details(asset_id)
+            .await
+            .map_err(|e| {
+                JsValue::from_str(&format!(
+                    "Failed to query DART asset details for Asset ID {}: {}",
+                    asset_id, e
+                ))
+            })?
+            .ok_or_else(|| {
+                JsValue::from_str(&format!("No DART asset found for Asset ID {}", asset_id))
+            })?;
+        Ok(AssetState {
+            inner: NativeAssetState {
+                asset_id,
+                auditors: scale_convert(&details.auditors),
+                mediators: scale_convert(&details.mediators),
+            },
+        })
     }
 }
 
@@ -135,34 +149,41 @@ pub struct FeeAccountCurveTree {
 #[wasm_bindgen]
 impl FeeAccountCurveTree {
     /// Get fee account leaf path and root.
-    #[wasm_bindgen(js_name = getFeeAccountLeafPath)]
-    pub async fn get_fee_account_leaf_path(
+    ///
+    /// If no block number is provided, the latest root is used.
+    #[wasm_bindgen(js_name = getLeafPathAndRoot)]
+    pub async fn get_leaf_path_and_root(
         &self,
         leaf_index: u64,
-    ) -> Result<FeeAccountLeafPath, JsValue> {
+        block_number: Option<u32>,
+    ) -> Result<FeeAccountLeafPathAndRoot, JsValue> {
+        log::info!(
+            "get_leaf_path_and_root called with leaf_index: {}, block_number: {:?}",
+            leaf_index,
+            block_number
+        );
         let path = self
             .inner
-            .get_path_and_root(leaf_index)
+            .get_path_and_root(leaf_index, block_number)
             .await
             .map_err(|e| {
                 JsValue::from_str(&format!("Failed to get fee account leaf path: {}", e))
             })?;
 
-        Ok(FeeAccountLeafPath { path })
+        Ok(FeeAccountLeafPathAndRoot { path })
     }
-}
 
-/// Account leaf path and root.
-#[wasm_bindgen]
-pub struct AccountLeafPath {
-    pub(crate) path: curve_tree::AccountLeafPath,
-}
+    /// Get the block number of the last updated root.
+    #[wasm_bindgen(js_name = getLastBlockNumber)]
+    pub async fn get_last_block_number(&self) -> Result<u32, JsValue> {
+        let block_number = self.inner.get_block_number().await.map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to get last block number of fee account curve tree: {}",
+                e
+            ))
+        })?;
 
-impl Deref for AccountLeafPath {
-    type Target = curve_tree::AccountLeafPath;
-
-    fn deref(&self) -> &Self::Target {
-        &self.path
+        Ok(block_number)
     }
 }
 
@@ -175,15 +196,38 @@ pub struct AccountCurveTree {
 #[wasm_bindgen]
 impl AccountCurveTree {
     /// Get account leaf path and root.
-    #[wasm_bindgen(js_name = getAccountLeafPath)]
-    pub async fn get_account_leaf_path(&self, leaf_index: u64) -> Result<AccountLeafPath, JsValue> {
+    ///
+    /// If no block number is provided, the latest root is used.
+    #[wasm_bindgen(js_name = getLeafPathAndRoot)]
+    pub async fn get_leaf_path_and_root(
+        &self,
+        leaf_index: u64,
+        block_number: Option<u32>,
+    ) -> Result<AccountLeafPathAndRoot, JsValue> {
+        log::info!(
+            "get_leaf_path_and_root called with leaf_index: {}, block_number: {:?}",
+            leaf_index,
+            block_number
+        );
         let path = self
             .inner
-            .get_path_and_root(leaf_index)
+            .get_path_and_root(leaf_index, block_number)
             .await
             .map_err(|e| JsValue::from_str(&format!("Failed to get account leaf path: {}", e)))?;
 
-        Ok(AccountLeafPath { path })
+        Ok(AccountLeafPathAndRoot { path })
+    }
+
+    /// Get the block number of the last updated root.
+    #[wasm_bindgen(js_name = getLastBlockNumber)]
+    pub async fn get_last_block_number(&self) -> Result<u32, JsValue> {
+        let block_number = self.inner.get_block_number().await.map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to get last block number of account curve tree: {}",
+                e
+            ))
+        })?;
+        Ok(block_number)
     }
 }
 
@@ -195,40 +239,80 @@ pub struct AssetCurveTree {
 
 #[wasm_bindgen]
 impl AssetCurveTree {
-    /// Asset Leaf paths builder.
-    #[wasm_bindgen(js_name = buildAssetLeafPaths)]
-    pub async fn build_asset_leaf_paths(&self) -> Result<AssetLeafPaths, JsValue> {
-        let paths = curve_tree::AssetLeafPaths::new(&self.inner)
+    /// Get asset leaf path and root.
+    ///
+    /// If no block number is provided, the latest root is used.
+    #[wasm_bindgen(js_name = getLeafPathAndRoot)]
+    pub async fn get_leaf_path_and_root(
+        &self,
+        leaf_index: u64,
+        block_number: Option<u32>,
+    ) -> Result<AssetLeafPathAndRoot, JsValue> {
+        log::info!(
+            "get_leaf_path_and_root called with leaf_index: {}, block_number: {:?}",
+            leaf_index,
+            block_number
+        );
+        let path = self
+            .inner
+            .get_path_and_root(leaf_index, block_number)
             .await
-            .map_err(|e| JsValue::from_str(&format!("Failed to get asset leaf paths: {}", e)))?;
+            .map_err(|e| JsValue::from_str(&format!("Failed to get asset leaf path: {}", e)))?;
 
-        Ok(AssetLeafPaths {
-            paths,
-            tree: self.inner.clone(),
-        })
+        Ok(AssetLeafPathAndRoot { path })
     }
-}
 
-/// Asset Leaf paths
-#[wasm_bindgen]
-pub struct AssetLeafPaths {
-    pub(crate) paths: curve_tree::AssetLeafPaths,
-    pub(crate) tree: curve_tree::AssetCurveTree,
-}
+    /// Get the block number of the last updated root.
+    #[wasm_bindgen(js_name = getLastBlockNumber)]
+    pub async fn get_last_block_number(&self) -> Result<u32, JsValue> {
+        let block_number = self.inner.get_block_number().await.map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to get last block number of asset curve tree: {}",
+                e
+            ))
+        })?;
+        log::info!(
+            "get_last_block_number returning block_number: {}",
+            block_number
+        );
+        Ok(block_number)
+    }
 
-#[wasm_bindgen]
-impl AssetLeafPaths {
-    /// Track asset path and get the asset state.
-    #[wasm_bindgen(js_name = trackAsset)]
-    pub async fn track_asset(&mut self, asset_id: u32) -> Result<AssetState, JsValue> {
-        // track asset id
-        let api = &self.tree.backend.api;
-        let state = self
-            .paths
-            .track_asset(asset_id, &self.tree, api)
+    /// Get the Asset tree root.
+    #[wasm_bindgen(js_name = getRoot)]
+    pub async fn get_root(&self, block_number: Option<u32>) -> Result<AssetTreeRoot, JsValue> {
+        log::info!("get_root called with block_number: {:?}", block_number);
+        let root = self
+            .inner
+            .fetch_root(block_number)
             .await
-            .map_err(|e| JsValue::from_str(&format!("Failed to track asset id: {}", e)))?;
+            .map_err(|e| JsValue::from_str(&format!("Failed to get asset tree root: {}", e)))?;
+        Ok(AssetTreeRoot { root })
+    }
 
-        Ok(AssetState { inner: state })
+    /// Get asset leaf path.
+    ///
+    /// If no block number is provided, the latest root is used.
+    #[wasm_bindgen(js_name = getLeafPath)]
+    pub async fn get_leaf_path(
+        &self,
+        leaf_index: u64,
+        block_number: Option<u32>,
+    ) -> Result<AssetLeafPath, JsValue> {
+        log::info!(
+            "get_leaf_path called with leaf_index: {}, block_number: {:?}",
+            leaf_index,
+            block_number
+        );
+        let path = self
+            .inner
+            .get_path_to_leaf(leaf_index, 0, block_number)
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Failed to get asset leaf path: {}", e)))?;
+        Ok(AssetLeafPath {
+            path: WrappedCanonical::wrap(&path).map_err(|e| {
+                JsValue::from_str(&format!("Failed to wrap asset leaf path: {}", e))
+            })?,
+        })
     }
 }

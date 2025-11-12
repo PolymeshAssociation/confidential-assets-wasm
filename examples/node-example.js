@@ -10,6 +10,8 @@ const {
     AssetState,
     PolymeshClient,
     PolymeshSigner,
+    SettlementBuilder,
+    LegBuilder,
 } = require('../pkg-node/polymesh_dart_wasm.js');
 
 console.log('=== Polymesh DART WASM Node.js Example ===\n');
@@ -79,6 +81,7 @@ async function main() {
     if (issuerAccountDid === null) {
         console.log('   No account identity found for issuer keys, registering account keys...');
         const issuerRegistrationProof = issuerKeys.registerAccountProof(issuer_did);
+        console.log('   Registration proof bytes length:', issuerRegistrationProof.toBytes().length);
         const txHash = await issuer.registerAccount(issuerRegistrationProof);
         console.log('   ✓ Account keys registered with tx hash:', txHash);
     } else {
@@ -98,6 +101,7 @@ async function main() {
     if (investorAccountDid === null) {
         console.log('   No account identity found for investor keys, registering account keys...');
         const investorRegistrationProof = investorKeys.registerAccountProof(investor_did);
+        console.log('   Registration proof bytes length:', investorRegistrationProof.toBytes().length);
         const txHash = await investor.registerAccount(investorRegistrationProof);
         console.log('   ✓ Account keys registered with tx hash:', txHash);
     } else {
@@ -119,6 +123,7 @@ async function main() {
     if (mediatorAccountDid === null) {
         console.log('   No account identity found for mediator keys, registering account keys...');
         const mediatorRegistrationProof = mediatorKeys.registerAccountProof(mediator_did);
+        console.log('   Registration proof bytes length:', mediatorRegistrationProof.toBytes().length);
         const txHash = await mediator.registerAccount(mediatorRegistrationProof);
         console.log('   ✓ Account keys registered with tx hash:', txHash);
     } else {
@@ -126,15 +131,12 @@ async function main() {
     }
     console.log('');
 
-    // 7. Create an asset state
-    console.log('Creating an asset state...');
-    const mediators = [];
-    const auditors = [mediatorEncryptionKey]; // Just use mediator as auditor for this example.
-
     // Create the asset on-chain using the issuer signer.
     console.log('Creating confidential asset on-chain...');
     var assetId = null;
     try {
+        const mediators = [];
+        const auditors = [mediatorEncryptionKey]; // Just use mediator as auditor for this example.
         const results = await issuer.createAsset(mediators, auditors, "Test Confidential Asset");
         const assetState = results.assetState();
         assetId = assetState.assetId();
@@ -180,7 +182,7 @@ async function main() {
     try {
         const leaf = issuerAccountState.leafIndex();
         console.log('Get the path to the issuer account leaf: ', leaf);
-        const issuerAccountLeafPath = await accountCurveTree.getAccountLeafPath(leaf);
+        const issuerAccountLeafPath = await accountCurveTree.getLeafPathAndRoot(leaf);
 
         // The issuer's account balance before minting
         console.log('   Issuer Account Asset State before minting:', issuerAccountState.balance());
@@ -241,21 +243,48 @@ async function main() {
     console.log('   Asset Curve Tree:', assetCurveTree);
     console.log('');
 
-    // Create an asset leaf path builder.
-    console.log('Creating asset leaf path builder...');
-    const assetLeafPathBuilder = await assetCurveTree.buildAssetLeafPaths();
-    console.log('   ✓ Created asset leaf path builder');
-    console.log('   Asset Leaf Path Builder:', assetLeafPathBuilder);
+    // Get the last block number and root from the asset curve tree.
+    const blockNumber = await assetCurveTree.getLastBlockNumber();
+    const assetTreeRoot = await assetCurveTree.getRoot(blockNumber);
+
+    // Get the asset state and asset path.
+    const assetState = await client.getAssetState(assetId); // Using the Rust client here to create the `AssetState` object from on-chain data.
+    // The `AssetState` object can be recreated from the AssetDetails on-chain.
+    // const assetDetails = api.query().confidentialAssets.dartAssetDetails(assetId);
+    // const assetState = new AssetState(assetId, assetDetails.mediators, assetDetails.auditors); // The mediator/auditors encryption keys would need to be converted from the on-chain type.
+    const assetLeafIndex = assetState.leafIndex();
+    const assetPath = await assetCurveTree.getLeafPath(assetLeafIndex);
+
+    // Build a settlement proof to transfer some asset from issuer to investor.
+    console.log('Building settlement proof to transfer asset from issuer to investor...');
+
+    // Create a settlement builder
+    const settlementBuilder = new SettlementBuilder("Test memo", blockNumber, assetTreeRoot);
+
+    // Add the asset path to the settlement builder
+    settlementBuilder.addAssetPath(assetId, assetPath); // If the same asset is used in multiple legs, only need to add the asset path once.
+
+    // Add a leg to transfer asset from issuer to investor
+    const transferAmount = BigInt(250);
+    const issuerLegBuilder = new LegBuilder(issuerPublicKeys, investorPublicKeys, assetState, transferAmount);
+    settlementBuilder.addLeg(issuerLegBuilder);
+
+    // Build the settlement proof
+    const settlementProof = settlementBuilder.build();
+    console.log('   ✓ Built settlement proof');
+    console.log('   Settlement Proof Bytes Length:', settlementProof.toBytes().length);
     console.log('');
 
-    // Track an asset and get it's current state.
-    console.log('Tracking asset state...');
-    const assetState = await assetLeafPathBuilder.trackAsset(assetId);
-    console.log('   ✓ Tracked asset state');
-    console.log('   Asset State:', assetState);
-    console.log('   Mediators:', assetState.mediatorCount());
-    console.log('   Auditors:', assetState.auditorCount());
-    console.log('');
+    // Create the settlement on-chain using the issuer signer.
+    console.log('Creating settlement on-chain...');
+    try {
+        const results = await issuer.createSettlement(settlementProof);
+        console.log('   ✓ Settlement created with tx hash:', results);
+        console.log('');
+    } catch (e) {
+        console.error('   ✗ Error creating settlement:', e);
+        process.exit(1);
+    }
 
     console.log('=== Example Complete ===');
     process.exit(0);

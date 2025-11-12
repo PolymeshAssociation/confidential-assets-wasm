@@ -75,21 +75,3 @@ fn test_asset_state_creation() {
     let reimported = AssetState::from_bytes(&bytes).unwrap();
     assert_eq!(reimported.asset_id(), asset_id);
 }
-
-#[wasm_bindgen_test]
-fn test_settlement_ref_hex() {
-    let mut bytes = [0u8; 32];
-    bytes[0] = 0xAB;
-    bytes[31] = 0xCD;
-
-    let settlement_ref = SettlementRef::from_bytes(&bytes).unwrap();
-    let hex = settlement_ref.to_hex();
-
-    // Should start with ab and end with cd
-    assert!(hex.starts_with("ab"));
-    assert!(hex.ends_with("cd"));
-
-    // Should be able to round-trip through hex
-    let reimported = SettlementRef::from_hex(&hex).unwrap();
-    assert_eq!(settlement_ref.to_bytes(), reimported.to_bytes());
-}

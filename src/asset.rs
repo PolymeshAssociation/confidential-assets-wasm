@@ -51,6 +51,14 @@ impl AssetState {
         self.inner.asset_id
     }
 
+    /// Get the asset leaf index.
+    ///
+    /// Right now this is the asset ID converted to u64.  In the future asset ID might change.
+    #[wasm_bindgen(js_name = leafIndex)]
+    pub fn leaf_index(&self) -> u64 {
+        self.inner.asset_id as _
+    }
+
     /// Get the number of mediators
     #[wasm_bindgen(js_name = mediatorCount)]
     pub fn mediator_count(&self) -> usize {
