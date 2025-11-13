@@ -12,8 +12,8 @@ use polymesh_dart::{
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    bytes_to_jsvalue, jsvalue_to_bytes, AccountKeys, AccountPublicKey, AccountPublicKeys,
-    AssetLeafPath, AssetState, AssetTreeRoot, EncryptionKeyPair,
+    bytes_to_jsvalue, jsvalue_to_balance, jsvalue_to_bytes, AccountKeys, AccountPublicKey,
+    AccountPublicKeys, AssetLeafPath, AssetState, AssetTreeRoot, EncryptionKeyPair,
 };
 
 /// A settlement builder to create settlements
@@ -115,20 +115,21 @@ impl LegBuilder {
     /// - `sender`: The sender's account public keys.  Type `AccountPublicKeys`.
     /// - `receiver`: The receiver's account public keys.  Type `AccountPublicKeys`.
     /// - `asset`: The asset state.  Type `AssetState`.
-    /// - `amount`: The amount to transfer.  Type `Balance`.
+    /// - `amount`: The amount to transfer.  Type `Balance`.  JS number or BigInt or decimal/hex string.
     #[wasm_bindgen(constructor)]
     pub fn new(
         sender: &AccountPublicKeys,
         receiver: &AccountPublicKeys,
         asset: &AssetState,
-        amount: Balance,
-    ) -> LegBuilder {
-        LegBuilder {
+        amount: JsValue,
+    ) -> Result<LegBuilder, JsValue> {
+        let amount = jsvalue_to_balance(&amount)?;
+        Ok(LegBuilder {
             sender: sender.clone(),
             receiver: receiver.clone(),
             asset: asset.clone(),
             amount,
-        }
+        })
     }
 }
 

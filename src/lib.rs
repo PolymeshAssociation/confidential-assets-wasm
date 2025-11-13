@@ -119,15 +119,52 @@ pub fn bytes_to_jsvalue(bytes: &[u8]) -> JsValue {
 
 /// Convert `JsValue` to `Balance`
 ///
-/// Convert js number to u64 Balance.
+/// Accepts:
+/// - JavaScript number (e.g., `1000`)
+/// - JavaScript BigInt (e.g., `1000n`)
+/// - Decimal string (e.g., `"1000"`)
+/// - Hex string with 0x prefix (e.g., `"0x3e8"`)
 pub fn jsvalue_to_balance(value: &JsValue) -> Result<Balance, JsValue> {
-    let num = value
-        .as_f64()
-        .ok_or_else(|| JsValue::from_str("Balance must be a number representable as u64"))?;
-    if num < 0.0 || num > u64::MAX as f64 {
-        return Err(JsValue::from_str("Balance out of range for u64"));
+    // Try as number first
+    if let Some(num) = value.as_f64() {
+        if num < 0.0 || num > u64::MAX as f64 || num.fract() != 0.0 {
+            return Err(JsValue::from_str(
+                "Balance number must be a non-negative integer within u64 range",
+            ));
+        }
+        return Ok(num as u64);
     }
-    Ok(num as u64)
+
+    // Try as BigInt
+    if let Ok(bigint) = js_sys::BigInt::new(value) {
+        let bigint_str = format!("{}", bigint);
+
+        log::info!("Convert JS BigInt to string: '{bigint_str}'");
+
+        return bigint_str
+            .parse::<u64>()
+            .map_err(|e| JsValue::from_str(&format!("BigInt out of range for u64: {}", e)));
+    }
+
+    // Try as string (decimal or hex)
+    if let Some(s) = value.as_string() {
+        let s = s.trim();
+
+        // Handle hex string
+        if let Some(hex_str) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+            return u64::from_str_radix(hex_str, 16)
+                .map_err(|e| JsValue::from_str(&format!("Invalid hex balance: {}", e)));
+        }
+
+        // Handle decimal string
+        return s
+            .parse::<u64>()
+            .map_err(|e| JsValue::from_str(&format!("Invalid decimal balance: {}", e)));
+    }
+
+    Err(JsValue::from_str(
+        "Balance must be a number, BigInt, decimal string (e.g., \"1000\"), or hex string (e.g., \"0x3e8\")"
+    ))
 }
 
 /// Convert `Balance` to `JsValue`
