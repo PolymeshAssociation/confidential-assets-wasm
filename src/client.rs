@@ -21,6 +21,20 @@ pub struct PolymeshClient {
 #[wasm_bindgen]
 impl PolymeshClient {
     /// Connect to a Polymesh node at the given URL
+    ///
+    /// # Arguments
+    /// * `url` - The WebSocket URL of the Polymesh node to connect to
+    ///
+    /// # Returns
+    /// A `PolymeshClient` instance connected to the specified node
+    ///
+    /// # Errors
+    /// Returns a `JsValue` error if the connection to the node fails
+    ///
+    /// # Examples
+    /// ```javascript
+    /// const client = await PolymeshClient.connect("ws://localhost:9944");
+    /// ```
     #[wasm_bindgen]
     pub async fn connect(url: &str) -> Result<Self, JsValue> {
         let url = url.to_string();
