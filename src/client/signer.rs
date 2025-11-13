@@ -10,10 +10,14 @@ use polymesh_api::{
 use polymesh_api_client::{
     AccountId, BlockHash, DefaultSigner, IdentityId, Signer, TransactionResults,
 };
-use polymesh_dart::{AssetState as NativeAssetState, BatchedAccountAssetRegistrationProof};
+use polymesh_dart::{
+    AssetState as NativeAssetState, BatchedAccountAssetRegistrationProof, SettlementRef,
+};
 use wasm_bindgen::prelude::*;
 
-use crate::{asset::AssetState, identity_id_to_jsvalue, jsvalue_to_bytes};
+use crate::{
+    asset::AssetState, identity_id_to_jsvalue, jsvalue_to_bytes, settlement_ref_to_jsvalue,
+};
 use crate::{block_hash_to_jsvalue, error::Error};
 use crate::{
     keys::{AccountRegistrationProof, EncryptionPublicKey},
@@ -300,8 +304,11 @@ impl PolymeshSigner {
 
     /// Create a settlement from a settlement proof.
     #[wasm_bindgen(js_name = createSettlement)]
-    pub async fn create_settlement(&mut self, proof: SettlementProof) -> Result<JsValue, JsValue> {
-        let mut res = self
+    pub async fn create_settlement(
+        &mut self,
+        proof: SettlementProof,
+    ) -> Result<CreateSettlementResult, JsValue> {
+        let res = self
             .api
             .call()
             .confidential_assets()
@@ -311,17 +318,73 @@ impl PolymeshSigner {
             .await
             .map_err(|e| JsValue::from_str(&format!("Failed to submit settlement call: {}", e)))?;
 
+        CreateSettlementResult::from_tx(res).await.map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to process create settlement transaction: {}",
+                e
+            ))
+        })
+    }
+}
+
+/// Transaction results for created settlement.
+#[wasm_bindgen]
+#[derive(Clone, Debug)]
+pub struct CreateSettlementResult {
+    pub(crate) block_hash: BlockHash,
+    pub(crate) settlement_ref: Option<SettlementRef>,
+}
+
+impl CreateSettlementResult {
+    pub async fn from_tx(mut res: TransactionResults<Api>) -> Result<Self, Error> {
         // Check if the transaction was successful
-        res.ok()
-            .await
-            .map_err(|e| JsValue::from_str(&format!("Settlement call failed: {}", e)))?;
+        res.ok().await?;
 
         // Wait for the call to be finalized
-        let hash = res.wait_finalized().await.map_err(|e| {
-            JsValue::from_str(&format!("Failed to finalize settlement call: {}", e))
-        })?;
+        let block_hash = res
+            .wait_finalized()
+            .await?
+            .ok_or_else(|| Error::other("Settlement transaction finalized without success"))?;
 
-        Ok(block_hash_to_jsvalue(hash))
+        // Process events to find the SettlementCreated event.
+        let mut settlement_ref = None;
+        let events = res.events().await?;
+        if let Some(events) = events {
+            for event in &events.0 {
+                if let RuntimeEvent::ConfidentialAssets(
+                    ConfidentialAssetsEvent::SettlementCreated {
+                        settlement_ref: s_ref,
+                        ..
+                    },
+                ) = &event.event
+                {
+                    settlement_ref = Some(scale_convert(s_ref));
+                }
+            }
+        }
+
+        Ok(CreateSettlementResult {
+            block_hash,
+            settlement_ref,
+        })
+    }
+}
+
+#[wasm_bindgen]
+impl CreateSettlementResult {
+    /// Get the block hash where the settlement was created.
+    #[wasm_bindgen(js_name = blockHash)]
+    pub fn block_hash(&self) -> JsValue {
+        block_hash_to_jsvalue(Some(self.block_hash))
+    }
+
+    /// Get the settlement reference, if available.
+    #[wasm_bindgen(js_name = settlementRef)]
+    pub fn settlement_ref(&self) -> JsValue {
+        match &self.settlement_ref {
+            Some(s_ref) => JsValue::from(settlement_ref_to_jsvalue(s_ref)),
+            None => JsValue::NULL,
+        }
     }
 }
 

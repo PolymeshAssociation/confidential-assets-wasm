@@ -277,12 +277,39 @@ async function main() {
 
     // Create the settlement on-chain using the issuer signer.
     console.log('Creating settlement on-chain...');
+    var settlementRef = null;
     try {
         const results = await issuer.createSettlement(settlementProof);
+        settlementRef = results.settlementRef();
         console.log('   ✓ Settlement created with tx hash:', results);
         console.log('');
     } catch (e) {
         console.error('   ✗ Error creating settlement:', e);
+        process.exit(1);
+    }
+
+    // Retrieve and try to decrypt the settlement legs
+    console.log('Retrieving and trying to decrypt settlement legs...');
+    try {
+        const settlement_legs = await client.getSettlementLegs(settlementRef);
+        console.log('   ✓ Retrieved settlement with', settlement_legs.legCount(), 'legs');
+
+        const decrypted_legs = settlement_legs.tryDecrypt(investorKeys);
+        for (let i = 0; i < decrypted_legs.legCount(); i++) {
+            const leg = decrypted_legs.getLeg(i);
+            if (leg !== null) {
+                console.log(`   ✓ Decrypted leg ${i}:`);
+                console.log('     Sender Public Key:', leg.sender.toJson());
+                console.log('     Receiver Public Key:', leg.receiver.toJson());
+                console.log('     Asset ID:', leg.assetId);
+                console.log('     Amount:', leg.amount.toString());
+            } else {
+                console.log(`   ✗ Could not decrypt leg ${i}`);
+            }
+        }
+        console.log('');
+    } catch (e) {
+        console.error('   ✗ Error retrieving or decrypting settlement:', e);
         process.exit(1);
     }
 

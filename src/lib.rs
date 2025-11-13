@@ -1,4 +1,4 @@
-use polymesh_dart::Balance;
+use polymesh_dart::{Balance, SettlementRef};
 use wasm_bindgen::prelude::*;
 
 use polymesh_api_client::{BlockHash, IdentityId};
@@ -69,6 +69,17 @@ pub fn jsvalue_to_identity_id(value: &JsValue) -> Result<IdentityId, JsValue> {
 /// Convert IdentityId to JsValue (hex string)
 pub fn identity_id_to_jsvalue(did: &IdentityId) -> JsValue {
     JsValue::from_str(&format!("0x{}", hex::encode(did.0)))
+}
+
+/// Convert `JsValue` (String or 32 byte array) to `SettlementRef`
+pub fn jsvalue_to_settlement_ref(value: &JsValue) -> Result<SettlementRef, JsValue> {
+    let bytes = jsvalue_to_array::<32>(value)?;
+    Ok(SettlementRef(bytes))
+}
+
+/// Convert `SettlementRef` to `JsValue` (hex string)
+pub fn settlement_ref_to_jsvalue(settlement_ref: &SettlementRef) -> JsValue {
+    JsValue::from_str(&format!("0x{}", hex::encode(settlement_ref.0)))
 }
 
 /// Convert `BlockHash` to `JsValue`

@@ -1,7 +1,7 @@
 use codec::{Decode, Encode};
 use polymesh_dart::{
-    AssetId, Balance, LegBuilder as NativeLegBuilder, LegEncrypted as NativeLegEncrypted,
-    MediatorAffirmationProof as NativeMediatorAffirmationProof,
+    AssetId, Balance, Leg as NativeLeg, LegBuilder as NativeLegBuilder,
+    LegEncrypted as NativeLegEncrypted, MediatorAffirmationProof as NativeMediatorAffirmationProof,
     ReceiverAffirmationProof as NativeReceiverAffirmationProof,
     ReceiverClaimProof as NativeReceiverClaimProof,
     SenderAffirmationProof as NativeSenderAffirmationProof,
@@ -12,7 +12,8 @@ use polymesh_dart::{
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    bytes_to_jsvalue, jsvalue_to_bytes, AccountPublicKeys, AssetLeafPath, AssetState, AssetTreeRoot,
+    bytes_to_jsvalue, jsvalue_to_bytes, AccountKeys, AccountPublicKey, AccountPublicKeys,
+    AssetLeafPath, AssetState, AssetTreeRoot, EncryptionKeyPair,
 };
 
 /// A settlement builder to create settlements
@@ -72,8 +73,15 @@ impl SettlementBuilder {
     }
 }
 
-/// A settlement leg containing asset transfer details
-#[wasm_bindgen(getter_with_clone)]
+/// A leg builder is need to hold leg information needed for encrypting the leg
+/// and generating the settlement proof.
+///
+/// The `Leg` type only contains the information that is encrypted.
+///
+/// To create a settlement we need both public keys (account and encryption) of the sender and receiver,
+/// as well as the asset state (mediator(s) and auditor(s) encryption keys) and amount.  All of this
+/// information can be queried from the on-chain state.
+#[wasm_bindgen(getter_with_clone, inspectable)]
 pub struct LegBuilder {
     pub sender: AccountPublicKeys,
     pub receiver: AccountPublicKeys,
@@ -96,6 +104,13 @@ impl LegBuilder {
 impl LegBuilder {
     /// Create a leg.
     ///
+    /// The settlement builder only needs to know the sender/receiver's account (account public key) and can lookup
+    /// the encryption public keys on-chain.  It also needs the asset state (mediator and auditor encryption keys) and amount.
+    ///
+    /// # Useful on-chain storages
+    /// - `confidentialAssets.accountEncryptionKey(accountPublicKey)` to get the encryption public key for an account
+    /// - `confidentialAssets.dartAssetDetails(assetId)` to get the asset state (mediators and auditors)
+    ///
     /// # Arguments
     /// - `sender`: The sender's account public keys.  Type `AccountPublicKeys`.
     /// - `receiver`: The receiver's account public keys.  Type `AccountPublicKeys`.
@@ -117,14 +132,105 @@ impl LegBuilder {
     }
 }
 
+/// Encrypted settlement legs
+#[wasm_bindgen]
+pub struct SettlementLegsEncrypted {
+    pub(crate) inner: Vec<NativeLegEncrypted>,
+}
+
+#[wasm_bindgen]
+impl SettlementLegsEncrypted {
+    /// Get the number of legs
+    #[wasm_bindgen(js_name = legCount)]
+    pub fn leg_count(&self) -> usize {
+        self.inner.len()
+    }
+
+    /// Export encrypted legs as a SCALE-encoded byte array
+    #[wasm_bindgen(js_name = toBytes)]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        self.inner.encode()
+    }
+
+    /// Import encrypted legs from a SCALE-encoded byte array
+    #[wasm_bindgen(js_name = fromBytes)]
+    pub fn from_bytes(bytes: &[u8]) -> Result<SettlementLegsEncrypted, JsValue> {
+        let inner = Decode::decode(&mut &bytes[..])
+            .map_err(|e| JsValue::from_str(&format!("Failed to decode encrypted legs: {}", e)))?;
+        Ok(SettlementLegsEncrypted { inner })
+    }
+
+    /// Try to decrypt all legs with the given set of keys.
+    ///
+    /// Returns a `SettlementLegs` where each leg is `Some` if decryption succeeded, or `None` if it failed.
+    #[wasm_bindgen(js_name = tryDecrypt)]
+    pub fn try_decrypt(&self, account_keys: &AccountKeys) -> SettlementLegs {
+        let mut legs = Vec::with_capacity(self.inner.len());
+        for leg_enc in &self.inner {
+            let leg = leg_enc
+                .try_decrypt(&account_keys.inner)
+                .map(|(leg, _role)| SettlementLeg::from_native(leg));
+            legs.push(leg);
+        }
+        SettlementLegs { legs }
+    }
+
+    /// Try to decrypt all legs as an auditor/mediator with the given encryption key.
+    ///
+    /// Returns a `SettlementLegs` where each leg is `Some` if decryption succeeded, or `None` if it failed.
+    #[wasm_bindgen(js_name = tryDecryptAsMediatorOrAuditor)]
+    pub fn try_decrypt_as_mediator_or_auditor(
+        &self,
+        encryption_key: &EncryptionKeyPair,
+    ) -> SettlementLegs {
+        let mut legs = Vec::with_capacity(self.inner.len());
+        for leg_enc in &self.inner {
+            let leg = leg_enc
+                .try_decrypt_with_key(&encryption_key.inner, None, None)
+                .ok()
+                .map(|(leg, _role)| SettlementLeg::from_native(leg));
+            legs.push(leg);
+        }
+
+        SettlementLegs { legs }
+    }
+}
+
+/// Decrypted settlement legs
+#[wasm_bindgen]
+pub struct SettlementLegs {
+    pub(crate) legs: Vec<Option<SettlementLeg>>,
+}
+
+#[wasm_bindgen]
+impl SettlementLegs {
+    /// Get the number of legs
+    #[wasm_bindgen(js_name = legCount)]
+    pub fn leg_count(&self) -> usize {
+        self.legs.len()
+    }
+
+    /// Get a leg by index
+    ///
+    /// Returns `null` if the leg could not be decrypted.
+    #[wasm_bindgen(js_name = getLeg)]
+    pub fn get_leg(&self, index: usize) -> Option<SettlementLeg> {
+        if index >= self.legs.len() {
+            None
+        } else {
+            self.legs[index].clone()
+        }
+    }
+}
+
 /// Encrypted settlement leg
 #[wasm_bindgen]
-pub struct LegEncrypted {
+pub struct SettlementLegEncrypted {
     pub(crate) inner: NativeLegEncrypted,
 }
 
 #[wasm_bindgen]
-impl LegEncrypted {
+impl SettlementLegEncrypted {
     /// Export encrypted leg as a SCALE-encoded byte array
     #[wasm_bindgen(js_name = toBytes)]
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -133,10 +239,10 @@ impl LegEncrypted {
 
     /// Import encrypted leg from a SCALE-encoded byte array
     #[wasm_bindgen(js_name = fromBytes)]
-    pub fn from_bytes(bytes: &[u8]) -> Result<LegEncrypted, JsValue> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<SettlementLegEncrypted, JsValue> {
         let inner = Decode::decode(&mut &bytes[..])
             .map_err(|e| JsValue::from_str(&format!("Failed to decode encrypted leg: {}", e)))?;
-        Ok(LegEncrypted { inner })
+        Ok(SettlementLegEncrypted { inner })
     }
 
     /// Export as hex string
@@ -147,10 +253,62 @@ impl LegEncrypted {
 
     /// Import from hex string
     #[wasm_bindgen(js_name = fromHex)]
-    pub fn from_hex(hex_str: &str) -> Result<LegEncrypted, JsValue> {
+    pub fn from_hex(hex_str: &str) -> Result<SettlementLegEncrypted, JsValue> {
         let bytes = hex::decode(hex_str)
             .map_err(|e| JsValue::from_str(&format!("Invalid hex string: {}", e)))?;
         Self::from_bytes(&bytes)
+    }
+
+    /// Try to decrypt the leg with the given set of keys.
+    #[wasm_bindgen(js_name = tryDecrypt)]
+    pub fn try_decrypt(
+        &self,
+        account_keys: &AccountKeys,
+    ) -> Result<Option<SettlementLeg>, JsValue> {
+        if let Some((leg, _role)) = self.inner.try_decrypt(&account_keys.inner) {
+            Ok(Some(SettlementLeg::from_native(leg)))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Try to decrypt the leg as an auditor/mediator with the given encryption key.
+    #[wasm_bindgen(js_name = tryDecryptAsMediatorOrAuditor)]
+    pub fn try_decrypt_as_mediator_or_auditor(
+        &self,
+        encryption_key: &EncryptionKeyPair,
+    ) -> Result<Option<SettlementLeg>, JsValue> {
+        if let Some((leg, _role)) = self
+            .inner
+            .try_decrypt_with_key(&encryption_key.inner, None, None)
+            .ok()
+        {
+            Ok(Some(SettlementLeg::from_native(leg)))
+        } else {
+            Ok(None)
+        }
+    }
+}
+
+/// Decrypted settlement leg
+#[wasm_bindgen(inspectable)]
+#[derive(Clone, Debug)]
+pub struct SettlementLeg {
+    pub sender: AccountPublicKey,
+    pub receiver: AccountPublicKey,
+    #[wasm_bindgen(js_name = "assetId")]
+    pub asset_id: AssetId,
+    pub amount: Balance,
+}
+
+impl SettlementLeg {
+    pub fn from_native(leg: NativeLeg) -> SettlementLeg {
+        SettlementLeg {
+            sender: AccountPublicKey::from_native(leg.sender),
+            receiver: AccountPublicKey::from_native(leg.receiver),
+            asset_id: leg.asset_id,
+            amount: leg.amount,
+        }
     }
 }
 
@@ -196,16 +354,17 @@ impl SettlementProof {
         self.inner.legs.len()
     }
 
-    /// Get the encrypted legs.
-    #[wasm_bindgen(js_name = getLegs)]
-    pub fn get_legs(&self) -> Vec<LegEncrypted> {
-        self.inner
+    /// Get the encrypted legs from the settlement proof.
+    #[wasm_bindgen(js_name = getEncryptedLegs)]
+    pub fn get_encrypted_legs(&self) -> SettlementLegsEncrypted {
+        let legs = self
+            .inner
             .legs
             .iter()
-            .map(|proof| LegEncrypted {
-                inner: proof.leg_enc.clone(),
-            })
-            .collect()
+            .map(|proof| proof.leg_enc.clone())
+            .collect();
+
+        SettlementLegsEncrypted { inner: legs }
     }
 }
 

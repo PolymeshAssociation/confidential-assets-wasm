@@ -1,3 +1,5 @@
+use futures_util::StreamExt;
+
 use polymesh_api::Api;
 use polymesh_api_client::{DefaultSigner, Signer};
 use polymesh_dart::{AssetId, AssetState as NativeAssetState, WrappedCanonical};
@@ -5,7 +7,10 @@ use wasm_bindgen::prelude::*;
 
 use crate::curve_tree::{AccountLeafPathAndRoot, AssetLeafPathAndRoot, FeeAccountLeafPathAndRoot};
 use crate::keys::AccountPublicKey;
-use crate::{identity_id_to_jsvalue, scale_convert, AssetLeafPath, AssetState, AssetTreeRoot};
+use crate::{
+    identity_id_to_jsvalue, jsvalue_to_settlement_ref, scale_convert, AssetLeafPath, AssetState,
+    AssetTreeRoot, SettlementLegsEncrypted,
+};
 
 mod curve_tree;
 pub mod signer;
@@ -149,6 +154,39 @@ impl PolymeshClient {
                 mediators: scale_convert(&details.mediators),
             },
         })
+    }
+
+    /// Get settlement encrypted legs.
+    #[wasm_bindgen(js_name = getSettlementLegs)]
+    pub async fn get_settlement_legs(
+        &self,
+        settlement_ref: JsValue,
+    ) -> Result<SettlementLegsEncrypted, JsValue> {
+        let settlement_ref = jsvalue_to_settlement_ref(&settlement_ref)?;
+        let entries = self
+            .api
+            .paged_query()
+            .confidential_assets()
+            .settlement_legs(scale_convert(&settlement_ref))
+            .entries();
+        tokio::pin!(entries);
+
+        let mut legs = Vec::new();
+        while let Some(entry) = entries.next().await {
+            let (_key, leg) = entry.map_err(|e| {
+                JsValue::from_str(&format!(
+                    "Failed to query settlement legs for settlement ID {:?}: {}",
+                    settlement_ref, e
+                ))
+            })?;
+            if let Some(leg) = leg {
+                legs.push(scale_convert(&leg));
+            } else {
+                break;
+            }
+        }
+
+        Ok(SettlementLegsEncrypted { inner: legs })
     }
 }
 

@@ -5,7 +5,7 @@ use polymesh_dart::{
     AccountKeys as NativeAccountKeys, AccountPublicKey as NativeAccountPublicKey,
     AccountPublicKeys as NativeAccountPublicKeys,
     AccountRegistrationProof as NativeAccountRegistrationProof,
-    EncryptionPublicKey as NativeEncryptionPublicKey,
+    EncryptionKeyPair as NativeEncryptionKeyPair, EncryptionPublicKey as NativeEncryptionPublicKey,
 };
 use rand::RngCore as _;
 use rand_chacha::ChaChaRng;
@@ -76,6 +76,14 @@ impl AccountKeys {
         AccountPublicKeys::from_native(keys)
     }
 
+    /// Get the encryption key pair.
+    #[wasm_bindgen(js_name = encryptionKeyPair)]
+    pub fn encryption_key_pair(&self) -> EncryptionKeyPair {
+        EncryptionKeyPair {
+            inner: self.inner.enc.clone(),
+        }
+    }
+
     /// Generate an account registration proof for the account keys.  The proof needs the identity id that the account keys will be linked to.
     #[wasm_bindgen(js_name = registerAccountProof)]
     pub fn register_account_proof(
@@ -125,6 +133,12 @@ impl AccountKeys {
 
         Ok(AccountAssetRegistration { proof, state })
     }
+}
+
+/// Encryption key pair.
+#[wasm_bindgen]
+pub struct EncryptionKeyPair {
+    pub(crate) inner: NativeEncryptionKeyPair,
 }
 
 /// An account registration proof.
@@ -216,9 +230,16 @@ impl AccountPublicKeys {
 
 /// Account public key (used for account commitments and proofs)
 #[wasm_bindgen]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct AccountPublicKey {
     pub(crate) inner: NativeAccountPublicKey,
+}
+
+impl AccountPublicKey {
+    /// Convert from native AccountPublicKey
+    pub fn from_native(native: NativeAccountPublicKey) -> AccountPublicKey {
+        AccountPublicKey { inner: native }
+    }
 }
 
 #[wasm_bindgen]
@@ -266,6 +287,13 @@ impl AccountPublicKey {
 #[derive(Clone, Copy)]
 pub struct EncryptionPublicKey {
     pub(crate) inner: NativeEncryptionPublicKey,
+}
+
+impl EncryptionPublicKey {
+    /// Convert from native EncryptionPublicKey
+    pub fn from_native(native: NativeEncryptionPublicKey) -> EncryptionPublicKey {
+        EncryptionPublicKey { inner: native }
+    }
 }
 
 #[wasm_bindgen]
