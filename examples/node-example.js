@@ -17,7 +17,7 @@ const {
 console.log('=== Polymesh DART WASM Node.js Example ===\n');
 
 async function main() {
-    const client = await new PolymeshClient("ws://localhost:9944");
+    const client = await PolymeshClient.connect("ws://localhost:9944");
     console.log('   ✓ Connected to Polymesh node');
     console.log('   Client:', client);
     console.log('');

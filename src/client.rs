@@ -21,15 +21,13 @@ pub struct PolymeshClient {
 #[wasm_bindgen]
 impl PolymeshClient {
     /// Connect to a Polymesh node at the given URL
-    #[wasm_bindgen(constructor)]
-    pub fn new(url: &str) -> js_sys::Promise {
+    #[wasm_bindgen]
+    pub async fn connect(url: &str) -> Result<Self, JsValue> {
         let url = url.to_string();
-        wasm_bindgen_futures::future_to_promise(async move {
-            let api = Api::new(&url)
-                .await
-                .map_err(|e| JsValue::from_str(&format!("Failed to connect to node: {}", e)))?;
-            Ok(JsValue::from(PolymeshClient { api }))
-        })
+        let api = Api::new(&url)
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Failed to connect to node: {}", e)))?;
+        Ok(PolymeshClient { api })
     }
 
     /// Get a handle for the Asset curve tree.
