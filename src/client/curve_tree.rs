@@ -1,5 +1,8 @@
 use core::ops::{Deref, DerefMut};
 
+use std::{collections::BTreeMap, sync::Arc};
+use tokio::sync::RwLock;
+
 use polymesh_dart::{
     curve_tree::{
         AccountTreeConfig, AssetTreeConfig, AsyncCurveTreeBackend, AsyncCurveTreeWithBackend,
@@ -13,6 +16,7 @@ use polymesh_dart::{
 };
 
 use polymesh_api::{
+    client::BlockHash,
     types::polymesh_dart::curve_tree::common::{
         NodeLocation as ChainNodeLocation, NodePosition as ChainNodePosition,
     },
@@ -48,15 +52,79 @@ pub fn node_location_to_chain<const L: usize>(location: NodeLocation<L>) -> Chai
     }
 }
 
+/// Block hash cache.
+#[derive(Clone, Debug, Default)]
+pub struct BlockHashCache {
+    // Cache with internal mutability to allow updating
+    cache: Arc<RwLock<BTreeMap<BlockNumber, BlockHash>>>,
+}
+
+impl BlockHashCache {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Get block hash from cache.
+    pub async fn get(&self, block_number: &BlockNumber) -> Option<BlockHash> {
+        let cache = self.cache.read().await;
+        cache.get(block_number).cloned()
+    }
+
+    /// Insert block hash into cache.
+    pub async fn insert(&self, block_number: BlockNumber, block_hash: BlockHash) {
+        let mut cache = self.cache.write().await;
+        cache.insert(block_number, block_hash);
+    }
+}
+
+/// Polymesh Api with block hash caching.
+#[derive(Clone)]
+pub struct CachedApi {
+    pub(crate) api: Api,
+    pub(crate) block_hash_cache: BlockHashCache,
+}
+
+impl Deref for CachedApi {
+    type Target = Api;
+
+    fn deref(&self) -> &Self::Target {
+        &self.api
+    }
+}
+
+impl CachedApi {
+    pub fn new(api: &Api) -> Self {
+        Self {
+            api: api.clone(),
+            block_hash_cache: BlockHashCache::new(),
+        }
+    }
+
+    /// Get block hash with caching.
+    pub async fn get_block_hash(&self, block_number: BlockNumber) -> Result<Option<BlockHash>> {
+        if let Some(cached_hash) = self.block_hash_cache.get(&block_number).await {
+            return Ok(Some(cached_hash));
+        }
+        let block_hash = self.api.client().get_block_hash(block_number).await?;
+        if let Some(ref hash) = block_hash {
+            self.block_hash_cache.insert(block_number, *hash).await;
+        }
+
+        Ok(block_hash)
+    }
+}
+
 /// Asset Curve Tree Storage backend.
 #[derive(Clone)]
 pub struct AssetCurveTreeChainStorage {
-    pub(crate) api: Api,
+    pub(crate) api: CachedApi,
 }
 
 impl AssetCurveTreeChainStorage {
     fn new(api: &Api) -> Self {
-        Self { api: api.clone() }
+        Self {
+            api: CachedApi::new(api),
+        }
     }
 }
 
@@ -124,7 +192,7 @@ impl AsyncCurveTreeBackend<ASSET_TREE_L, ASSET_TREE_M, AssetTreeConfig>
         block_number: Option<BlockNumber>,
     ) -> Result<Option<AssetLeaf>, Error> {
         let block_hash = match block_number {
-            Some(num) => self.api.client().get_block_hash(num).await?,
+            Some(num) => self.api.get_block_hash(num).await?,
             None => None,
         };
         if let Some(block_hash) = block_hash {
@@ -161,7 +229,7 @@ impl AsyncCurveTreeBackend<ASSET_TREE_L, ASSET_TREE_M, AssetTreeConfig>
         block_number: Option<BlockNumber>,
     ) -> Result<Option<AssetInnerNode>, Error> {
         let block_hash = match block_number {
-            Some(num) => self.api.client().get_block_hash(num).await?,
+            Some(num) => self.api.get_block_hash(num).await?,
             None => None,
         };
         let location = node_location_to_chain(location);
@@ -227,12 +295,14 @@ impl AssetCurveTree {
 /// Account Curve Tree Storage backend.
 #[derive(Clone)]
 pub struct AccountCurveTreeChainStorage {
-    pub(crate) api: Api,
+    pub(crate) api: CachedApi,
 }
 
 impl AccountCurveTreeChainStorage {
     fn new(api: &Api) -> Self {
-        Self { api: api.clone() }
+        Self {
+            api: CachedApi::new(api),
+        }
     }
 }
 
@@ -300,7 +370,7 @@ impl AsyncCurveTreeBackend<ACCOUNT_TREE_L, ACCOUNT_TREE_M, AccountTreeConfig>
         block_number: Option<BlockNumber>,
     ) -> Result<Option<AccountLeaf>, Error> {
         let block_hash = match block_number {
-            Some(num) => self.api.client().get_block_hash(num).await?,
+            Some(num) => self.api.get_block_hash(num).await?,
             None => None,
         };
         if let Some(block_hash) = block_hash {
@@ -337,7 +407,7 @@ impl AsyncCurveTreeBackend<ACCOUNT_TREE_L, ACCOUNT_TREE_M, AccountTreeConfig>
         block_number: Option<BlockNumber>,
     ) -> Result<Option<AccountInnerNode>, Error> {
         let block_hash = match block_number {
-            Some(num) => self.api.client().get_block_hash(num).await?,
+            Some(num) => self.api.get_block_hash(num).await?,
             None => None,
         };
         let location = node_location_to_chain(location);
@@ -403,12 +473,14 @@ impl AccountCurveTree {
 /// Fee Account Curve Tree Storage backend.
 #[derive(Clone)]
 pub struct FeeAccountCurveTreeChainStorage {
-    pub(crate) api: Api,
+    pub(crate) api: CachedApi,
 }
 
 impl FeeAccountCurveTreeChainStorage {
     fn new(api: &Api) -> Self {
-        Self { api: api.clone() }
+        Self {
+            api: CachedApi::new(api),
+        }
     }
 }
 
@@ -477,7 +549,7 @@ impl AsyncCurveTreeBackend<FEE_ACCOUNT_TREE_L, FEE_ACCOUNT_TREE_M, FeeAccountTre
         block_number: Option<BlockNumber>,
     ) -> Result<Option<FeeAccountLeaf>, Error> {
         let block_hash = match block_number {
-            Some(num) => self.api.client().get_block_hash(num).await?,
+            Some(num) => self.api.get_block_hash(num).await?,
             None => None,
         };
         if let Some(block_hash) = block_hash {
@@ -514,7 +586,7 @@ impl AsyncCurveTreeBackend<FEE_ACCOUNT_TREE_L, FEE_ACCOUNT_TREE_M, FeeAccountTre
         block_number: Option<BlockNumber>,
     ) -> Result<Option<FeeAccountInnerNode>, Error> {
         let block_hash = match block_number {
-            Some(num) => self.api.client().get_block_hash(num).await?,
+            Some(num) => self.api.get_block_hash(num).await?,
             None => None,
         };
         let location = node_location_to_chain(location);
