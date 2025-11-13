@@ -29,11 +29,11 @@ impl SettlementBuilder {
     pub fn new(
         memo: JsValue,
         block_number: u32,
-        root: AssetTreeRoot,
+        root: &AssetTreeRoot,
     ) -> Result<SettlementBuilder, JsValue> {
         let memo = jsvalue_to_bytes(&memo)?;
         Ok(SettlementBuilder {
-            inner: NativeSettlementBuilder::new_root(&memo, block_number, root.root),
+            inner: NativeSettlementBuilder::new_root(&memo, block_number, root.root.clone()),
         })
     }
 
@@ -48,7 +48,7 @@ impl SettlementBuilder {
     pub fn add_asset_path(
         &mut self,
         asset_id: AssetId,
-        path: AssetLeafPath,
+        path: &AssetLeafPath,
     ) -> Result<(), JsValue> {
         let path = path
             .path
@@ -118,15 +118,15 @@ impl LegBuilder {
     /// - `amount`: The amount to transfer.  Type `Balance`.
     #[wasm_bindgen(constructor)]
     pub fn new(
-        sender: AccountPublicKeys,
-        receiver: AccountPublicKeys,
-        asset: AssetState,
+        sender: &AccountPublicKeys,
+        receiver: &AccountPublicKeys,
+        asset: &AssetState,
         amount: Balance,
     ) -> LegBuilder {
         LegBuilder {
-            sender,
-            receiver,
-            asset,
+            sender: sender.clone(),
+            receiver: receiver.clone(),
+            asset: asset.clone(),
             amount,
         }
     }
@@ -291,7 +291,7 @@ impl SettlementLegEncrypted {
 }
 
 /// Decrypted settlement leg
-#[wasm_bindgen(inspectable)]
+#[wasm_bindgen(getter_with_clone, inspectable)]
 #[derive(Clone, Debug)]
 pub struct SettlementLeg {
     pub sender: AccountPublicKey,

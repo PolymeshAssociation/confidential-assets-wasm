@@ -43,18 +43,32 @@ async function main() {
     }
     console.log('');
 
-    // Create and onboard an investor.
-    console.log('Creating and onboarding test investor...');
-    const investor = client.newSigner("//TestInvestor");
-    var investor_did = await investor.identity();
-    if (investor_did === null) {
+    // Create and onboard some investors.
+    console.log('Creating and onboarding test investor 1...');
+    const investor1 = client.newSigner("//TestInvestor1");
+    var investor1_did = await investor1.identity();
+    if (investor1_did === null) {
         console.log('   No identity found for signer, onboarding account...');
-        await client.onboardSigner(investor);
+        await client.onboardSigner(investor1);
 
-        investor_did = await investor.identity();
-        console.log('   ✓ Account onboarded DID:', investor_did);
+        investor1_did = await investor1.identity();
+        console.log('   ✓ Account onboarded DID:', investor1_did);
     } else {
-        console.log('   Signer identity DID:', investor_did);
+        console.log('   Signer identity DID:', investor1_did);
+    }
+    console.log('');
+
+    console.log('Creating and onboarding test investor 2...');
+    const investor2 = client.newSigner("//TestInvestor2");
+    var investor2_did = await investor2.identity();
+    if (investor2_did === null) {
+        console.log('   No identity found for signer, onboarding account...');
+        await client.onboardSigner(investor2);
+
+        investor2_did = await investor2.identity();
+        console.log('   ✓ Account onboarded DID:', investor2_did);
+    } else {
+        console.log('   Signer identity DID:', investor2_did);
     }
     console.log('');
 
@@ -93,24 +107,44 @@ async function main() {
         console.log('   Account identity DID for issuer keys:', issuerAccountDid);
     }
 
-    // Create account keys for test investor
-    console.log('Creating account keys for test investor...');
-    const investorKeys = AccountKeys.fromSeed("Test-Investor-seed");
-    const investorPublicKeys = investorKeys.publicKeys();
+    // Create account keys for the investors.
+    console.log('Creating account keys for test investor 1...');
+    const investor1Keys = AccountKeys.fromSeed("Test-Investor1-seed");
+    const investor1PublicKeys = investor1Keys.publicKeys();
     console.log('   Public keys JSON:');
-    console.log('  ', investorPublicKeys.toJson());
+    console.log('  ', investor1PublicKeys.toJson());
     console.log('');
 
-    // Register the investor's account keys if not already registered
-    const investorAccountDid = await client.getAccountIdentity(investorPublicKeys.accountPublicKey());
-    if (investorAccountDid === null) {
+    // Register the investor 1's account keys if not already registered
+    const investor1AccountDid = await client.getAccountIdentity(investor1PublicKeys.accountPublicKey());
+    if (investor1AccountDid === null) {
         console.log('   No account identity found for investor keys, registering account keys...');
-        const investorRegistrationProof = investorKeys.registerAccountProof(investor_did);
+        const investorRegistrationProof = investor1Keys.registerAccountProof(investor1_did);
         console.log('   Registration proof bytes length:', investorRegistrationProof.toBytes().length);
-        const txHash = await investor.registerAccount(investorRegistrationProof);
+        const txHash = await investor1.registerAccount(investorRegistrationProof);
         console.log('   ✓ Account keys registered with tx hash:', txHash);
     } else {
-        console.log('   Account identity DID for investor keys:', investorAccountDid);
+        console.log('   Account identity DID for investor keys:', investor1AccountDid);
+    }
+    console.log('');
+
+    console.log('Creating account keys for test investor 2...');
+    const investor2Keys = AccountKeys.fromSeed("Test-Investor2-seed");
+    const investor2PublicKeys = investor2Keys.publicKeys();
+    console.log('   Public keys JSON:');
+    console.log('  ', investor2PublicKeys.toJson());
+    console.log('');
+
+    // Register the investor 2's account keys if not already registered
+    const investor2AccountDid = await client.getAccountIdentity(investor2PublicKeys.accountPublicKey());
+    if (investor2AccountDid === null) {
+        console.log('   No account identity found for investor keys, registering account keys...');
+        const investorRegistrationProof = investor2Keys.registerAccountProof(investor2_did);
+        console.log('   Registration proof bytes length:', investorRegistrationProof.toBytes().length);
+        const txHash = await investor2.registerAccount(investorRegistrationProof);
+        console.log('   ✓ Account keys registered with tx hash:', txHash);
+    } else {
+        console.log('   Account identity DID for investor keys:', investor2AccountDid);
     }
     console.log('');
 
@@ -223,13 +257,13 @@ async function main() {
         process.exit(1);
     }
 
-    // Register the investor's account with the new asset.
-    console.log('Registering investor account with the new asset...');
-    const investorAssetRegistration = investorKeys.registerAccountAssetProof(assetId, investor_did);
+    // Register the investor 1 account with the new asset.
+    console.log('Registering investor 1 account with the new asset...');
+    const investorAssetRegistration = investor1Keys.registerAccountAssetProof(assetId, investor1_did);
     var investorAccountState = investorAssetRegistration.getAccountAssetState();
     console.log('   Account asset registration proof bytes length:', investorAssetRegistration.getProofBytes().length);
     try {
-        const results = await investor.registerAccountAsset(investorAssetRegistration.getProof());
+        const results = await investor1.registerAccountAsset(investorAssetRegistration.getProof());
         // commit pending state to account state
         const leaf = results.leafIndex();
         console.log('  Account leaf index from tx results:', leaf);
@@ -239,6 +273,25 @@ async function main() {
         console.log('');
     } catch (e) {
         console.error('   ✗ Error registering investor account with asset:', e);
+        process.exit(1);
+    }
+
+    // Register the investor 2 account with the new asset.
+    console.log('Registering investor 2 account with the new asset...');
+    const investor2AssetRegistration = investor2Keys.registerAccountAssetProof(assetId, investor2_did);
+    var investor2AccountState = investor2AssetRegistration.getAccountAssetState();
+    console.log('   Account asset registration proof bytes length:', investor2AssetRegistration.getProofBytes().length);
+    try {
+        const results = await investor2.registerAccountAsset(investor2AssetRegistration.getProof());
+        // commit pending state to account state
+        const leaf = results.leafIndex();
+        console.log('  Account leaf index from tx results:', leaf);
+        investor2AccountState.commitPendingState(leaf);
+        console.log('   ✓ Investor 2 account registered with asset with tx hash:', results.blockHash());
+        console.log('   Account Asset State:', investor2AccountState.toJson());
+        console.log('');
+    } catch (e) {
+        console.error('   ✗ Error registering investor 2 account with asset:', e);
         process.exit(1);
     }
 
@@ -270,10 +323,16 @@ async function main() {
     // Add the asset path to the settlement builder
     settlementBuilder.addAssetPath(assetId, assetPath); // If the same asset is used in multiple legs, only need to add the asset path once.
 
-    // Add a leg to transfer asset from issuer to investor
+    // Add a leg to transfer 250 units from issuer to investor 1
     const transferAmount = BigInt(250);
-    const issuerLegBuilder = new LegBuilder(issuerPublicKeys, investorPublicKeys, assetState, transferAmount);
+    const issuerLegBuilder = new LegBuilder(issuerPublicKeys, investor1PublicKeys, assetState, transferAmount);
     settlementBuilder.addLeg(issuerLegBuilder);
+
+    // Add a leg to transfer 150 units from issuer to investor 2
+    const transferAmount2 = BigInt(150);
+    console.log('   Leg 2:', issuerPublicKeys, investor2PublicKeys, assetState, transferAmount2);
+    const issuerLegBuilder2 = new LegBuilder(issuerPublicKeys, investor2PublicKeys, assetState, transferAmount2);
+    settlementBuilder.addLeg(issuerLegBuilder2);
 
     // Build the settlement proof
     const settlementProof = settlementBuilder.build();
@@ -318,7 +377,7 @@ async function main() {
 
         // Try to decrypt legs with investor keys
         console.log('   Trying to decrypt legs with investor keys...');
-        const decrypted_legs_investor = settlement_legs.tryDecrypt(investorKeys);
+        const decrypted_legs_investor = settlement_legs.tryDecrypt(investor1Keys);
         for (let i = 0; i < decrypted_legs_investor.legCount(); i++) {
             const leg = decrypted_legs_investor.getLeg(i);
             if (leg) {

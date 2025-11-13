@@ -5,7 +5,7 @@ use polymesh_api::{
         polymesh_primitives::secondary_key::KeyRecord,
         runtime::{events::*, RuntimeEvent},
     },
-    Api,
+    Api, WrappedCall,
 };
 use polymesh_api_client::{
     AccountId, BlockHash, DefaultSigner, IdentityId, Signer, TransactionResults,
@@ -30,60 +30,81 @@ use crate::{scale_convert, AssetMintingProof};
 pub struct PolymeshSigner {
     pub(crate) signer: DefaultSigner,
     pub(crate) api: Api,
+    pub(crate) finalize: bool,
 }
 
 impl PolymeshSigner {
-    pub fn new(signer: DefaultSigner, api: &Api) -> Self {
+    pub fn new(signer: DefaultSigner, api: &Api, finalize: bool) -> Self {
         PolymeshSigner {
             signer,
             api: api.clone(),
+            finalize,
         }
     }
 
-    pub fn alice(api: &Api) -> Self {
-        Self::new(polymesh_api_client::dev::alice(), api)
+    pub fn alice(api: &Api, finalize: bool) -> Self {
+        Self::new(polymesh_api_client::dev::alice(), api, finalize)
+    }
+
+    pub(crate) async fn submit_and_watch(
+        &mut self,
+        call: WrappedCall,
+    ) -> Result<TransactionResults<Api>, Error> {
+        let mut res = call
+            .submit_and_watch(&mut self.signer)
+            .await
+            .map_err(Error::from)?;
+
+        // Wait for the call to execute.
+        if self.finalize {
+            res.wait_finalized().await?;
+        } else {
+            res.wait_in_block().await?;
+        }
+
+        Ok(res)
     }
 
     pub(crate) async fn onboard_signer(&mut self, account_id: AccountId) -> Result<(), Error> {
         // Use a batch call to onboard the new signer.
         let mut res = self
-            .api
-            .call()
-            .utility()
-            .batch(vec![
-                // Onboard the new signer with a DID and CDD.
+            .submit_and_watch(
                 self.api
                     .call()
-                    .identity()
-                    .cdd_register_did_with_cdd(account_id, vec![], None)
-                    .map_err(Error::from)?
-                    .into(),
-                // Fund the new signer with some POLYX for fees.
-                self.api
-                    .call()
-                    .sudo()
-                    .sudo(
+                    .utility()
+                    .batch(vec![
+                        // Onboard the new signer with a DID and CDD.
                         self.api
                             .call()
-                            .balances()
-                            .set_balance(
-                                account_id.into(),
-                                100_000_000_000, // Free balance: 100,000 POLYX
-                                0,               // Reserved balance
+                            .identity()
+                            .cdd_register_did_with_cdd(account_id, vec![], None)
+                            .map_err(Error::from)?
+                            .into(),
+                        // Fund the new signer with some POLYX for fees.
+                        self.api
+                            .call()
+                            .sudo()
+                            .sudo(
+                                self.api
+                                    .call()
+                                    .balances()
+                                    .set_balance(
+                                        account_id.into(),
+                                        100_000_000_000, // Free balance: 100,000 POLYX
+                                        0,               // Reserved balance
+                                    )
+                                    .map_err(Error::from)?
+                                    .into(),
                             )
                             .map_err(Error::from)?
                             .into(),
-                    )
-                    .map_err(Error::from)?
-                    .into(),
-            ])
-            .map_err(Error::from)?
-            .submit_and_watch(&mut self.signer)
-            .await
-            .map_err(Error::from)?;
+                    ])
+                    .map_err(Error::from)?,
+            )
+            .await?;
 
-        // Wait for the batch call to be finalized
-        res.wait_finalized().await?;
+        // Check if the transaction was successful
+        res.ok().await.map_err(Error::from)?;
 
         Ok(())
     }
@@ -114,6 +135,12 @@ impl PolymeshSigner {
         JsValue::from_str(&account_id.to_string())
     }
 
+    /// Set whether to finalize transactions.
+    #[wasm_bindgen(setter)]
+    pub fn set_finalize(&mut self, finalize: bool) {
+        self.finalize = finalize;
+    }
+
     /// Query the signer's Polymesh identity DID, if any.
     #[wasm_bindgen(js_name = identity)]
     pub async fn identity(&self) -> Result<JsValue, JsValue> {
@@ -131,14 +158,15 @@ impl PolymeshSigner {
         proof: &AccountRegistrationProof,
     ) -> Result<JsValue, JsValue> {
         let mut res = self
-            .api
-            .call()
-            .confidential_assets()
-            .register_accounts(scale_convert(&proof.inner))
-            .map_err(|e| {
-                JsValue::from_str(&format!("Failed to create register account call: {}", e))
-            })?
-            .submit_and_watch(&mut self.signer)
+            .submit_and_watch(
+                self.api
+                    .call()
+                    .confidential_assets()
+                    .register_accounts(scale_convert(&proof.inner))
+                    .map_err(|e| {
+                        JsValue::from_str(&format!("Failed to create register account call: {}", e))
+                    })?,
+            )
             .await
             .map_err(|e| {
                 JsValue::from_str(&format!("Failed to submit register account call: {}", e))
@@ -149,11 +177,13 @@ impl PolymeshSigner {
             .await
             .map_err(|e| JsValue::from_str(&format!("Register account call failed: {}", e)))?;
 
-        // Wait for the call to be finalized
-        let hash = res.wait_finalized().await.map_err(|e| {
-            JsValue::from_str(&format!("Failed to finalize register account call: {}", e))
+        // Get the block hash.
+        let hash = res.wait_in_block().await.map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to wait for register account call to be included: {}",
+                e
+            ))
         })?;
-
         Ok(block_hash_to_jsvalue(hash))
     }
 
@@ -181,12 +211,15 @@ impl PolymeshSigner {
         let data = jsvalue_to_bytes(&data)?;
 
         let mut res = self
-            .api
-            .call()
-            .confidential_assets()
-            .create_asset(scale_convert(&mediators), scale_convert(&auditors), data)
-            .map_err(|e| JsValue::from_str(&format!("Failed to create create asset call: {}", e)))?
-            .submit_and_watch(&mut self.signer)
+            .submit_and_watch(
+                self.api
+                    .call()
+                    .confidential_assets()
+                    .create_asset(scale_convert(&mediators), scale_convert(&auditors), data)
+                    .map_err(|e| {
+                        JsValue::from_str(&format!("Failed to create create asset call: {}", e))
+                    })?,
+            )
             .await
             .map_err(|e| {
                 JsValue::from_str(&format!("Failed to submit create asset call: {}", e))
@@ -197,9 +230,9 @@ impl PolymeshSigner {
             .await
             .map_err(|e| JsValue::from_str(&format!("Register account call failed: {}", e)))?;
 
-        // Wait for the call to be finalized and get the asset ID from the event.
+        // Get the block hash.
         let block_hash = res
-            .wait_finalized()
+            .wait_in_block()
             .await
             .map_err(|e| {
                 JsValue::from_str(&format!("Failed to finalize create asset call: {}", e))
@@ -241,27 +274,28 @@ impl PolymeshSigner {
     #[wasm_bindgen(js_name = registerAccountAsset)]
     pub async fn register_account_asset(
         &mut self,
-        proof: AccountAssetRegistrationProof,
+        proof: &AccountAssetRegistrationProof,
     ) -> Result<AccountStateResult, JsValue> {
         // Wrap the proof in a batched proof.
         let proof = BatchedAccountAssetRegistrationProof::<()> {
-            proofs: vec![proof.inner]
+            proofs: vec![proof.inner.clone()]
                 .try_into()
                 .map_err(|_| JsValue::from_str("Too many account asset registration proofs"))?,
         };
 
         let res = self
-            .api
-            .call()
-            .confidential_assets()
-            .register_account_assets(scale_convert(&proof))
-            .map_err(|e| {
-                JsValue::from_str(&format!(
-                    "Failed to create register account asset call: {}",
-                    e
-                ))
-            })?
-            .submit_and_watch(&mut self.signer)
+            .submit_and_watch(
+                self.api
+                    .call()
+                    .confidential_assets()
+                    .register_account_assets(scale_convert(&proof))
+                    .map_err(|e| {
+                        JsValue::from_str(&format!(
+                            "Failed to create register account asset call: {}",
+                            e
+                        ))
+                    })?,
+            )
             .await
             .map_err(|e| {
                 JsValue::from_str(&format!(
@@ -282,15 +316,18 @@ impl PolymeshSigner {
     #[wasm_bindgen(js_name = mintAsset)]
     pub async fn mint_asset(
         &mut self,
-        proof: AssetMintingProof,
+        proof: &AssetMintingProof,
     ) -> Result<AccountStateResult, JsValue> {
         let res = self
-            .api
-            .call()
-            .confidential_assets()
-            .mint_asset(scale_convert(&proof.inner))
-            .map_err(|e| JsValue::from_str(&format!("Failed to create mint asset call: {}", e)))?
-            .submit_and_watch(&mut self.signer)
+            .submit_and_watch(
+                self.api
+                    .call()
+                    .confidential_assets()
+                    .mint_asset(scale_convert(&proof.inner))
+                    .map_err(|e| {
+                        JsValue::from_str(&format!("Failed to create mint asset call: {}", e))
+                    })?,
+            )
             .await
             .map_err(|e| JsValue::from_str(&format!("Failed to submit mint asset call: {}", e)))?;
 
@@ -306,15 +343,18 @@ impl PolymeshSigner {
     #[wasm_bindgen(js_name = createSettlement)]
     pub async fn create_settlement(
         &mut self,
-        proof: SettlementProof,
+        proof: &SettlementProof,
     ) -> Result<CreateSettlementResult, JsValue> {
         let res = self
-            .api
-            .call()
-            .confidential_assets()
-            .create_settlement(scale_convert(&proof.inner))
-            .map_err(|e| JsValue::from_str(&format!("Failed to create settlement call: {}", e)))?
-            .submit_and_watch(&mut self.signer)
+            .submit_and_watch(
+                self.api
+                    .call()
+                    .confidential_assets()
+                    .create_settlement(scale_convert(&proof.inner))
+                    .map_err(|e| {
+                        JsValue::from_str(&format!("Failed to create settlement call: {}", e))
+                    })?,
+            )
             .await
             .map_err(|e| JsValue::from_str(&format!("Failed to submit settlement call: {}", e)))?;
 
@@ -340,9 +380,9 @@ impl CreateSettlementResult {
         // Check if the transaction was successful
         res.ok().await?;
 
-        // Wait for the call to be finalized
+        // Get the block hash.
         let block_hash = res
-            .wait_finalized()
+            .wait_in_block()
             .await?
             .ok_or_else(|| Error::other("Settlement transaction finalized without success"))?;
 
@@ -432,9 +472,9 @@ impl AccountStateResult {
         // Check if the transaction was successful
         res.ok().await?;
 
-        // Wait for the call to be finalized
+        // Get the block hash.
         let block_hash = res
-            .wait_finalized()
+            .wait_in_block()
             .await?
             .ok_or_else(|| Error::other("Account state transaction finalized without success"))?;
 

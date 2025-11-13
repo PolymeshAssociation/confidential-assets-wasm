@@ -21,6 +21,7 @@ pub use signer::*;
 #[wasm_bindgen]
 pub struct PolymeshClient {
     pub(crate) api: Api,
+    pub(crate) finalize: bool,
 }
 
 #[wasm_bindgen]
@@ -46,7 +47,16 @@ impl PolymeshClient {
         let api = Api::new(&url)
             .await
             .map_err(|e| JsValue::from_str(&format!("Failed to connect to node: {}", e)))?;
-        Ok(PolymeshClient { api })
+        Ok(PolymeshClient {
+            api,
+            finalize: true,
+        })
+    }
+
+    /// Set whether to finalize transactions.
+    #[wasm_bindgen(setter)]
+    pub fn set_finalize(&mut self, finalize: bool) {
+        self.finalize = finalize;
     }
 
     /// Get a handle for the Asset curve tree.
@@ -86,7 +96,7 @@ impl PolymeshClient {
     pub fn new_signer(&self, s: &str) -> Result<PolymeshSigner, JsValue> {
         let signer = DefaultSigner::from_string(s, None)
             .map_err(|e| JsValue::from_str(&format!("Failed to create signer: {}", e)))?;
-        Ok(PolymeshSigner::new(signer, &self.api))
+        Ok(PolymeshSigner::new(signer, &self.api, self.finalize))
     }
 
     /// Onboard a new signer (CDD + POLYX funding).
@@ -96,7 +106,7 @@ impl PolymeshClient {
     pub async fn onboard_signer(&self, new_signer: &PolymeshSigner) -> Result<(), JsValue> {
         let account_id = new_signer.signer.account();
         // Use `Alice` to onboard the new signer
-        let mut alice = PolymeshSigner::alice(&self.api);
+        let mut alice = PolymeshSigner::alice(&self.api, self.finalize);
 
         alice
             .onboard_signer(account_id)
