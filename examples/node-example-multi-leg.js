@@ -330,7 +330,6 @@ async function main() {
 
     // Add a leg to transfer 150 units from issuer to investor 2
     const transferAmount2 = BigInt(150);
-    console.log('   Leg 2:', issuerPublicKeys, investor2PublicKeys, assetState, transferAmount2);
     const issuerLegBuilder2 = new LegBuilder(issuerPublicKeys, investor2PublicKeys, assetState, transferAmount2);
     settlementBuilder.addLeg(issuerLegBuilder2);
 
@@ -375,11 +374,28 @@ async function main() {
             }
         }
 
-        // Try to decrypt legs with investor keys
-        console.log('   Trying to decrypt legs with investor keys...');
+        // Try to decrypt legs with investor 1
+        console.log('   Trying to decrypt legs with investor 1...');
         const decrypted_legs_investor = settlement_legs.tryDecrypt(investor1Keys);
         for (let i = 0; i < decrypted_legs_investor.legCount(); i++) {
             const leg = decrypted_legs_investor.getLeg(i);
+            if (leg) {
+                console.log(`   ✓ Decrypted leg ${i}:`);
+                console.log('     Sender Public Key:', leg.sender.toJson());
+                console.log('     Receiver Public Key:', leg.receiver.toJson());
+                console.log('     Asset ID:', leg.assetId);
+                console.log('     Amount:', leg.amount.toString());
+            } else {
+                console.log(`   ✗ Could not decrypt leg ${i}`);
+            }
+        }
+        console.log('');
+
+        // Try to decrypt legs with investor 2
+        console.log('   Trying to decrypt legs with investor 2...');
+        const decrypted_legs_investor2 = settlement_legs.tryDecrypt(investor2Keys);
+        for (let i = 0; i < decrypted_legs_investor2.legCount(); i++) {
+            const leg = decrypted_legs_investor2.getLeg(i);
             if (leg) {
                 console.log(`   ✓ Decrypted leg ${i}:`);
                 console.log('     Sender Public Key:', leg.sender.toJson());
