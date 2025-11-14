@@ -406,6 +406,11 @@ impl AsyncCurveTreeBackend<ACCOUNT_TREE_L, ACCOUNT_TREE_M, AccountTreeConfig>
         location: NodeLocation<ACCOUNT_TREE_L>,
         block_number: Option<BlockNumber>,
     ) -> Result<Option<AccountInnerNode>, Error> {
+        log::info!(
+            "Getting account inner node at location: {:?} for block number: {:?}",
+            location,
+            block_number
+        );
         let block_hash = match block_number {
             Some(num) => self.api.get_block_hash(num).await?,
             None => None,
@@ -433,6 +438,40 @@ impl AsyncCurveTreeBackend<ACCOUNT_TREE_L, ACCOUNT_TREE_M, AccountTreeConfig>
             }
         }
         Ok(None)
+    }
+
+    async fn get_inner_node_children(
+        &self,
+        parent: NodeLocation<ACCOUNT_TREE_L>,
+        block_number: Option<BlockNumber>,
+    ) -> Result<Vec<Option<CompressedInner<ACCOUNT_TREE_M, AccountTreeConfig>>>, Self::Error> {
+        log::info!(
+            "Getting account inner node children at parent location: {:?} for block number: {:?}",
+            parent,
+            block_number
+        );
+        let block_hash = match block_number {
+            Some(num) => self.api.get_block_hash(num).await?,
+            None => None,
+        };
+
+        let query = if let Some(block_hash) = block_hash {
+            self.api.query_at(block_hash).confidential_assets()
+        } else {
+            self.api.query().confidential_assets()
+        };
+        let mut children = Vec::with_capacity(ACCOUNT_TREE_L);
+        for idx in 0..ACCOUNT_TREE_L {
+            let location = node_location_to_chain(parent.child(idx as _)?);
+            let node = if let Some(node) = query.account_inner_nodes(location).await? {
+                Some(scale_convert(&node))
+            } else {
+                None
+            };
+            children.push(node);
+        }
+
+        Ok(children)
     }
 }
 
