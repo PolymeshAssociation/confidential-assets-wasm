@@ -3166,7 +3166,7 @@ dependencies = [
 [[package]]
 name = "polymesh-dart"
 version = "0.1.0"
-source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#b8e34747a0ac84d936c9ecdd6d9e26f067c3fd5a"
+source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#6fb6927f4e21b1be557b8834bdca6c19b3a63a65"
 dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -3201,7 +3201,7 @@ dependencies = [
 [[package]]
 name = "polymesh-dart-bp"
 version = "0.1.0"
-source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#b8e34747a0ac84d936c9ecdd6d9e26f067c3fd5a"
+source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#6fb6927f4e21b1be557b8834bdca6c19b3a63a65"
 dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -3229,7 +3229,7 @@ dependencies = [
 [[package]]
 name = "polymesh-dart-common"
 version = "0.1.0"
-source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#b8e34747a0ac84d936c9ecdd6d9e26f067c3fd5a"
+source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#6fb6927f4e21b1be557b8834bdca6c19b3a63a65"
 
 [[package]]
 name = "polymesh-dart-wasm"

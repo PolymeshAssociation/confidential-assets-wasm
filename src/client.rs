@@ -1,8 +1,12 @@
 use futures_util::StreamExt;
+use js_sys::Uint8Array;
 
-use polymesh_api::Api;
+use codec::{Decode, Encode};
+use polymesh_api::{Api, ChainApi};
 use polymesh_api_client::{DefaultSigner, Signer};
-use polymesh_dart::{AssetId, AssetState as NativeAssetState, WrappedCanonical};
+use polymesh_dart::{
+    AssetId, AssetState as NativeAssetState, BlockNumber, LeafIndex, WrappedCanonical,
+};
 use wasm_bindgen::prelude::*;
 
 use crate::curve_tree::{AccountLeafPathAndRoot, AssetLeafPathAndRoot, FeeAccountLeafPathAndRoot};
@@ -197,6 +201,226 @@ impl PolymeshClient {
         }
 
         Ok(SettlementLegsEncrypted { inner: legs })
+    }
+
+    /// Get an account leaf at the given index for a specific block number.
+    #[wasm_bindgen(js_name = getAccountLeaf)]
+    pub async fn get_account_leaf(
+        &self,
+        leaf_index: LeafIndex,
+        block_number: BlockNumber,
+    ) -> Result<Option<Uint8Array>, JsValue> {
+        let block_hash = self
+            .api
+            .client()
+            .get_block_hash(block_number)
+            .await
+            .map_err(|e| {
+                JsValue::from_str(&format!(
+                    "Failed to get block hash for block number {}: {}",
+                    block_number, e
+                ))
+            })?
+            .ok_or_else(|| {
+                JsValue::from_str(&format!(
+                    "No block hash found for block number {}",
+                    block_number
+                ))
+            })?;
+        let leaf = self
+            .api
+            .query_at(block_hash)
+            .confidential_assets()
+            .account_leaves(leaf_index)
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Failed to query account leaf: {}", e)))?;
+        if let Some(leaf) = leaf {
+            return Ok(Some(leaf.encode().as_slice().into()));
+        }
+        Ok(None)
+    }
+
+    /// Get an account inner node at the given location for a specific block number.
+    #[wasm_bindgen(js_name = getAccountInnerNode)]
+    pub async fn get_account_inner_node(
+        &self,
+        location: Uint8Array,
+        block_number: BlockNumber,
+    ) -> Result<Option<Uint8Array>, JsValue> {
+        let location = location.to_vec();
+        let location = Decode::decode(&mut &location[..]).map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to decode account inner node location: {}",
+                e
+            ))
+        })?;
+        log::info!(
+            "Getting account inner node at location: {:?} for block number: {:?}",
+            location,
+            block_number
+        );
+        let block_hash = self
+            .api
+            .client()
+            .get_block_hash(block_number)
+            .await
+            .map_err(|e| {
+                JsValue::from_str(&format!(
+                    "Failed to get block hash for block number {}: {}",
+                    block_number, e
+                ))
+            })?
+            .ok_or_else(|| {
+                JsValue::from_str(&format!(
+                    "No block hash found for block number {}",
+                    block_number
+                ))
+            })?;
+        let node = self
+            .api
+            .query_at(block_hash)
+            .confidential_assets()
+            .account_inner_nodes(location)
+            .await
+            .map_err(|e| {
+                JsValue::from_str(&format!("Failed to query account inner node: {}", e))
+            })?;
+        if let Some(node) = node {
+            return Ok(Some(node.encode().as_slice().into()));
+        }
+        Ok(None)
+    }
+
+    /// Get the Account tree root.
+    #[wasm_bindgen(js_name = getAccountTreeRoot)]
+    pub async fn get_account_tree_root(
+        &self,
+        block_number: BlockNumber,
+    ) -> Result<Uint8Array, JsValue> {
+        let root = self
+            .api
+            .query()
+            .confidential_assets()
+            .account_curve_tree_roots(block_number)
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Failed to query account tree root: {}", e)))?;
+        if let Some(root) = root {
+            Ok(root.encode().as_slice().into())
+        } else {
+            Err(JsValue::from_str(&format!(
+                "No account tree root found for block number {}",
+                block_number
+            )))
+        }
+    }
+
+    /// Get an asset leaf at the given index for a specific block number.
+    #[wasm_bindgen(js_name = getAssetLeaf)]
+    pub async fn get_asset_leaf(
+        &self,
+        leaf_index: LeafIndex,
+        block_number: BlockNumber,
+    ) -> Result<Option<Uint8Array>, JsValue> {
+        let block_hash = self
+            .api
+            .client()
+            .get_block_hash(block_number)
+            .await
+            .map_err(|e| {
+                JsValue::from_str(&format!(
+                    "Failed to get block hash for block number {}: {}",
+                    block_number, e
+                ))
+            })?
+            .ok_or_else(|| {
+                JsValue::from_str(&format!(
+                    "No block hash found for block number {}",
+                    block_number
+                ))
+            })?;
+        let leaf = self
+            .api
+            .query_at(block_hash)
+            .confidential_assets()
+            .asset_leaves(leaf_index)
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Failed to query asset leaf: {}", e)))?;
+        if let Some(leaf) = leaf {
+            return Ok(Some(leaf.encode().as_slice().into()));
+        }
+        Ok(None)
+    }
+
+    /// Get an asset inner node at the given location for a specific block number.
+    #[wasm_bindgen(js_name = getAssetInnerNode)]
+    pub async fn get_asset_inner_node(
+        &self,
+        location: Uint8Array,
+        block_number: BlockNumber,
+    ) -> Result<Option<Uint8Array>, JsValue> {
+        let location = location.to_vec();
+        let location = Decode::decode(&mut &location[..]).map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to decode asset inner node location: {}",
+                e
+            ))
+        })?;
+        log::info!(
+            "Getting asset inner node at location: {:?} for block number: {:?}",
+            location,
+            block_number
+        );
+        let block_hash = self
+            .api
+            .client()
+            .get_block_hash(block_number)
+            .await
+            .map_err(|e| {
+                JsValue::from_str(&format!(
+                    "Failed to get block hash for block number {}: {}",
+                    block_number, e
+                ))
+            })?
+            .ok_or_else(|| {
+                JsValue::from_str(&format!(
+                    "No block hash found for block number {}",
+                    block_number
+                ))
+            })?;
+        let node = self
+            .api
+            .query_at(block_hash)
+            .confidential_assets()
+            .asset_inner_nodes(location)
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Failed to query asset inner node: {}", e)))?;
+        if let Some(node) = node {
+            return Ok(Some(node.encode().as_slice().into()));
+        }
+        Ok(None)
+    }
+
+    /// Get the Asset tree root.
+    #[wasm_bindgen(js_name = getAssetTreeRoot)]
+    pub async fn get_asset_tree_root(
+        &self,
+        block_number: BlockNumber,
+    ) -> Result<Uint8Array, JsValue> {
+        let root = self
+            .api
+            .query()
+            .confidential_assets()
+            .asset_curve_tree_roots(block_number)
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Failed to query asset tree root: {}", e)))?;
+        if let Some(root) = root {
+            Ok(root.encode().as_slice().into())
+        } else {
+            Err(JsValue::from_str(&format!(
+                "No asset tree root found for block number {}",
+                block_number
+            )))
+        }
     }
 }
 
