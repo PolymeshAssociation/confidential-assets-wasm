@@ -34,12 +34,12 @@ async function main() {
     console.log('   ✓ Created asset leaf path builder: ', assetLeafPathBuilder);
 
     // Query the chain for the required leaves.
-    const leafIndices = assetLeafPathBuilder.getLeafIndices();
-    for (let i = 0; i < leafIndices.length; i++) {
-        const index = leafIndices[i];
-        console.log(`   leaf index ${i}: ${index}`);
+    const minLeafIndex = assetLeafPathBuilder.getMinLeafIndex();
+    const maxLeafIndex = assetLeafPathBuilder.getMaxLeafIndex();
+    console.log(`   Need leaves in range [${minLeafIndex}, ${maxLeafIndex}]`);
+    for (let index = minLeafIndex; index < maxLeafIndex; index++) {
         const leaf = await client.getAssetLeaf(index, blockNumber);
-        console.log(`      got leaf: ${leaf}`);
+        console.log(`   got leaf: ${index} => ${leaf}`);
         // Add the leaf to the path builder.
         assetLeafPathBuilder.setLeaf(index, leaf);
     }

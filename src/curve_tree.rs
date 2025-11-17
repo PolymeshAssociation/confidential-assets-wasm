@@ -463,6 +463,18 @@ impl AssetLeafPathBuilder {
         }
     }
 
+    /// Return the `L` parameter of the tree.
+    #[wasm_bindgen(js_name = getL)]
+    pub fn get_l(&self) -> usize {
+        ASSET_TREE_L
+    }
+
+    /// Return the `M` parameter of the tree.
+    #[wasm_bindgen(js_name = getM)]
+    pub fn get_m(&self) -> usize {
+        ASSET_TREE_M
+    }
+
     /// Get the list of node locations to query
     #[wasm_bindgen(js_name = getNodeLocations)]
     pub fn get_node_locations(&self) -> Vec<Uint8Array> {
@@ -577,6 +589,18 @@ impl AccountLeafPathBuilder {
             tree: CurveTreeWithBackend::new_with_backend(backend)
                 .expect("LeafPathBuilder backend; qed"),
         }
+    }
+
+    /// Return the `L` parameter of the tree.
+    #[wasm_bindgen(js_name = getL)]
+    pub fn get_l(&self) -> usize {
+        ACCOUNT_TREE_L
+    }
+
+    /// Return the `M` parameter of the tree.
+    #[wasm_bindgen(js_name = getM)]
+    pub fn get_m(&self) -> usize {
+        ACCOUNT_TREE_M
     }
 
     /// Get the list of node locations to query
