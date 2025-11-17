@@ -1,13 +1,22 @@
 use codec::{Decode, Encode};
-use polymesh_dart::AssetId;
 use polymesh_dart::{
     AccountAssetRegistrationProof as NativeAccountAssetRegistrationProof,
     AccountAssetState as NativeAccountAssetState, AccountState as NativeAccountState,
-    AssetMintingProof as NativeAssetMintingProof,
+    AssetMintingProof as NativeAssetMintingProof, LegId, LegRef,
+    ReceiverAffirmationProof as NativeReceiverAffirmationProof,
+    ReceiverClaimProof as NativeReceiverClaimProof,
+    SenderAffirmationProof as NativeSenderAffirmationProof,
+    SenderCounterUpdateProof as NativeSenderCounterUpdateProof,
+    SenderReversalProof as NativeSenderReversalProof,
 };
+use polymesh_dart::{AssetId, LegRole};
 use wasm_bindgen::prelude::*;
 
-use crate::{balance_to_jsvalue, jsvalue_to_balance, AccountKeys, AccountLeafPathAndRoot};
+use crate::{
+    balance_to_jsvalue, jsvalue_to_balance, jsvalue_to_settlement_ref, AccountKeys,
+    AccountLeafPathAndRoot, ReceiverAffirmationProof, ReceiverClaimProof, SenderAffirmationProof,
+    SenderCounterUpdateProof, SenderReversalProof, SettlementLegEncrypted,
+};
 
 /// Account state for a specific asset
 #[wasm_bindgen]
@@ -107,6 +116,277 @@ impl AccountAssetState {
                 })?;
 
         Ok(AssetMintingProof { inner: proof })
+    }
+
+    /// Generate a sender affirmation proof for a settlement leg.
+    #[wasm_bindgen(js_name = senderAffirmProof)]
+    pub fn sender_affirm_proof(
+        &mut self,
+        keys: &AccountKeys,
+        path: &AccountLeafPathAndRoot,
+        settlement_ref: JsValue,
+        leg_id: LegId,
+        leg_enc: &SettlementLegEncrypted,
+        asset_id: AssetId,
+        amount: JsValue,
+    ) -> Result<SenderAffirmationProof, JsValue> {
+        let settlement_ref = jsvalue_to_settlement_ref(&settlement_ref)?;
+        let leg_ref = LegRef::new(settlement_ref, leg_id);
+        let keys = &keys.inner;
+        let mut rng = rand::rngs::OsRng;
+        let leg_enc = &leg_enc.inner;
+
+        // Decrypt leg.
+        let (leg, leg_enc_rand) = leg_enc
+            .decrypt_with_randomness(LegRole::Sender, keys)
+            .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
+        // Verify asset id matches.
+        if leg.asset_id != asset_id {
+            return Err(JsValue::from_str("Settlement leg asset ID does not match"));
+        }
+        // Verify amount matches if provided.
+        if !amount.is_null_or_undefined() {
+            let amount = jsvalue_to_balance(&amount)?;
+            if leg.amount != amount {
+                return Err(JsValue::from_str(
+                    "Settlement leg amount does not match provided amount",
+                ));
+            }
+        }
+        let amount = leg.amount;
+
+        let proof = NativeSenderAffirmationProof::new(
+            &mut rng,
+            &keys.acct,
+            &leg_ref,
+            amount,
+            &leg_enc,
+            &leg_enc_rand,
+            &mut self.inner,
+            &path.path,
+        )
+        .map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to generate sender affirmation proof: {}",
+                e
+            ))
+        })?;
+
+        Ok(SenderAffirmationProof { inner: proof })
+    }
+
+    /// Generate a sender counter update proof for a settlement leg.
+    #[wasm_bindgen(js_name = senderCounterUpdateProof)]
+    pub fn sender_counter_update_proof(
+        &mut self,
+        keys: &AccountKeys,
+        path: &AccountLeafPathAndRoot,
+        settlement_ref: JsValue,
+        leg_id: LegId,
+        leg_enc: &SettlementLegEncrypted,
+        asset_id: AssetId,
+        amount: JsValue,
+    ) -> Result<SenderCounterUpdateProof, JsValue> {
+        let settlement_ref = jsvalue_to_settlement_ref(&settlement_ref)?;
+        let leg_ref = LegRef::new(settlement_ref, leg_id);
+        let keys = &keys.inner;
+        let mut rng = rand::rngs::OsRng;
+        let leg_enc = &leg_enc.inner;
+
+        // Decrypt leg.
+        let (leg, leg_enc_rand) = leg_enc
+            .decrypt_with_randomness(LegRole::Sender, keys)
+            .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
+
+        // Verify asset id matches.
+        if leg.asset_id != asset_id {
+            return Err(JsValue::from_str("Settlement leg asset id does not match"));
+        }
+        // Verify amount matches if provided.
+        if !amount.is_null_or_undefined() {
+            let amount = jsvalue_to_balance(&amount)?;
+            if leg.amount != amount {
+                return Err(JsValue::from_str("Settlement leg amount does not match"));
+            }
+        }
+
+        let proof = NativeSenderCounterUpdateProof::new(
+            &mut rng,
+            &keys.acct,
+            &leg_ref,
+            &leg_enc,
+            &leg_enc_rand,
+            &mut self.inner,
+            &path.path,
+        )
+        .map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to generate sender counter update proof: {}",
+                e
+            ))
+        })?;
+
+        Ok(SenderCounterUpdateProof { inner: proof })
+    }
+
+    /// Generate a sender revert proof for a settlement leg.
+    #[wasm_bindgen(js_name = senderRevertProof)]
+    pub fn sender_revert_proof(
+        &mut self,
+        keys: &AccountKeys,
+        path: &AccountLeafPathAndRoot,
+        settlement_ref: JsValue,
+        leg_id: LegId,
+        leg_enc: &SettlementLegEncrypted,
+        asset_id: AssetId,
+        amount: JsValue,
+    ) -> Result<SenderReversalProof, JsValue> {
+        let settlement_ref = jsvalue_to_settlement_ref(&settlement_ref)?;
+        let leg_ref = LegRef::new(settlement_ref, leg_id);
+        let keys = &keys.inner;
+        let mut rng = rand::rngs::OsRng;
+        let leg_enc = &leg_enc.inner;
+
+        // Decrypt leg.
+        let (leg, leg_enc_rand) = leg_enc
+            .decrypt_with_randomness(LegRole::Sender, keys)
+            .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
+
+        // Verify asset id matches.
+        if leg.asset_id != asset_id {
+            return Err(JsValue::from_str("Settlement leg asset id does not match"));
+        }
+        // Verify amount matches if provided.
+        if !amount.is_null_or_undefined() {
+            let amount = jsvalue_to_balance(&amount)?;
+            if leg.amount != amount {
+                return Err(JsValue::from_str("Settlement leg amount does not match"));
+            }
+        }
+        let amount = leg.amount;
+
+        let proof = NativeSenderReversalProof::new(
+            &mut rng,
+            &keys.acct,
+            &leg_ref,
+            amount,
+            &leg_enc,
+            &leg_enc_rand,
+            &mut self.inner,
+            &path.path,
+        )
+        .map_err(|e| {
+            JsValue::from_str(&format!("Failed to generate sender revert proof: {}", e))
+        })?;
+
+        Ok(SenderReversalProof { inner: proof })
+    }
+
+    /// Generate a receiver affirmation proof for a settlement leg.
+    #[wasm_bindgen(js_name = receiverAffirmProof)]
+    pub fn receiver_affirm_proof(
+        &mut self,
+        keys: &AccountKeys,
+        path: &AccountLeafPathAndRoot,
+        settlement_ref: JsValue,
+        leg_id: LegId,
+        leg_enc: &SettlementLegEncrypted,
+        asset_id: AssetId,
+        amount: JsValue,
+    ) -> Result<ReceiverAffirmationProof, JsValue> {
+        let settlement_ref = jsvalue_to_settlement_ref(&settlement_ref)?;
+        let leg_ref = LegRef::new(settlement_ref, leg_id);
+        let keys = &keys.inner;
+        let mut rng = rand::rngs::OsRng;
+        let leg_enc = &leg_enc.inner;
+
+        // Decrypt leg.
+        let (leg, leg_enc_rand) = leg_enc
+            .decrypt_with_randomness(LegRole::Receiver, keys)
+            .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
+
+        // Verify asset id matches.
+        if leg.asset_id != asset_id {
+            return Err(JsValue::from_str("Settlement leg asset id does not match"));
+        }
+        // Verify amount matches if provided.
+        if !amount.is_null_or_undefined() {
+            let amount = jsvalue_to_balance(&amount)?;
+            if leg.amount != amount {
+                return Err(JsValue::from_str("Settlement leg amount does not match"));
+            }
+        }
+
+        let proof = NativeReceiverAffirmationProof::new(
+            &mut rng,
+            &keys.acct,
+            &leg_ref,
+            &leg_enc,
+            &leg_enc_rand,
+            &mut self.inner,
+            &path.path,
+        )
+        .map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to generate receiver affirmation proof: {}",
+                e
+            ))
+        })?;
+
+        Ok(ReceiverAffirmationProof { inner: proof })
+    }
+
+    /// Generate a receiver claim assets proof for a settlement leg.
+    #[wasm_bindgen(js_name = receiverClaimProof)]
+    pub fn receiver_claim_proof(
+        &mut self,
+        keys: &AccountKeys,
+        path: &AccountLeafPathAndRoot,
+        settlement_ref: JsValue,
+        leg_id: LegId,
+        leg_enc: &SettlementLegEncrypted,
+        asset_id: AssetId,
+        amount: JsValue,
+    ) -> Result<ReceiverClaimProof, JsValue> {
+        let settlement_ref = jsvalue_to_settlement_ref(&settlement_ref)?;
+        let leg_ref = LegRef::new(settlement_ref, leg_id);
+        let keys = &keys.inner;
+        let mut rng = rand::rngs::OsRng;
+        let leg_enc = &leg_enc.inner;
+
+        // Decrypt leg.
+        let (leg, leg_enc_rand) = leg_enc
+            .decrypt_with_randomness(LegRole::Receiver, keys)
+            .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
+
+        // Verify asset id matches.
+        if leg.asset_id != asset_id {
+            return Err(JsValue::from_str("Settlement leg asset id does not match"));
+        }
+        // Verify amount matches if provided.
+        if !amount.is_null_or_undefined() {
+            let amount = jsvalue_to_balance(&amount)?;
+            if leg.amount != amount {
+                return Err(JsValue::from_str("Settlement leg amount does not match"));
+            }
+        }
+        let amount = leg.amount;
+
+        let proof = NativeReceiverClaimProof::new(
+            &mut rng,
+            &keys.acct,
+            &leg_ref,
+            amount,
+            &leg_enc,
+            &leg_enc_rand,
+            &mut self.inner,
+            &path.path,
+        )
+        .map_err(|e| {
+            JsValue::from_str(&format!("Failed to generate receiver claim proof: {}", e))
+        })?;
+
+        Ok(ReceiverClaimProof { inner: proof })
     }
 }
 

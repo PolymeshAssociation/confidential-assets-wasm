@@ -185,7 +185,7 @@ async function main() {
     console.log('');
 
     // Mint some asset to the into the issuer's account.
-    const mintAmount = 1000;
+    const mintAmount = 123456789123n;
     try {
         const leaf = issuerAccountState.leafIndex();
         console.log('Get the path to the issuer account leaf: ', leaf);
@@ -296,61 +296,182 @@ async function main() {
 
     // Retrieve and try to decrypt the settlement legs
     console.log('Retrieving and trying to decrypt settlement legs...');
+    const settlement_legs = await client.getSettlementLegs(settlementRef);
+    console.log('   ✓ Retrieved settlement with', settlement_legs.legCount(), 'legs');
+    const encryptedLeg = settlement_legs.getLeg(0);
+
     try {
-        const settlement_legs = await client.getSettlementLegs(settlementRef);
-        console.log('   ✓ Retrieved settlement with', settlement_legs.legCount(), 'legs');
-
-        // Try to decrypt legs with issuer keys
-        console.log('   Trying to decrypt legs with issuer keys...');
-        const decrypted_legs_issuer = settlement_legs.tryDecrypt(issuerKeys);
-        for (let i = 0; i < decrypted_legs_issuer.legCount(); i++) {
-            const leg = decrypted_legs_issuer.getLeg(i);
-            if (leg) {
-                console.log(`   ✓ Decrypted leg ${i}:`);
-                console.log('     Sender Public Key:', leg.sender.toJson());
-                console.log('     Receiver Public Key:', leg.receiver.toJson());
-                console.log('     Asset ID:', leg.assetId);
-                console.log('     Amount:', leg.amount.toString());
-            } else {
-                console.log(`   ✗ Could not decrypt leg ${i}`);
-            }
-        }
-
-        // Try to decrypt legs with investor keys
-        console.log('   Trying to decrypt legs with investor keys...');
-        const decrypted_legs_investor = settlement_legs.tryDecrypt(investorKeys);
-        for (let i = 0; i < decrypted_legs_investor.legCount(); i++) {
-            const leg = decrypted_legs_investor.getLeg(i);
-            if (leg) {
-                console.log(`   ✓ Decrypted leg ${i}:`);
-                console.log('     Sender Public Key:', leg.sender.toJson());
-                console.log('     Receiver Public Key:', leg.receiver.toJson());
-                console.log('     Asset ID:', leg.assetId);
-                console.log('     Amount:', leg.amount.toString());
-            } else {
-                console.log(`   ✗ Could not decrypt leg ${i}`);
-            }
+        // Try to decrypt leg with issuer keys
+        console.log('   Trying to decrypt leg with issuer keys...');
+        const decrypted_leg_issuer = encryptedLeg.tryDecrypt(issuerKeys);
+        if (decrypted_leg_issuer !== null) {
+            const leg = decrypted_leg_issuer;
+            console.log(`   ✓ Decrypted leg:`);
+            console.log('     Sender Public Key:', leg.sender.toJson());
+            console.log('     Receiver Public Key:', leg.receiver.toJson());
+            console.log('     Asset ID:', leg.assetId);
+            console.log('     Amount:', leg.amount.toString());
+        } else {
+            console.log(`   ✗ Could not decrypt leg`);
         }
         console.log('');
 
-        // Try to decrypt legs with mediator encryption key.
-        console.log('   Trying to decrypt legs with mediator encryption key...');
-        const decrypted_legs_mediator = settlement_legs.tryDecryptAsMediatorOrAuditor(mediatorEncryptionKey);
-        for (let i = 0; i < decrypted_legs_mediator.legCount(); i++) {
-            const leg = decrypted_legs_mediator.getLeg(i);
-            if (leg) {
-                console.log(`   ✓ Decrypted leg ${i}:`);
-                console.log('     Sender Public Key:', leg.sender.toJson());
-                console.log('     Receiver Public Key:', leg.receiver.toJson());
-                console.log('     Asset ID:', leg.assetId);
-                console.log('     Amount:', leg.amount.toString());
-            } else {
-                console.log(`   ✗ Could not decrypt leg ${i}`);
-            }
+        // Try to decrypt leg with investor keys
+        console.log('   Trying to decrypt leg with investor keys...');
+        const decrypted_leg_investor = encryptedLeg.tryDecrypt(investorKeys);
+        if (decrypted_leg_investor !== null) {
+            const leg = decrypted_leg_investor;
+            console.log(`   ✓ Decrypted leg:`);
+            console.log('     Sender Public Key:', leg.sender.toJson());
+            console.log('     Receiver Public Key:', leg.receiver.toJson());
+            console.log('     Asset ID:', leg.assetId);
+            console.log('     Amount:', leg.amount.toString());
+        } else {
+            console.log(`   ✗ Could not decrypt leg`);
+        }
+        console.log('');
+
+        // Try to decrypt leg with mediator keys
+        console.log('   Trying to decrypt leg with mediator keys...');
+        const decrypted_leg_mediator = encryptedLeg.tryDecryptAsMediatorOrAuditor(mediatorEncryptionKey);
+        if (decrypted_leg_mediator !== null) {
+            const leg = decrypted_leg_mediator;
+            console.log(`   ✓ Decrypted leg:`);
+            console.log('     Sender Public Key:', leg.sender.toJson());
+            console.log('     Receiver Public Key:', leg.receiver.toJson());
+            console.log('     Asset ID:', leg.assetId);
+            console.log('     Amount:', leg.amount.toString());
+        } else {
+            console.log(`   ✗ Could not decrypt leg`);
         }
         console.log('');
     } catch (e) {
-        console.error('   ✗ Error retrieving or decrypting settlement:', e);
+        console.error('   ✗ Error decrypting settlement leg:', e);
+        process.exit(1);
+    }
+
+    // Affirm settlement leg as the sender (issuer)
+    try {
+        const leaf = issuerAccountState.leafIndex();
+        console.log('Get the path to the issuer account leaf: ', leaf);
+        const issuerAccountLeafPath = await accountCurveTree.getLeafPathAndRoot(leaf);
+
+        // The issuer's account balance before affirming
+        console.log('   Issuer Account Asset State before affirming:', issuerAccountState.balance());
+
+        // Generate sender affirmation proof
+        console.log('Generating sender affirmation proof for issuer account...');
+        const senderAffirmProof = issuerAccountState.senderAffirmProof(
+            issuerKeys,
+            issuerAccountLeafPath,
+            settlementRef,
+            0,
+            encryptedLeg,
+            assetId,
+        );
+        console.log('   ✓ Generated sender affirmation proof');
+        console.log('   Sender affirmation Proof Bytes Length:', senderAffirmProof.toBytes().length);
+
+        // Affirm the settlement leg as the sender
+        console.log('Affirming settlement leg as sender...');
+        const results = await issuer.senderAffirmation(senderAffirmProof);
+        // Commit pending state to account state
+        const newLeaf = results.leafIndex();
+        console.log('  New Account leaf index from tx results:', newLeaf);
+        issuerAccountState.commitPendingState(newLeaf);
+
+        // The issuer's account balance after affirming
+        console.log('   Issuer Account Asset Balance after affirming:', issuerAccountState.balance());
+
+        console.log('   Account Asset State after affirming:', issuerAccountState.toJson());
+        console.log('   ✓ Sender affirm with tx hash:', results.blockHash());
+        console.log('');
+    } catch (e) {
+        console.error('   ✗ Error affirming settlement leg as sender:', e);
+        process.exit(1);
+    }
+
+    // Affirm settlement leg as the receiver (investor)
+    try {
+        const leaf = investorAccountState.leafIndex();
+        console.log('Get the path to the investor account leaf: ', leaf);
+        const investorAccountLeafPath = await accountCurveTree.getLeafPathAndRoot(leaf);
+
+        // The investor's account balance before affirming
+        console.log('   Investor Account Asset State before affirming:', investorAccountState.balance());
+
+        // Generate receiver affirmation proof
+        console.log('Generating receiver affirmation proof for investor account...');
+        const receiverAffirmProof = investorAccountState.receiverAffirmProof(
+            investorKeys,
+            investorAccountLeafPath,
+            settlementRef,
+            0,
+            encryptedLeg,
+            assetId,
+        );
+        console.log('   ✓ Generated receiver affirmation proof');
+        console.log('   Receiver affirmation Proof Bytes Length:', receiverAffirmProof.toBytes().length);
+
+        // Affirm the settlement leg as the receiver
+        console.log('Affirming settlement leg as receiver...');
+        const results = await investor.receiverAffirmation(receiverAffirmProof);
+        // Commit pending state to account state
+        const newLeaf = results.leafIndex();
+        console.log('  New Account leaf index from tx results:', newLeaf);
+        investorAccountState.commitPendingState(newLeaf);
+
+        // The investor's account balance after affirming
+        console.log('   Investor Account Asset Balance after affirming:', investorAccountState.balance());
+
+        console.log('   Account Asset State after affirming:', investorAccountState.toJson());
+        console.log('   ✓ Receiver affirm with tx hash:', results.blockHash());
+        console.log('');
+    } catch (e) {
+        console.error('   ✗ Error affirming settlement leg as receiver:', e);
+        process.exit(1);
+    }
+
+    // All parties have affirmed the settlement it should now have executed on-chain.  The receiver can now claim their assets.
+
+    // Receiver (investor) claims the asset from the settlement leg
+    try {
+        const leaf = investorAccountState.leafIndex();
+        console.log('Get the path to the investor account leaf: ', leaf);
+        const investorAccountLeafPath = await accountCurveTree.getLeafPathAndRoot(leaf);
+
+        // The investor's account balance before claiming
+        console.log('   Investor Account Asset State before claiming:', investorAccountState.balance());
+
+        // Generate claim proof
+        console.log('Generating claim proof for investor account...');
+        const claimProof = investorAccountState.receiverClaimProof(
+            investorKeys,
+            investorAccountLeafPath,
+            settlementRef,
+            0,
+            encryptedLeg,
+            assetId,
+        );
+        console.log('   ✓ Generated claim proof');
+        console.log('   Claim Proof Bytes Length:', claimProof.toBytes().length);
+
+        // Claim the asset from the settlement leg
+        console.log('Claiming asset from settlement leg as receiver...');
+        const results = await investor.receiverClaim(claimProof);
+        // Commit pending state to account state
+        const newLeaf = results.leafIndex();
+        console.log('  New Account leaf index from tx results:', newLeaf);
+        investorAccountState.commitPendingState(newLeaf);
+
+        // The investor's account balance after claiming
+        console.log('   Investor Account Asset Balance after claiming:', investorAccountState.balance());
+
+        console.log('   Account Asset State after claiming:', investorAccountState.toJson());
+        console.log('   ✓ Receiver claim with tx hash:', results.blockHash());
+        console.log('');
+    } catch (e) {
+        console.error('   ✗ Error claiming asset from settlement leg as receiver:', e);
         process.exit(1);
     }
 

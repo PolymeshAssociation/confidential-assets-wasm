@@ -21,7 +21,8 @@ use crate::{
 use crate::{block_hash_to_jsvalue, error::Error};
 use crate::{
     keys::{AccountRegistrationProof, EncryptionPublicKey},
-    AccountAssetRegistrationProof, SettlementProof,
+    AccountAssetRegistrationProof, ReceiverAffirmationProof, ReceiverClaimProof,
+    SenderAffirmationProof, SenderCounterUpdateProof, SenderReversalProof, SettlementProof,
 };
 use crate::{scale_convert, AssetMintingProof};
 
@@ -332,10 +333,7 @@ impl PolymeshSigner {
             .map_err(|e| JsValue::from_str(&format!("Failed to submit mint asset call: {}", e)))?;
 
         AccountStateResult::from_tx(res).await.map_err(|e| {
-            JsValue::from_str(&format!(
-                "Failed to process register account asset transaction: {}",
-                e
-            ))
+            JsValue::from_str(&format!("Failed to process mint asset transaction: {}", e))
         })
     }
 
@@ -361,6 +359,166 @@ impl PolymeshSigner {
         CreateSettlementResult::from_tx(res).await.map_err(|e| {
             JsValue::from_str(&format!(
                 "Failed to process create settlement transaction: {}",
+                e
+            ))
+        })
+    }
+
+    /// Sender affirmation of a settlement leg.
+    #[wasm_bindgen(js_name = senderAffirmation)]
+    pub async fn sender_affirmation(
+        &mut self,
+        proof: &SenderAffirmationProof,
+    ) -> Result<AccountStateResult, JsValue> {
+        let res = self
+            .submit_and_watch(
+                self.api
+                    .call()
+                    .confidential_assets()
+                    .sender_affirmation(scale_convert(&proof.inner))
+                    .map_err(|e| {
+                        JsValue::from_str(&format!(
+                            "Failed to create sender affirmation call: {}",
+                            e
+                        ))
+                    })?,
+            )
+            .await
+            .map_err(|e| {
+                JsValue::from_str(&format!("Failed to submit sender affirmation call: {}", e))
+            })?;
+
+        AccountStateResult::from_tx(res).await.map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to process sender affirmation transaction: {}",
+                e
+            ))
+        })
+    }
+
+    /// Sender counter update
+    #[wasm_bindgen(js_name = senderCounterUpdate)]
+    pub async fn sender_counter_update(
+        &mut self,
+        proof: &SenderCounterUpdateProof,
+    ) -> Result<AccountStateResult, JsValue> {
+        let res = self
+            .submit_and_watch(
+                self.api
+                    .call()
+                    .confidential_assets()
+                    .sender_update_counter(scale_convert(&proof.inner))
+                    .map_err(|e| {
+                        JsValue::from_str(&format!(
+                            "Failed to create sender update counter call: {}",
+                            e
+                        ))
+                    })?,
+            )
+            .await
+            .map_err(|e| {
+                JsValue::from_str(&format!(
+                    "Failed to submit sender update counter call: {}",
+                    e
+                ))
+            })?;
+
+        AccountStateResult::from_tx(res).await.map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to process sender affirmation transaction: {}",
+                e
+            ))
+        })
+    }
+
+    /// Sender revert
+    #[wasm_bindgen(js_name = senderRevert)]
+    pub async fn sender_revert(
+        &mut self,
+        proof: &SenderReversalProof,
+    ) -> Result<AccountStateResult, JsValue> {
+        let res = self
+            .submit_and_watch(
+                self.api
+                    .call()
+                    .confidential_assets()
+                    .sender_revert(scale_convert(&proof.inner))
+                    .map_err(|e| {
+                        JsValue::from_str(&format!("Failed to create sender revert call: {}", e))
+                    })?,
+            )
+            .await
+            .map_err(|e| {
+                JsValue::from_str(&format!("Failed to submit sender revert call: {}", e))
+            })?;
+
+        AccountStateResult::from_tx(res).await.map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to process sender affirmation transaction: {}",
+                e
+            ))
+        })
+    }
+
+    /// Receiver affirmation of a settlement leg.
+    #[wasm_bindgen(js_name = receiverAffirmation)]
+    pub async fn receiver_affirmation(
+        &mut self,
+        proof: &ReceiverAffirmationProof,
+    ) -> Result<AccountStateResult, JsValue> {
+        let res = self
+            .submit_and_watch(
+                self.api
+                    .call()
+                    .confidential_assets()
+                    .receiver_affirmation(scale_convert(&proof.inner))
+                    .map_err(|e| {
+                        JsValue::from_str(&format!(
+                            "Failed to create receiver affirmation call: {}",
+                            e
+                        ))
+                    })?,
+            )
+            .await
+            .map_err(|e| {
+                JsValue::from_str(&format!(
+                    "Failed to submit receiver affirmation call: {}",
+                    e
+                ))
+            })?;
+
+        AccountStateResult::from_tx(res).await.map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to process receiver affirmation transaction: {}",
+                e
+            ))
+        })
+    }
+
+    /// Receiver claim of a settlement leg.
+    #[wasm_bindgen(js_name = receiverClaim)]
+    pub async fn receiver_claim(
+        &mut self,
+        proof: &ReceiverClaimProof,
+    ) -> Result<AccountStateResult, JsValue> {
+        let res = self
+            .submit_and_watch(
+                self.api
+                    .call()
+                    .confidential_assets()
+                    .receiver_claim(scale_convert(&proof.inner))
+                    .map_err(|e| {
+                        JsValue::from_str(&format!("Failed to create receiver claim call: {}", e))
+                    })?,
+            )
+            .await
+            .map_err(|e| {
+                JsValue::from_str(&format!("Failed to submit receiver claim call: {}", e))
+            })?;
+
+        AccountStateResult::from_tx(res).await.map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to process receiver claim transaction: {}",
                 e
             ))
         })

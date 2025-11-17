@@ -147,6 +147,14 @@ impl SettlementLegsEncrypted {
         self.inner.len()
     }
 
+    /// Get a leg by index
+    #[wasm_bindgen(js_name = getLeg)]
+    pub fn get_leg(&self, index: usize) -> Option<SettlementLegEncrypted> {
+        self.inner
+            .get(index)
+            .map(|leg| SettlementLegEncrypted { inner: leg.clone() })
+    }
+
     /// Export encrypted legs as a SCALE-encoded byte array
     #[wasm_bindgen(js_name = toBytes)]
     pub fn to_bytes(&self) -> Vec<u8> {
