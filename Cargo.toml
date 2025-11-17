@@ -45,17 +45,17 @@ ark-vesta = { git = "https://github.com/PolymeshAssociation/arkworks-algebra.git
 [dependencies]
 # DART Assets
 polymesh-dart = { version = "0.1.0", default-features = false, features = [
-	"std",
+  "std",
   "asm",
-	"serde",
+  "serde",
   "parallel",
   "backend_bp",
   "async_tree",
 ] }
 
-async-trait = "0.1"
-futures-util = "0.3.31"
-tokio = { version = "1", default-features = false }
+async-trait = { version = "0.1", optional = true }
+futures-util = { version = "0.3.31", optional = true }
+tokio = { version = "1", default-features = false, optional = true }
 
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
@@ -69,7 +69,10 @@ log = "0.4"
 wasm-logger = "0.2"
 
 console_error_panic_hook = { version = "0.1", optional = true }
-rand = { version = "0.8", default-features = false, features = ["alloc", "getrandom"] }
+rand = { version = "0.8", default-features = false, features = [
+  "alloc",
+  "getrandom",
+] }
 getrandom = { version = "0.3", features = ["wasm_js"] }
 thiserror = "1.0"
 
@@ -86,20 +89,35 @@ wasm-bindgen-test = "0.3"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-polymesh-api = { version = "3.6", features = ["serde"] }
+polymesh-api = { version = "3.6", features = ["serde"], optional = true }
 polymesh-api-client = { version = "3.10.0" }
 
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-polymesh-api = { version = "3.6", default-features = false, features = ["polymesh_v7", "wasm", "serde"] }
-polymesh-api-client = { version = "3.10.0", default-features = false, features = [ "wasm" ] }
+polymesh-api = { version = "3.6", default-features = false, features = [
+  "polymesh_v7",
+  "wasm",
+  "serde",
+], optional = true }
+polymesh-api-client = { version = "3.10.0", default-features = false, features = [
+  "v14",
+  "wasm",
+  "serde",
+] }
 
 [features]
-default = ["download_metadata"]
+default = ["polymesh-client"]
 
 # Enable this feature to compile against a dev-chain.
-download_metadata = [
-	"polymesh-api/download_metadata",
+download_metadata = ["polymesh-api/download_metadata"]
+
+# Enable `PolymeshClient` support.
+polymesh-client = [
+  "download_metadata",
+  "polymesh-api",
+  "async-trait",
+  "futures-util",
+  "tokio",
 ]
 
 [profile.release]

@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use polymesh_api::client::Error as PolymeshClientError;
+use polymesh_api_client::Error as PolymeshClientError;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -11,7 +11,6 @@ pub enum Error {
     /// Polymesh client error
     #[error("Polymesh client error: {0}")]
     PolymeshClientError(String),
-    //PolymeshClientError(#[from] PolymeshClientError),
     /// Other generic error
     #[error("other error: {0}")]
     Other(String),

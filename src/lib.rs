@@ -1,13 +1,19 @@
 use polymesh_dart::{Balance, SettlementRef};
 use wasm_bindgen::prelude::*;
 
+#[cfg(feature = "polymesh-client")]
 use polymesh_api_client::{BlockHash, IdentityId};
+
+#[cfg(not(feature = "polymesh-client"))]
+#[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct IdentityId(pub [u8; 32]);
 
 pub mod error;
 pub use error::*;
 
 mod account;
 mod asset;
+#[cfg(feature = "polymesh-client")]
 mod client;
 mod curve_tree;
 mod keys;
@@ -17,6 +23,7 @@ mod utils;
 // Re-export main types
 pub use account::*;
 pub use asset::*;
+#[cfg(feature = "polymesh-client")]
 pub use client::*;
 pub use curve_tree::*;
 pub use keys::*;
@@ -83,9 +90,10 @@ pub fn settlement_ref_to_jsvalue(settlement_ref: &SettlementRef) -> JsValue {
 }
 
 /// Convert `BlockHash` to `JsValue`
+#[cfg(feature = "polymesh-client")]
 pub fn block_hash_to_jsvalue(hash: Option<BlockHash>) -> JsValue {
     match hash {
-        Some(h) => JsValue::from_str(&h.to_string()),
+        Some(h) => JsValue::from_str(&format!("0x{}", hex::encode(h.0))),
         None => JsValue::NULL,
     }
 }
