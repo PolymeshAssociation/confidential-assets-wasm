@@ -34,12 +34,12 @@ async function main() {
     console.log('   ✓ Created account leaf path builder: ', accountLeafPathBuilder);
 
     // Query the chain for the required leaves.
-    const leafIndices = accountLeafPathBuilder.getLeafIndices();
-    for (let i = 0; i < leafIndices.length; i++) {
-        const index = leafIndices[i];
-        console.log(`   leaf index ${i}: ${index}`);
+    const minLeafIndex = accountLeafPathBuilder.getMinLeafIndex();
+    const maxLeafIndex = accountLeafPathBuilder.getMaxLeafIndex();
+    console.log(`   Need leaves in range [${minLeafIndex}, ${maxLeafIndex}]`);
+    for (let index = minLeafIndex; index < maxLeafIndex; index++) {
         const leaf = await client.getAccountLeaf(index, blockNumber);
-        console.log(`      got leaf: ${leaf}`);
+        console.log(`   got leaf: ${index} => ${leaf}`);
         // Add the leaf to the path builder.
         accountLeafPathBuilder.setLeaf(index, leaf);
     }
@@ -63,11 +63,6 @@ async function main() {
     // Add the root to the path builder.
     accountLeafPathBuilder.setRoot(accountTreeRoot);
     console.log('   ✓ Set account tree root in builder');
-
-    // Build the path.
-    console.log('Building the account leaf path...');
-    const accountLeafPath2 = accountLeafPathBuilder.buildLeafPath();
-    console.log('   ✓ Set leaves and nodes in builder');
 
     // Build the path with root.
     console.log('Building the account leaf path with root...');

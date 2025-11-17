@@ -212,6 +212,7 @@ pub struct LeafPathBuilder<const L: usize, const M: usize, C: CurveTreeConfig> {
     pub node_locations: Vec<NodeLocation<L>>,
     pub nodes: BTreeMap<NodeLocation<L>, CompressedInner<M, C>>,
     pub leaves: BTreeMap<LeafIndex, CompressedLeafValue<C>>,
+    pub leaf_range: (LeafIndex, LeafIndex),
     pub leaf_indices: Vec<LeafIndex>,
     pub root: Option<Vec<u8>>,
 }
@@ -219,9 +220,11 @@ pub struct LeafPathBuilder<const L: usize, const M: usize, C: CurveTreeConfig> {
 fn calculate_node_locations<const L: usize>(
     leaf_index: LeafIndex,
     height: NodeLevel,
-) -> (Vec<NodeLocation<L>>, Vec<LeafIndex>) {
+) -> (Vec<NodeLocation<L>>, Vec<LeafIndex>, (LeafIndex, LeafIndex)) {
     let mut node_locations = BTreeSet::new();
     let mut leaf_indices = Vec::with_capacity(L);
+    let mut min_leaf_index = leaf_index;
+    let mut max_leaf_index = leaf_index;
 
     // Start at the leaf's location.
     let mut location = NodeLocation::<L>::leaf(leaf_index);
@@ -236,7 +239,14 @@ fn calculate_node_locations<const L: usize>(
                 .child(idx as ChildIndex)
                 .expect("Child index within bounds; qed");
             if child.is_leaf() {
-                leaf_indices.push(child.index());
+                let index = child.index();
+                if index < min_leaf_index {
+                    min_leaf_index = index;
+                }
+                if index > max_leaf_index {
+                    max_leaf_index = index;
+                }
+                leaf_indices.push(index);
             } else {
                 node_locations.insert(child);
             }
@@ -246,13 +256,18 @@ fn calculate_node_locations<const L: usize>(
         location = parent;
     }
 
-    (node_locations.into_iter().collect(), leaf_indices)
+    (
+        node_locations.into_iter().collect(),
+        leaf_indices,
+        (min_leaf_index, max_leaf_index),
+    )
 }
 
 impl<const L: usize, const M: usize, C: CurveTreeConfig> LeafPathBuilder<L, M, C> {
     /// Create a new LeafPathBuilder
     pub fn new(leaf_index: LeafIndex, height: NodeLevel, block_number: BlockNumber) -> Self {
-        let (node_locations, leaf_indices) = calculate_node_locations::<L>(leaf_index, height);
+        let (node_locations, leaf_indices, leaf_range) =
+            calculate_node_locations::<L>(leaf_index, height);
         Self {
             leaf_index,
             height,
@@ -260,6 +275,7 @@ impl<const L: usize, const M: usize, C: CurveTreeConfig> LeafPathBuilder<L, M, C
             node_locations,
             nodes: BTreeMap::new(),
             leaves: BTreeMap::new(),
+            leaf_range,
             leaf_indices,
             root: None,
         }
@@ -273,6 +289,16 @@ impl<const L: usize, const M: usize, C: CurveTreeConfig> LeafPathBuilder<L, M, C
     /// Get the leaf indices
     pub fn get_leaf_indices(&self) -> Vec<LeafIndex> {
         self.leaf_indices.clone()
+    }
+
+    /// Get the min leaf index
+    pub fn get_min_leaf_index(&self) -> LeafIndex {
+        self.leaf_range.0
+    }
+
+    /// Get the max leaf index
+    pub fn get_max_leaf_index(&self) -> LeafIndex {
+        self.leaf_range.1
     }
 
     /// Set the root.
@@ -454,6 +480,18 @@ impl AssetLeafPathBuilder {
         self.tree.backend.leaf_indices.clone()
     }
 
+    /// Get the min leaf index
+    #[wasm_bindgen(js_name = getMinLeafIndex)]
+    pub fn get_min_leaf_index(&self) -> LeafIndex {
+        self.tree.backend.get_min_leaf_index()
+    }
+
+    /// Get the max leaf index
+    #[wasm_bindgen(js_name = getMaxLeafIndex)]
+    pub fn get_max_leaf_index(&self) -> LeafIndex {
+        self.tree.backend.get_max_leaf_index()
+    }
+
     /// Set the root.
     #[wasm_bindgen(js_name = setRoot)]
     pub fn set_root(&mut self, root: &[u8]) {
@@ -556,6 +594,18 @@ impl AccountLeafPathBuilder {
     #[wasm_bindgen(js_name = getLeafIndices)]
     pub fn get_leaf_indices(&self) -> Vec<LeafIndex> {
         self.tree.backend.leaf_indices.clone()
+    }
+
+    /// Get the min leaf index
+    #[wasm_bindgen(js_name = getMinLeafIndex)]
+    pub fn get_min_leaf_index(&self) -> LeafIndex {
+        self.tree.backend.get_min_leaf_index()
+    }
+
+    /// Get the max leaf index
+    #[wasm_bindgen(js_name = getMaxLeafIndex)]
+    pub fn get_max_leaf_index(&self) -> LeafIndex {
+        self.tree.backend.get_max_leaf_index()
     }
 
     /// Set the root.
