@@ -22,6 +22,10 @@ pub mod signer;
 pub use signer::*;
 
 /// A client connection to a Polymesh node
+///
+/// This is the main entry point for interacting with the Polymesh blockchain.
+/// It provides methods to query on-chain data, submit transactions, and access
+/// the various curve trees (account, asset, and fee account trees).
 #[wasm_bindgen]
 pub struct PolymeshClient {
     pub(crate) api: Api,
@@ -30,20 +34,28 @@ pub struct PolymeshClient {
 
 #[wasm_bindgen]
 impl PolymeshClient {
-    /// Connect to a Polymesh node at the given URL
+    /// Connects to a Polymesh node via WebSocket.
+    ///
+    /// Establishes a connection to the specified Polymesh node and initializes the API client.
+    /// This is typically the first method called when working with the library.
     ///
     /// # Arguments
-    /// * `url` - The WebSocket URL of the Polymesh node to connect to
+    /// * `url` - The WebSocket URL of the Polymesh node (e.g., `"ws://localhost:9944"` or `"wss://dev.polymesh.tech/dart/dev/"`)
     ///
     /// # Returns
-    /// A `PolymeshClient` instance connected to the specified node
+    /// A connected `PolymeshClient` instance.
     ///
     /// # Errors
-    /// Returns a `JsValue` error if the connection to the node fails
+    /// * Throws an error if the connection to the node fails.
+    /// * Throws an error if the node is unreachable or returns invalid metadata.
     ///
-    /// # Examples
+    /// # Example
     /// ```javascript
+    /// // Connect to local node
     /// const client = await PolymeshClient.connect("ws://localhost:9944");
+    ///
+    /// // Connect to testnet
+    /// const client = await PolymeshClient.connect("wss://dev.polymesh.tech/dart/dev/");
     /// ```
     #[wasm_bindgen]
     pub async fn connect(url: &str) -> Result<Self, JsValue> {
@@ -57,13 +69,48 @@ impl PolymeshClient {
         })
     }
 
-    /// Set whether to finalize transactions.
+    /// Sets whether to wait for transaction finalization.
+    ///
+    /// When set to `true` (default), transactions will wait for finalization before returning.
+    /// When set to `false`, transactions will return as soon as they are included in a block,
+    /// which is faster but provides weaker guarantees.
+    ///
+    /// # Arguments
+    /// * `finalize` - Whether to wait for transaction finalization
+    ///
+    /// # Example
+    /// ```javascript
+    /// const client = await PolymeshClient.connect("ws://localhost:9944");
+    ///
+    /// // Disable finalization for faster testing
+    /// client.finalize = false;
+    ///
+    /// // Re-enable finalization for production
+    /// client.finalize = true;
+    /// ```
     #[wasm_bindgen(setter)]
     pub fn set_finalize(&mut self, finalize: bool) {
         self.finalize = finalize;
     }
 
-    /// Get a handle for the Asset curve tree.
+    /// Gets a handle to the asset curve tree for querying asset states.
+    ///
+    /// The asset curve tree stores commitments to all confidential assets in the system.
+    /// Use this to query asset leaf paths, roots, and build proofs for settlements.
+    ///
+    /// # Returns
+    /// An `AssetCurveTree` instance for querying the asset tree.
+    ///
+    /// # Errors
+    /// * Throws an error if the curve tree cannot be initialized.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const client = await PolymeshClient.connect("ws://localhost:9944");
+    /// const assetCurveTree = await client.getAssetCurveTree();
+    /// const blockNumber = await assetCurveTree.getLastBlockNumber();
+    /// const assetPath = await assetCurveTree.getLeafPathAndRoot(assetLeafIndex, blockNumber);
+    /// ```
     #[wasm_bindgen(js_name = getAssetCurveTree)]
     pub async fn get_asset_curve_tree(&self) -> Result<AssetCurveTree, JsValue> {
         let tree = curve_tree::AssetCurveTree::new(&self.api)
@@ -72,7 +119,24 @@ impl PolymeshClient {
         Ok(AssetCurveTree { inner: tree })
     }
 
-    /// Get a handle for the Account curve tree.
+    /// Gets a handle to the account curve tree for querying account states.
+    ///
+    /// The account curve tree stores commitments to all confidential account balances.
+    /// Use this to query account leaf paths and build proofs for balance-related operations.
+    ///
+    /// # Returns
+    /// An `AccountCurveTree` instance for querying the account tree.
+    ///
+    /// # Errors
+    /// * Throws an error if the curve tree cannot be initialized.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const client = await PolymeshClient.connect("ws://localhost:9944");
+    /// const accountCurveTree = await client.getAccountCurveTree();
+    /// const blockNumber = await accountCurveTree.getLastBlockNumber();
+    /// const accountPath = await accountCurveTree.getLeafPathAndRoot(accountLeafIndex, blockNumber);
+    /// ```
     #[wasm_bindgen(js_name = getAccountCurveTree)]
     pub async fn get_account_curve_tree(&self) -> Result<AccountCurveTree, JsValue> {
         let tree = curve_tree::AccountCurveTree::new(&self.api)
@@ -81,7 +145,21 @@ impl PolymeshClient {
         Ok(AccountCurveTree { inner: tree })
     }
 
-    /// Get a handle for the Fee Account curve tree.
+    /// Gets a handle to the fee account curve tree.
+    ///
+    /// The fee account curve tree stores commitments related to fee accounts.
+    ///
+    /// # Returns
+    /// A `FeeAccountCurveTree` instance for querying the fee account tree.
+    ///
+    /// # Errors
+    /// * Throws an error if the curve tree cannot be initialized.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const client = await PolymeshClient.connect("ws://localhost:9944");
+    /// const feeAccountCurveTree = await client.getFeeAccountCurveTree();
+    /// ```
     #[wasm_bindgen(js_name = getFeeAccountCurveTree)]
     pub async fn get_fee_account_curve_tree(&self) -> Result<FeeAccountCurveTree, JsValue> {
         let tree = curve_tree::FeeAccountCurveTree::new(&self.api)
@@ -92,10 +170,31 @@ impl PolymeshClient {
         Ok(FeeAccountCurveTree { inner: tree })
     }
 
-    /// Create a new signer from the given string.
+    /// Creates a new signer from a seed phrase or private key.
     ///
-    /// The string can be in any format supported by `subxt_signer::ecdsa::Keypair::from_uri`,
-    /// such as a mnemonic phrase or raw private key.
+    /// The signer can be used to submit transactions to the blockchain.
+    /// The seed string supports various formats including mnemonic phrases,
+    /// hex-encoded private keys, and Substrate development accounts (e.g., "//Alice").
+    ///
+    /// # Arguments
+    /// * `s` - A seed phrase, private key, or development account identifier
+    ///
+    /// # Returns
+    /// A `PolymeshSigner` instance ready to submit transactions.
+    ///
+    /// # Errors
+    /// * Throws an error if the seed string cannot be parsed into a valid keypair.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const client = await PolymeshClient.connect("ws://localhost:9944");
+    ///
+    /// // Create signer from development account
+    /// const issuer = client.newSigner("//TestIssuer");
+    ///
+    /// // Create signer from mnemonic
+    /// const investor = client.newSigner("bottom drive obey lake curtain smoke basket hold race lonely fit walk");
+    /// ```
     #[wasm_bindgen(js_name = newSigner)]
     pub fn new_signer(&self, s: &str) -> Result<PolymeshSigner, JsValue> {
         let signer = DefaultSigner::from_string(s, None)
@@ -425,6 +524,9 @@ impl PolymeshClient {
 }
 
 /// The Fee Account curve tree.
+///
+/// Provides access to query fee account states from the on-chain curve tree.
+/// Fee accounts track transaction fees in the confidential asset system.
 #[wasm_bindgen]
 pub struct FeeAccountCurveTree {
     pub(crate) inner: curve_tree::FeeAccountCurveTree,
@@ -432,9 +534,35 @@ pub struct FeeAccountCurveTree {
 
 #[wasm_bindgen]
 impl FeeAccountCurveTree {
-    /// Get fee account leaf path and root.
+    /// Retrieves the curve tree path and root for a specific fee account leaf.
     ///
-    /// If no block number is provided, the latest root is used.
+    /// This method queries the blockchain and constructs the complete path from the
+    /// specified leaf to the tree root. If no block number is provided, the latest
+    /// finalized block is used.
+    ///
+    /// # Arguments
+    /// * `leaf_index` - The index of the target leaf in the fee account tree
+    /// * `block_number` - Optional block number at which to query the tree state (uses latest if not provided)
+    ///
+    /// # Returns
+    /// A `FeeAccountLeafPathAndRoot` containing the curve tree path and root.
+    ///
+    /// # Errors
+    /// * Throws an error if the leaf path cannot be retrieved from the blockchain.
+    /// * Throws an error if the specified block number is invalid or too old.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const client = await PolymeshClient.connect("ws://localhost:9944");
+    /// const feeAccountCurveTree = await client.getFeeAccountCurveTree();
+    ///
+    /// // Get latest path
+    /// const pathAndRoot = await feeAccountCurveTree.getLeafPathAndRoot(leafIndex);
+    ///
+    /// // Get path at specific block
+    /// const blockNumber = 12345;
+    /// const historicalPath = await feeAccountCurveTree.getLeafPathAndRoot(leafIndex, blockNumber);
+    /// ```
     #[wasm_bindgen(js_name = getLeafPathAndRoot)]
     pub async fn get_leaf_path_and_root(
         &self,
@@ -457,7 +585,23 @@ impl FeeAccountCurveTree {
         Ok(FeeAccountLeafPathAndRoot { path })
     }
 
-    /// Get the block number of the last updated root.
+    /// Gets the block number of the most recently updated tree root.
+    ///
+    /// This is useful for determining which block to use when querying historical tree states.
+    ///
+    /// # Returns
+    /// The block number as a `u32`.
+    ///
+    /// # Errors
+    /// * Throws an error if the block number cannot be queried from the blockchain.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const client = await PolymeshClient.connect("ws://localhost:9944");
+    /// const feeAccountCurveTree = await client.getFeeAccountCurveTree();
+    /// const lastBlock = await feeAccountCurveTree.getLastBlockNumber();
+    /// console.log(`Fee account tree last updated at block ${lastBlock}`);
+    /// ```
     #[wasm_bindgen(js_name = getLastBlockNumber)]
     pub async fn get_last_block_number(&self) -> Result<u32, JsValue> {
         let block_number = self.inner.get_block_number().await.map_err(|e| {
@@ -472,6 +616,9 @@ impl FeeAccountCurveTree {
 }
 
 /// The Account curve tree.
+///
+/// Provides access to query account states from the on-chain curve tree.
+/// Account states contain commitments to confidential balances for each account-asset pair.
 #[wasm_bindgen]
 pub struct AccountCurveTree {
     pub(crate) inner: curve_tree::AccountCurveTree,
@@ -479,9 +626,36 @@ pub struct AccountCurveTree {
 
 #[wasm_bindgen]
 impl AccountCurveTree {
-    /// Get account leaf path and root.
+    /// Retrieves the curve tree path and root for a specific account leaf.
     ///
-    /// If no block number is provided, the latest root is used.
+    /// This method queries the blockchain and constructs the complete path from the
+    /// specified leaf to the tree root. Account leaves contain balance commitments
+    /// for account-asset pairs. If no block number is provided, the latest finalized block is used.
+    ///
+    /// # Arguments
+    /// * `leaf_index` - The index of the target leaf in the account tree (typically from `accountAssetState.leafIndex()`)
+    /// * `block_number` - Optional block number at which to query the tree state (uses latest if not provided)
+    ///
+    /// # Returns
+    /// An `AccountLeafPathAndRoot` containing the curve tree path and root.
+    ///
+    /// # Errors
+    /// * Throws an error if the leaf path cannot be retrieved from the blockchain.
+    /// * Throws an error if the specified block number is invalid or too old.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const client = await PolymeshClient.connect("ws://localhost:9944");
+    /// const accountCurveTree = await client.getAccountCurveTree();
+    ///
+    /// // Get latest path for generating proofs
+    /// const leafIndex = accountAssetState.leafIndex();
+    /// const pathAndRoot = await accountCurveTree.getLeafPathAndRoot(leafIndex);
+    ///
+    /// // Get path at specific block for historical proofs
+    /// const blockNumber = 12345;
+    /// const historicalPath = await accountCurveTree.getLeafPathAndRoot(leafIndex, blockNumber);
+    /// ```
     #[wasm_bindgen(js_name = getLeafPathAndRoot)]
     pub async fn get_leaf_path_and_root(
         &self,
@@ -502,7 +676,27 @@ impl AccountCurveTree {
         Ok(AccountLeafPathAndRoot { path })
     }
 
-    /// Get the block number of the last updated root.
+    /// Gets the block number of the most recently updated tree root.
+    ///
+    /// This is useful for determining which block to use when generating proofs.
+    /// Proofs must reference a specific block's root to be valid.
+    ///
+    /// # Returns
+    /// The block number as a `u32`.
+    ///
+    /// # Errors
+    /// * Throws an error if the block number cannot be queried from the blockchain.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const client = await PolymeshClient.connect("ws://localhost:9944");
+    /// const accountCurveTree = await client.getAccountCurveTree();
+    /// const lastBlock = await accountCurveTree.getLastBlockNumber();
+    /// console.log(`Account tree last updated at block ${lastBlock}`);
+    ///
+    /// // Use this block number for proof generation
+    /// const pathAndRoot = await accountCurveTree.getLeafPathAndRoot(leafIndex, lastBlock);
+    /// ```
     #[wasm_bindgen(js_name = getLastBlockNumber)]
     pub async fn get_last_block_number(&self) -> Result<u32, JsValue> {
         let block_number = self.inner.get_block_number().await.map_err(|e| {
@@ -516,6 +710,9 @@ impl AccountCurveTree {
 }
 
 /// The Asset curve tree.
+///
+/// Provides access to query asset states from the on-chain curve tree.
+/// Asset states contain metadata about confidential assets including mediator and auditor keys.
 #[wasm_bindgen]
 pub struct AssetCurveTree {
     pub(crate) inner: curve_tree::AssetCurveTree,
@@ -523,9 +720,43 @@ pub struct AssetCurveTree {
 
 #[wasm_bindgen]
 impl AssetCurveTree {
-    /// Get asset leaf path and root.
+    /// Retrieves the curve tree path and root for a specific asset leaf.
     ///
-    /// If no block number is provided, the latest root is used.
+    /// This method queries the blockchain and constructs the complete path from the
+    /// specified leaf to the tree root. Asset leaves contain metadata about confidential
+    /// assets. If no block number is provided, the latest finalized block is used.
+    ///
+    /// This is commonly used when building settlement proofs, as the asset path is required
+    /// to prove the asset state at a specific block.
+    ///
+    /// # Arguments
+    /// * `leaf_index` - The index of the target leaf in the asset tree (typically from `assetState.leafIndex()`)
+    /// * `block_number` - Optional block number at which to query the tree state (uses latest if not provided)
+    ///
+    /// # Returns
+    /// An `AssetLeafPathAndRoot` containing the curve tree path and root.
+    ///
+    /// # Errors
+    /// * Throws an error if the leaf path cannot be retrieved from the blockchain.
+    /// * Throws an error if the specified block number is invalid or too old.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const client = await PolymeshClient.connect("ws://localhost:9944");
+    /// const assetCurveTree = await client.getAssetCurveTree();
+    ///
+    /// // Get the latest block number
+    /// const blockNumber = await assetCurveTree.getLastBlockNumber();
+    ///
+    /// // Get asset state and its path
+    /// const assetState = await client.getAssetState(assetId);
+    /// const assetLeafIndex = assetState.leafIndex();
+    /// const assetPath = await assetCurveTree.getLeafPathAndRoot(assetLeafIndex, blockNumber);
+    ///
+    /// // Use in settlement builder
+    /// const settlementBuilder = new SettlementBuilder("memo", blockNumber, assetPath.getRoot());
+    /// settlementBuilder.addAssetPath(assetId, assetPath);
+    /// ```
     #[wasm_bindgen(js_name = getLeafPathAndRoot)]
     pub async fn get_leaf_path_and_root(
         &self,
@@ -546,7 +777,29 @@ impl AssetCurveTree {
         Ok(AssetLeafPathAndRoot { path })
     }
 
-    /// Get the block number of the last updated root.
+    /// Gets the block number of the most recently updated tree root.
+    ///
+    /// This is critical for settlement proof generation, as the proof must reference
+    /// a specific block's root. Always use this to get the current block before building settlements.
+    ///
+    /// # Returns
+    /// The block number as a `u32`.
+    ///
+    /// # Errors
+    /// * Throws an error if the block number cannot be queried from the blockchain.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const client = await PolymeshClient.connect("ws://localhost:9944");
+    /// const assetCurveTree = await client.getAssetCurveTree();
+    ///
+    /// // Get the latest block for proof generation
+    /// const blockNumber = await assetCurveTree.getLastBlockNumber();
+    /// const assetTreeRoot = await assetCurveTree.getRoot(blockNumber);
+    ///
+    /// // Use in settlement builder
+    /// const settlementBuilder = new SettlementBuilder("Transfer", blockNumber, assetTreeRoot);
+    /// ```
     #[wasm_bindgen(js_name = getLastBlockNumber)]
     pub async fn get_last_block_number(&self) -> Result<u32, JsValue> {
         let block_number = self.inner.get_block_number().await.map_err(|e| {
@@ -562,7 +815,33 @@ impl AssetCurveTree {
         Ok(block_number)
     }
 
-    /// Get the Asset tree root.
+    /// Retrieves the asset tree root at a specific block.
+    ///
+    /// The root is a commitment to all asset states in the tree. This is required
+    /// when building settlement proofs.
+    ///
+    /// # Arguments
+    /// * `block_number` - Optional block number at which to query the root (uses latest if not provided)
+    ///
+    /// # Returns
+    /// An `AssetTreeRoot` instance.
+    ///
+    /// # Errors
+    /// * Throws an error if the root cannot be retrieved from the blockchain.
+    /// * Throws an error if the specified block number is invalid.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const client = await PolymeshClient.connect("ws://localhost:9944");
+    /// const assetCurveTree = await client.getAssetCurveTree();
+    ///
+    /// // Get latest root
+    /// const blockNumber = await assetCurveTree.getLastBlockNumber();
+    /// const root = await assetCurveTree.getRoot(blockNumber);
+    ///
+    /// // Use in settlement builder
+    /// const settlementBuilder = new SettlementBuilder("Transfer", blockNumber, root);
+    /// ```
     #[wasm_bindgen(js_name = getRoot)]
     pub async fn get_root(&self, block_number: Option<u32>) -> Result<AssetTreeRoot, JsValue> {
         log::info!("get_root called with block_number: {:?}", block_number);
@@ -574,9 +853,29 @@ impl AssetCurveTree {
         Ok(AssetTreeRoot { root })
     }
 
-    /// Get asset leaf path.
+    /// Retrieves only the curve tree path for a specific asset leaf (without the root).
     ///
-    /// If no block number is provided, the latest root is used.
+    /// This is less commonly used than `getLeafPathAndRoot()`. Most operations require
+    /// both the path and root together.
+    ///
+    /// # Arguments
+    /// * `leaf_index` - The index of the target leaf in the asset tree
+    /// * `block_number` - Optional block number at which to query the tree state (uses latest if not provided)
+    ///
+    /// # Returns
+    /// An `AssetLeafPath` containing only the curve tree path.
+    ///
+    /// # Errors
+    /// * Throws an error if the leaf path cannot be retrieved from the blockchain.
+    /// * Throws an error if the specified block number is invalid or too old.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const client = await PolymeshClient.connect("ws://localhost:9944");
+    /// const assetCurveTree = await client.getAssetCurveTree();
+    /// const assetLeafIndex = assetState.leafIndex();
+    /// const path = await assetCurveTree.getLeafPath(assetLeafIndex);
+    /// ```
     #[wasm_bindgen(js_name = getLeafPath)]
     pub async fn get_leaf_path(
         &self,

@@ -45,6 +45,9 @@ pub type NativeFeeAccountTreeRoot =
     CompressedCurveTreeRoot<FEE_ACCOUNT_TREE_L, FEE_ACCOUNT_TREE_M, FeeAccountTreeConfig>;
 
 /// Fee account leaf path and root.
+///
+/// Contains both the curve tree path from a fee account leaf to the root and the root value itself
+/// at a specific block number. Used for generating zero-knowledge proofs about fee account states.
 #[wasm_bindgen]
 pub struct FeeAccountLeafPathAndRoot {
     pub(crate) path: NativeFeeAccountLeafPathAndRoot,
@@ -52,13 +55,40 @@ pub struct FeeAccountLeafPathAndRoot {
 
 #[wasm_bindgen]
 impl FeeAccountLeafPathAndRoot {
-    /// Export the path and root as a SCALE-encoded byte array
+    /// Exports the fee account leaf path and root as a SCALE-encoded byte array.
+    ///
+    /// This is useful for storing or transmitting the path and root in a compact binary format.
+    ///
+    /// # Returns
+    /// A `Uint8Array` containing the SCALE-encoded path and root.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const feeAccountCurveTree = await client.getFeeAccountCurveTree();
+    /// const pathAndRoot = await feeAccountCurveTree.getLeafPathAndRoot(leafIndex);
+    /// const bytes = pathAndRoot.toBytes();
+    /// // Store or transmit bytes
+    /// ```
     #[wasm_bindgen(js_name = toBytes)]
     pub fn to_bytes(&self) -> Vec<u8> {
         self.path.encode()
     }
 
-    /// Import the path and root from a SCALE-encoded byte array
+    /// Imports a fee account leaf path and root from a SCALE-encoded byte array.
+    ///
+    /// # Arguments
+    /// * `bytes` - A `Uint8Array` containing the SCALE-encoded path and root.
+    ///
+    /// # Returns
+    /// A `FeeAccountLeafPathAndRoot` instance.
+    ///
+    /// # Errors
+    /// * Throws an error if the bytes are not a valid SCALE-encoded fee account leaf path and root.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const pathAndRoot = FeeAccountLeafPathAndRoot.fromBytes(bytes);
+    /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<FeeAccountLeafPathAndRoot, JsValue> {
         let path = Decode::decode(&mut &bytes[..]).map_err(|e| {
@@ -72,6 +102,10 @@ impl FeeAccountLeafPathAndRoot {
 }
 
 /// Account leaf path and root.
+///
+/// Contains both the curve tree path from an account leaf to the root and the root value itself
+/// at a specific block number. Used for generating zero-knowledge proofs about account states
+/// (e.g., proving balance sufficiency during settlement affirmations).
 #[wasm_bindgen]
 pub struct AccountLeafPathAndRoot {
     pub(crate) path: NativeAccountLeafPathAndRoot,
@@ -79,13 +113,40 @@ pub struct AccountLeafPathAndRoot {
 
 #[wasm_bindgen]
 impl AccountLeafPathAndRoot {
-    /// Export the path and root as a SCALE-encoded byte array
+    /// Exports the account leaf path and root as a SCALE-encoded byte array.
+    ///
+    /// This is useful for storing or transmitting the path and root in a compact binary format.
+    ///
+    /// # Returns
+    /// A `Uint8Array` containing the SCALE-encoded path and root.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const accountCurveTree = await client.getAccountCurveTree();
+    /// const pathAndRoot = await accountCurveTree.getLeafPathAndRoot(leafIndex);
+    /// const bytes = pathAndRoot.toBytes();
+    /// // Store or transmit bytes
+    /// ```
     #[wasm_bindgen(js_name = toBytes)]
     pub fn to_bytes(&self) -> Vec<u8> {
         self.path.encode()
     }
 
-    /// Import the path and root from a SCALE-encoded byte array
+    /// Imports an account leaf path and root from a SCALE-encoded byte array.
+    ///
+    /// # Arguments
+    /// * `bytes` - A `Uint8Array` containing the SCALE-encoded path and root.
+    ///
+    /// # Returns
+    /// A `FeeAccountLeafPathAndRoot` instance.
+    ///
+    /// # Errors
+    /// * Throws an error if the bytes are not a valid SCALE-encoded account leaf path and root.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const pathAndRoot = AccountLeafPathAndRoot.fromBytes(bytes);
+    /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<FeeAccountLeafPathAndRoot, JsValue> {
         let path = Decode::decode(&mut &bytes[..]).map_err(|e| {
@@ -97,7 +158,24 @@ impl AccountLeafPathAndRoot {
         Ok(FeeAccountLeafPathAndRoot { path })
     }
 
-    /// Get the block number of the root.
+    /// Gets the block number at which this root was generated.
+    ///
+    /// The block number indicates at which blockchain state the curve tree root was calculated.
+    /// This is important for ensuring proofs are verified against the correct historical state.
+    ///
+    /// # Returns
+    /// The block number as a `u32`.
+    ///
+    /// # Errors
+    /// * Throws an error if the block number cannot be extracted from the path.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const accountCurveTree = await client.getAccountCurveTree();
+    /// const pathAndRoot = await accountCurveTree.getLeafPathAndRoot(leafIndex);
+    /// const blockNumber = pathAndRoot.getBlockNumber();
+    /// console.log(`Root calculated at block ${blockNumber}`);
+    /// ```
     #[wasm_bindgen(js_name = getBlockNumber)]
     pub fn get_block_number(&self) -> Result<u32, JsValue> {
         self.path
@@ -107,6 +185,10 @@ impl AccountLeafPathAndRoot {
 }
 
 /// Asset leaf path and root.
+///
+/// Contains both the curve tree path from an asset leaf to the root and the root value itself
+/// at a specific block number. Assets are stored in their own curve tree separate from accounts.
+/// This structure is used when building settlement proofs to prove asset states.
 #[wasm_bindgen]
 pub struct AssetLeafPathAndRoot {
     pub(crate) path: NativeAssetLeafPathAndRoot,
@@ -114,13 +196,40 @@ pub struct AssetLeafPathAndRoot {
 
 #[wasm_bindgen]
 impl AssetLeafPathAndRoot {
-    /// Export the path and root as a SCALE-encoded byte array
+    /// Exports the asset leaf path and root as a SCALE-encoded byte array.
+    ///
+    /// This is useful for storing or transmitting the path and root in a compact binary format.
+    ///
+    /// # Returns
+    /// A `Uint8Array` containing the SCALE-encoded path and root.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const assetCurveTree = await client.getAssetCurveTree();
+    /// const pathAndRoot = await assetCurveTree.getLeafPathAndRoot(assetState.leafIndex());
+    /// const bytes = pathAndRoot.toBytes();
+    /// // Store or transmit bytes
+    /// ```
     #[wasm_bindgen(js_name = toBytes)]
     pub fn to_bytes(&self) -> Vec<u8> {
         self.path.encode()
     }
 
-    /// Import the path and root from a SCALE-encoded byte array
+    /// Imports an asset leaf path and root from a SCALE-encoded byte array.
+    ///
+    /// # Arguments
+    /// * `bytes` - A `Uint8Array` containing the SCALE-encoded path and root.
+    ///
+    /// # Returns
+    /// An `AssetLeafPathAndRoot` instance.
+    ///
+    /// # Errors
+    /// * Throws an error if the bytes are not a valid SCALE-encoded asset leaf path and root.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const pathAndRoot = AssetLeafPathAndRoot.fromBytes(bytes);
+    /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<AssetLeafPathAndRoot, JsValue> {
         let path = Decode::decode(&mut &bytes[..]).map_err(|e| {
@@ -129,7 +238,22 @@ impl AssetLeafPathAndRoot {
         Ok(AssetLeafPathAndRoot { path })
     }
 
-    /// Get the Asset tree root.
+    /// Extracts the asset tree root from the path and root.
+    ///
+    /// The root represents the commitment to all asset states in the tree at a specific block.
+    ///
+    /// # Returns
+    /// An `AssetTreeRoot` instance.
+    ///
+    /// # Errors
+    /// * Throws an error if the root cannot be extracted from the path.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const assetCurveTree = await client.getAssetCurveTree();
+    /// const pathAndRoot = await assetCurveTree.getLeafPathAndRoot(assetState.leafIndex());
+    /// const root = pathAndRoot.getRoot();
+    /// ```
     #[wasm_bindgen(js_name = getRoot)]
     pub fn get_root(&self) -> Result<AssetTreeRoot, JsValue> {
         let root = self
@@ -139,7 +263,24 @@ impl AssetLeafPathAndRoot {
         Ok(AssetTreeRoot { root })
     }
 
-    /// Get the block number of the root.
+    /// Gets the block number at which this root was generated.
+    ///
+    /// The block number indicates at which blockchain state the curve tree root was calculated.
+    /// This is critical for settlement proofs as they must reference a specific block state.
+    ///
+    /// # Returns
+    /// The block number as a `u32`.
+    ///
+    /// # Errors
+    /// * Throws an error if the block number cannot be extracted from the path.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const assetCurveTree = await client.getAssetCurveTree();
+    /// const pathAndRoot = await assetCurveTree.getLeafPathAndRoot(assetState.leafIndex());
+    /// const blockNumber = pathAndRoot.getBlockNumber();
+    /// console.log(`Asset root at block ${blockNumber}`);
+    /// ```
     #[wasm_bindgen(js_name = getBlockNumber)]
     pub fn get_block_number(&self) -> Result<u32, JsValue> {
         self.path
@@ -149,6 +290,9 @@ impl AssetLeafPathAndRoot {
 }
 
 /// Asset tree root.
+///
+/// Represents the root commitment of the asset curve tree at a specific point in time.
+/// This root is used in settlement proofs to verify that asset states are valid.
 #[wasm_bindgen]
 pub struct AssetTreeRoot {
     pub(crate) root: NativeAssetTreeRoot,
@@ -156,13 +300,38 @@ pub struct AssetTreeRoot {
 
 #[wasm_bindgen]
 impl AssetTreeRoot {
-    /// Export the root as a SCALE-encoded byte array
+    /// Exports the asset tree root as a SCALE-encoded byte array.
+    ///
+    /// # Returns
+    /// A `Uint8Array` containing the SCALE-encoded root.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const assetCurveTree = await client.getAssetCurveTree();
+    /// const pathAndRoot = await assetCurveTree.getLeafPathAndRoot(assetState.leafIndex());
+    /// const root = pathAndRoot.getRoot();
+    /// const bytes = root.toBytes();
+    /// ```
     #[wasm_bindgen(js_name = toBytes)]
     pub fn to_bytes(&self) -> Vec<u8> {
         self.root.encode()
     }
 
-    /// Import the root from a SCALE-encoded byte array
+    /// Imports an asset tree root from a SCALE-encoded byte array.
+    ///
+    /// # Arguments
+    /// * `bytes` - A `Uint8Array` containing the SCALE-encoded root.
+    ///
+    /// # Returns
+    /// An `AssetTreeRoot` instance.
+    ///
+    /// # Errors
+    /// * Throws an error if the bytes are not a valid SCALE-encoded asset tree root.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const root = AssetTreeRoot.fromBytes(bytes);
+    /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<AssetTreeRoot, JsValue> {
         let root = Decode::decode(&mut &bytes[..])
@@ -172,6 +341,9 @@ impl AssetTreeRoot {
 }
 
 /// Asset leaf path.
+///
+/// Contains the curve tree path from an asset leaf to the root (without the root value itself).
+/// Used when you only need the path structure without the specific root commitment.
 #[wasm_bindgen]
 pub struct AssetLeafPath {
     pub(crate) path: NativeAssetLeafPath,
@@ -179,13 +351,38 @@ pub struct AssetLeafPath {
 
 #[wasm_bindgen]
 impl AssetLeafPath {
-    /// Export the path as a SCALE-encoded byte array
+    /// Exports the asset leaf path as a SCALE-encoded byte array.
+    ///
+    /// # Returns
+    /// A `Uint8Array` containing the SCALE-encoded path.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const assetLeafPathBuilder = new AssetLeafPathBuilder(leafIndex, height, blockNumber);
+    /// // ... set leaves and nodes ...
+    /// const path = assetLeafPathBuilder.buildLeafPath();
+    /// const bytes = path.toBytes();
+    /// ```
     #[wasm_bindgen(js_name = toBytes)]
     pub fn to_bytes(&self) -> Vec<u8> {
         self.path.encode()
     }
 
-    /// Import the path from a SCALE-encoded byte array
+    /// Imports an asset leaf path from a SCALE-encoded byte array.
+    ///
+    /// # Arguments
+    /// * `bytes` - A `Uint8Array` containing the SCALE-encoded path.
+    ///
+    /// # Returns
+    /// An `AssetLeafPath` instance.
+    ///
+    /// # Errors
+    /// * Throws an error if the bytes are not a valid SCALE-encoded asset leaf path.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const path = AssetLeafPath.fromBytes(bytes);
+    /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<AssetLeafPath, JsValue> {
         let path = Decode::decode(&mut &bytes[..])
@@ -446,6 +643,52 @@ type AssetLeafPathBuilderType = CurveTreeWithBackend<
 >;
 
 /// Asset leaf path builder.
+///
+/// A utility for incrementally building curve tree paths for assets in the asset curve tree.
+/// This builder helps you construct paths by querying on-chain data (leaves, inner nodes, and roots)
+/// and assembling them into a complete path structure.
+///
+/// # Workflow
+/// 1. Create a new builder with the target leaf index, tree height, and block number
+/// 2. Get the list of node locations needed from `getNodeLocations()`
+/// 3. Query the blockchain for inner nodes at those locations
+/// 4. Get the range of leaf indices needed from `getMinLeafIndex()` / `getMaxLeafIndex()`
+/// 5. Query the blockchain for those leaves
+/// 6. Query the blockchain for the tree root at the block number
+/// 7. Set all the data using `setLeaf()`, `setNodeAtIndex()`, and `setRoot()`
+/// 8. Build the final path with `buildLeafPath()` or `buildLeafPathWithRoot()`
+///
+/// # Example
+/// ```javascript
+/// const assetCurveTree = await client.getAssetCurveTree();
+/// const blockNumber = await assetCurveTree.getLastBlockNumber();
+/// const leafIndex = assetState.leafIndex();
+///
+/// // Create the builder
+/// const builder = new AssetLeafPathBuilder(leafIndex, 4, blockNumber);
+///
+/// // Query and set leaves
+/// const minLeaf = builder.getMinLeafIndex();
+/// const maxLeaf = builder.getMaxLeafIndex();
+/// for (let i = minLeaf; i < maxLeaf; i++) {
+///   const leaf = await client.getAssetLeaf(i, blockNumber);
+///   builder.setLeaf(i, leaf);
+/// }
+///
+/// // Query and set inner nodes
+/// const nodeLocations = builder.getNodeLocations();
+/// for (let i = 0; i < nodeLocations.length; i++) {
+///   const node = await client.getAssetInnerNode(nodeLocations[i], blockNumber);
+///   builder.setNodeAtIndex(i, node);
+/// }
+///
+/// // Query and set root
+/// const root = await client.getAssetTreeRoot(blockNumber);
+/// builder.setRoot(root);
+///
+/// // Build the path
+/// const pathAndRoot = builder.buildLeafPathWithRoot();
+/// ```
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct AssetLeafPathBuilder {
@@ -454,6 +697,23 @@ pub struct AssetLeafPathBuilder {
 
 #[wasm_bindgen]
 impl AssetLeafPathBuilder {
+    /// Creates a new asset leaf path builder.
+    ///
+    /// # Arguments
+    /// * `leaf_index` - The index of the target leaf in the tree (typically from `assetState.leafIndex()`)
+    /// * `height` - The height of the tree (typically 4 for asset trees)
+    /// * `block_number` - The block number at which to build the path
+    ///
+    /// # Returns
+    /// A new `AssetLeafPathBuilder` instance ready to collect tree data.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const assetCurveTree = await client.getAssetCurveTree();
+    /// const blockNumber = await assetCurveTree.getLastBlockNumber();
+    /// const leafIndex = assetState.leafIndex();
+    /// const builder = new AssetLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(leaf_index: LeafIndex, height: NodeLevel, block_number: BlockNumber) -> Self {
         let backend = LeafPathBuilder::new(leaf_index, height, block_number);
@@ -463,19 +723,57 @@ impl AssetLeafPathBuilder {
         }
     }
 
-    /// Return the `L` parameter of the tree.
+    /// Returns the `L` parameter of the asset tree.
+    ///
+    /// This represents the branching factor (arity) of the tree - how many children each node has.
+    ///
+    /// # Returns
+    /// The tree arity as a number (typically 4 for asset trees).
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AssetLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// console.log(`Tree arity: ${builder.getL()}`); // 4
+    /// ```
     #[wasm_bindgen(js_name = getL)]
     pub fn get_l(&self) -> usize {
         ASSET_TREE_L
     }
 
-    /// Return the `M` parameter of the tree.
+    /// Returns the `M` parameter of the asset tree.
+    ///
+    /// This represents the maximum number of children stored in each compressed inner node.
+    ///
+    /// # Returns
+    /// The compression parameter as a number.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AssetLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// console.log(`Compression parameter: ${builder.getM()}`);
+    /// ```
     #[wasm_bindgen(js_name = getM)]
     pub fn get_m(&self) -> usize {
         ASSET_TREE_M
     }
 
-    /// Get the list of node locations to query
+    /// Gets the list of inner node locations that need to be queried from the blockchain.
+    ///
+    /// Returns an array of SCALE-encoded node locations. These should be used to query
+    /// the on-chain storage for inner nodes.
+    ///
+    /// # Returns
+    /// An array of `Uint8Array` values, each representing a SCALE-encoded node location.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AssetLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// const nodeLocations = builder.getNodeLocations();
+    /// for (let i = 0; i < nodeLocations.length; i++) {
+    ///   const node = await client.getAssetInnerNode(nodeLocations[i], blockNumber);
+    ///   builder.setNodeAtIndex(i, node);
+    /// }
+    /// ```
     #[wasm_bindgen(js_name = getNodeLocations)]
     pub fn get_node_locations(&self) -> Vec<Uint8Array> {
         self.tree
@@ -486,31 +784,102 @@ impl AssetLeafPathBuilder {
             .collect()
     }
 
-    /// Get the leaf indices
+    /// Gets the list of leaf indices that need to be queried from the blockchain.
+    ///
+    /// Returns all sibling leaf indices along the path to the target leaf.
+    ///
+    /// # Returns
+    /// An array of leaf indices (as numbers).
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AssetLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// const leafIndices = builder.getLeafIndices();
+    /// for (const index of leafIndices) {
+    ///   const leaf = await client.getAssetLeaf(index, blockNumber);
+    ///   builder.setLeaf(index, leaf);
+    /// }
+    /// ```
     #[wasm_bindgen(js_name = getLeafIndices)]
     pub fn get_leaf_indices(&self) -> Vec<LeafIndex> {
         self.tree.backend.leaf_indices.clone()
     }
 
-    /// Get the min leaf index
+    /// Gets the minimum leaf index that needs to be queried.
+    ///
+    /// Combined with `getMaxLeafIndex()`, this defines a range of leaves to query.
+    ///
+    /// # Returns
+    /// The minimum leaf index as a number.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AssetLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// const minLeaf = builder.getMinLeafIndex();
+    /// const maxLeaf = builder.getMaxLeafIndex();
+    /// for (let i = minLeaf; i < maxLeaf; i++) {
+    ///   const leaf = await client.getAssetLeaf(i, blockNumber);
+    ///   builder.setLeaf(i, leaf);
+    /// }
+    /// ```
     #[wasm_bindgen(js_name = getMinLeafIndex)]
     pub fn get_min_leaf_index(&self) -> LeafIndex {
         self.tree.backend.get_min_leaf_index()
     }
 
-    /// Get the max leaf index
+    /// Gets the maximum leaf index that needs to be queried.
+    ///
+    /// Combined with `getMinLeafIndex()`, this defines a range of leaves to query.
+    ///
+    /// # Returns
+    /// The maximum leaf index as a number (exclusive - use `i < maxLeaf` in loops).
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AssetLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// const minLeaf = builder.getMinLeafIndex();
+    /// const maxLeaf = builder.getMaxLeafIndex();
+    /// for (let i = minLeaf; i < maxLeaf; i++) {
+    ///   const leaf = await client.getAssetLeaf(i, blockNumber);
+    ///   builder.setLeaf(i, leaf);
+    /// }
+    /// ```
     #[wasm_bindgen(js_name = getMaxLeafIndex)]
     pub fn get_max_leaf_index(&self) -> LeafIndex {
         self.tree.backend.get_max_leaf_index()
     }
 
-    /// Set the root.
+    /// Sets the tree root value.
+    ///
+    /// # Arguments
+    /// * `root` - A `Uint8Array` containing the SCALE-encoded tree root
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AssetLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// const root = await client.getAssetTreeRoot(blockNumber);
+    /// builder.setRoot(root);
+    /// ```
     #[wasm_bindgen(js_name = setRoot)]
     pub fn set_root(&mut self, root: &[u8]) {
         self.tree.backend.set_root(root);
     }
 
-    /// Set a leaf at the given index.
+    /// Sets a leaf value at the specified index.
+    ///
+    /// # Arguments
+    /// * `leaf_index` - The index of the leaf in the tree
+    /// * `leaf` - A `Uint8Array` containing the SCALE-encoded leaf value, or `null`/`undefined` to remove
+    ///
+    /// # Errors
+    /// * Throws an error if the leaf data cannot be decoded.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AssetLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// const leaf = await client.getAssetLeaf(0, blockNumber);
+    /// builder.setLeaf(0, leaf);
+    /// ```
     #[wasm_bindgen(js_name = setLeaf)]
     pub fn set_leaf(
         &mut self,
@@ -523,7 +892,27 @@ impl AssetLeafPathBuilder {
             .map_err(|e| JsValue::from_str(&format!("Failed to set leaf: {}", e)))
     }
 
-    /// Set a node at the given location index.
+    /// Sets an inner node at the specified location index.
+    ///
+    /// The location index corresponds to the position in the array returned by `getNodeLocations()`.
+    ///
+    /// # Arguments
+    /// * `location_index` - The index in the node locations array
+    /// * `node` - A `Uint8Array` containing the SCALE-encoded inner node, or `null`/`undefined` to remove
+    ///
+    /// # Errors
+    /// * Throws an error if the location index is out of bounds.
+    /// * Throws an error if the node data cannot be decoded.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AssetLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// const nodeLocations = builder.getNodeLocations();
+    /// for (let i = 0; i < nodeLocations.length; i++) {
+    ///   const node = await client.getAssetInnerNode(nodeLocations[i], blockNumber);
+    ///   builder.setNodeAtIndex(i, node);
+    /// }
+    /// ```
     #[wasm_bindgen(js_name = setNodeAtIndex)]
     pub fn set_node_at_index(
         &mut self,
@@ -536,7 +925,24 @@ impl AssetLeafPathBuilder {
             .map_err(|e| JsValue::from_str(&format!("Failed to set node: {}", e)))
     }
 
-    /// Build the leaf path
+    /// Builds the asset leaf path (without the root).
+    ///
+    /// Constructs the curve tree path from the target leaf to the root using the leaves and nodes
+    /// that have been set. The root itself is not included in the result.
+    ///
+    /// # Returns
+    /// An `AssetLeafPath` instance containing the curve tree path.
+    ///
+    /// # Errors
+    /// * Throws an error if required leaves or nodes have not been set.
+    /// * Throws an error if the path cannot be constructed.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AssetLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// // ... set all leaves and nodes ...
+    /// const path = builder.buildLeafPath();
+    /// ```
     #[wasm_bindgen(js_name = buildLeafPath)]
     pub fn build_leaf_path(&mut self) -> Result<AssetLeafPath, JsValue> {
         let path = self
@@ -551,7 +957,44 @@ impl AssetLeafPathBuilder {
         })
     }
 
-    /// Build the leaf path with root.
+    /// Builds the asset leaf path with the root included.
+    ///
+    /// Constructs the complete curve tree path from the target leaf to the root, including the root value.
+    /// This is the most common method used as proofs typically require both the path and the root.
+    ///
+    /// # Returns
+    /// An `AssetLeafPathAndRoot` instance containing both the curve tree path and the root.
+    ///
+    /// # Errors
+    /// * Throws an error if required leaves, nodes, or root have not been set.
+    /// * Throws an error if the path cannot be constructed.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AssetLeafPathBuilder(leafIndex, 4, blockNumber);
+    ///
+    /// // Set all leaves
+    /// const minLeaf = builder.getMinLeafIndex();
+    /// const maxLeaf = builder.getMaxLeafIndex();
+    /// for (let i = minLeaf; i < maxLeaf; i++) {
+    ///   const leaf = await client.getAssetLeaf(i, blockNumber);
+    ///   builder.setLeaf(i, leaf);
+    /// }
+    ///
+    /// // Set all inner nodes
+    /// const nodeLocations = builder.getNodeLocations();
+    /// for (let i = 0; i < nodeLocations.length; i++) {
+    ///   const node = await client.getAssetInnerNode(nodeLocations[i], blockNumber);
+    ///   builder.setNodeAtIndex(i, node);
+    /// }
+    ///
+    /// // Set the root
+    /// const root = await client.getAssetTreeRoot(blockNumber);
+    /// builder.setRoot(root);
+    ///
+    /// // Build the complete path with root
+    /// const pathAndRoot = builder.buildLeafPathWithRoot();
+    /// ```
     #[wasm_bindgen(js_name = buildLeafPathWithRoot)]
     pub fn build_leaf_path_with_root(&mut self) -> Result<AssetLeafPathAndRoot, JsValue> {
         let path = self
@@ -574,6 +1017,55 @@ type AccountLeafPathBuilderType = CurveTreeWithBackend<
 >;
 
 /// Account leaf path builder.
+///
+/// A utility for incrementally building curve tree paths for accounts in the account curve tree.
+/// This builder helps you construct paths by querying on-chain data (leaves, inner nodes, and roots)
+/// and assembling them into a complete path structure.
+///
+/// The workflow is identical to `AssetLeafPathBuilder` but operates on the account tree instead of the asset tree.
+/// Account paths are used when generating proofs related to account states (balance commitments, etc.).
+///
+/// # Workflow
+/// 1. Create a new builder with the target leaf index, tree height, and block number
+/// 2. Get the list of node locations needed from `getNodeLocations()`
+/// 3. Query the blockchain for inner nodes at those locations
+/// 4. Get the range of leaf indices needed from `getMinLeafIndex()` / `getMaxLeafIndex()`
+/// 5. Query the blockchain for those leaves
+/// 6. Query the blockchain for the tree root at the block number
+/// 7. Set all the data using `setLeaf()`, `setNodeAtIndex()`, and `setRoot()`
+/// 8. Build the final path with `buildLeafPathWithRoot()`
+///
+/// # Example
+/// ```javascript
+/// const accountCurveTree = await client.getAccountCurveTree();
+/// const blockNumber = await accountCurveTree.getLastBlockNumber();
+/// const leafIndex = accountState.leafIndex();
+///
+/// // Create the builder
+/// const builder = new AccountLeafPathBuilder(leafIndex, 4, blockNumber);
+///
+/// // Query and set leaves
+/// const minLeaf = builder.getMinLeafIndex();
+/// const maxLeaf = builder.getMaxLeafIndex();
+/// for (let i = minLeaf; i < maxLeaf; i++) {
+///   const leaf = await client.getAccountLeaf(i, blockNumber);
+///   builder.setLeaf(i, leaf);
+/// }
+///
+/// // Query and set inner nodes
+/// const nodeLocations = builder.getNodeLocations();
+/// for (let i = 0; i < nodeLocations.length; i++) {
+///   const node = await client.getAccountInnerNode(nodeLocations[i], blockNumber);
+///   builder.setNodeAtIndex(i, node);
+/// }
+///
+/// // Query and set root
+/// const root = await client.getAccountTreeRoot(blockNumber);
+/// builder.setRoot(root);
+///
+/// // Build the path
+/// const pathAndRoot = builder.buildLeafPathWithRoot();
+/// ```
 #[wasm_bindgen]
 #[derive(Clone)]
 pub struct AccountLeafPathBuilder {
@@ -582,6 +1074,23 @@ pub struct AccountLeafPathBuilder {
 
 #[wasm_bindgen]
 impl AccountLeafPathBuilder {
+    /// Creates a new account leaf path builder.
+    ///
+    /// # Arguments
+    /// * `leaf_index` - The index of the target leaf in the tree (typically from account state)
+    /// * `height` - The height of the tree (typically 4 for account trees)
+    /// * `block_number` - The block number at which to build the path
+    ///
+    /// # Returns
+    /// A new `AccountLeafPathBuilder` instance ready to collect tree data.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const accountCurveTree = await client.getAccountCurveTree();
+    /// const blockNumber = await accountCurveTree.getLastBlockNumber();
+    /// const leafIndex = accountState.leafIndex();
+    /// const builder = new AccountLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(leaf_index: LeafIndex, height: NodeLevel, block_number: BlockNumber) -> Self {
         let backend = LeafPathBuilder::new(leaf_index, height, block_number);
@@ -591,19 +1100,57 @@ impl AccountLeafPathBuilder {
         }
     }
 
-    /// Return the `L` parameter of the tree.
+    /// Returns the `L` parameter of the account tree.
+    ///
+    /// This represents the branching factor (arity) of the tree - how many children each node has.
+    ///
+    /// # Returns
+    /// The tree arity as a number (typically 4 for account trees).
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AccountLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// console.log(`Tree arity: ${builder.getL()}`); // 4
+    /// ```
     #[wasm_bindgen(js_name = getL)]
     pub fn get_l(&self) -> usize {
         ACCOUNT_TREE_L
     }
 
-    /// Return the `M` parameter of the tree.
+    /// Returns the `M` parameter of the account tree.
+    ///
+    /// This represents the maximum number of children stored in each compressed inner node.
+    ///
+    /// # Returns
+    /// The compression parameter as a number.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AccountLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// console.log(`Compression parameter: ${builder.getM()}`);
+    /// ```
     #[wasm_bindgen(js_name = getM)]
     pub fn get_m(&self) -> usize {
         ACCOUNT_TREE_M
     }
 
-    /// Get the list of node locations to query
+    /// Gets the list of inner node locations that need to be queried from the blockchain.
+    ///
+    /// Returns an array of SCALE-encoded node locations. These should be used to query
+    /// the on-chain storage for inner nodes.
+    ///
+    /// # Returns
+    /// An array of `Uint8Array` values, each representing a SCALE-encoded node location.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AccountLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// const nodeLocations = builder.getNodeLocations();
+    /// for (let i = 0; i < nodeLocations.length; i++) {
+    ///   const node = await client.getAccountInnerNode(nodeLocations[i], blockNumber);
+    ///   builder.setNodeAtIndex(i, node);
+    /// }
+    /// ```
     #[wasm_bindgen(js_name = getNodeLocations)]
     pub fn get_node_locations(&self) -> Vec<Uint8Array> {
         self.tree
@@ -614,31 +1161,102 @@ impl AccountLeafPathBuilder {
             .collect()
     }
 
-    /// Get the leaf indices
+    /// Gets the list of leaf indices that need to be queried from the blockchain.
+    ///
+    /// Returns all sibling leaf indices along the path to the target leaf.
+    ///
+    /// # Returns
+    /// An array of leaf indices (as numbers).
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AccountLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// const leafIndices = builder.getLeafIndices();
+    /// for (const index of leafIndices) {
+    ///   const leaf = await client.getAccountLeaf(index, blockNumber);
+    ///   builder.setLeaf(index, leaf);
+    /// }
+    /// ```
     #[wasm_bindgen(js_name = getLeafIndices)]
     pub fn get_leaf_indices(&self) -> Vec<LeafIndex> {
         self.tree.backend.leaf_indices.clone()
     }
 
-    /// Get the min leaf index
+    /// Gets the minimum leaf index that needs to be queried.
+    ///
+    /// Combined with `getMaxLeafIndex()`, this defines a range of leaves to query.
+    ///
+    /// # Returns
+    /// The minimum leaf index as a number.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AccountLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// const minLeaf = builder.getMinLeafIndex();
+    /// const maxLeaf = builder.getMaxLeafIndex();
+    /// for (let i = minLeaf; i < maxLeaf; i++) {
+    ///   const leaf = await client.getAccountLeaf(i, blockNumber);
+    ///   builder.setLeaf(i, leaf);
+    /// }
+    /// ```
     #[wasm_bindgen(js_name = getMinLeafIndex)]
     pub fn get_min_leaf_index(&self) -> LeafIndex {
         self.tree.backend.get_min_leaf_index()
     }
 
-    /// Get the max leaf index
+    /// Gets the maximum leaf index that needs to be queried.
+    ///
+    /// Combined with `getMinLeafIndex()`, this defines a range of leaves to query.
+    ///
+    /// # Returns
+    /// The maximum leaf index as a number (exclusive - use `i < maxLeaf` in loops).
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AccountLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// const minLeaf = builder.getMinLeafIndex();
+    /// const maxLeaf = builder.getMaxLeafIndex();
+    /// for (let i = minLeaf; i < maxLeaf; i++) {
+    ///   const leaf = await client.getAccountLeaf(i, blockNumber);
+    ///   builder.setLeaf(i, leaf);
+    /// }
+    /// ```
     #[wasm_bindgen(js_name = getMaxLeafIndex)]
     pub fn get_max_leaf_index(&self) -> LeafIndex {
         self.tree.backend.get_max_leaf_index()
     }
 
-    /// Set the root.
+    /// Sets the tree root value.
+    ///
+    /// # Arguments
+    /// * `root` - A `Uint8Array` containing the SCALE-encoded tree root
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AccountLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// const root = await client.getAccountTreeRoot(blockNumber);
+    /// builder.setRoot(root);
+    /// ```
     #[wasm_bindgen(js_name = setRoot)]
     pub fn set_root(&mut self, root: &[u8]) {
         self.tree.backend.set_root(root);
     }
 
-    /// Set a leaf at the given index.
+    /// Sets a leaf value at the specified index.
+    ///
+    /// # Arguments
+    /// * `leaf_index` - The index of the leaf in the tree
+    /// * `leaf` - A `Uint8Array` containing the SCALE-encoded leaf value, or `null`/`undefined` to remove
+    ///
+    /// # Errors
+    /// * Throws an error if the leaf data cannot be decoded.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AccountLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// const leaf = await client.getAccountLeaf(0, blockNumber);
+    /// builder.setLeaf(0, leaf);
+    /// ```
     #[wasm_bindgen(js_name = setLeaf)]
     pub fn set_leaf(
         &mut self,
@@ -651,7 +1269,27 @@ impl AccountLeafPathBuilder {
             .map_err(|e| JsValue::from_str(&format!("Failed to set leaf: {}", e)))
     }
 
-    /// Set a node at the given location index.
+    /// Sets an inner node at the specified location index.
+    ///
+    /// The location index corresponds to the position in the array returned by `getNodeLocations()`.
+    ///
+    /// # Arguments
+    /// * `location_index` - The index in the node locations array
+    /// * `node` - A `Uint8Array` containing the SCALE-encoded inner node, or `null`/`undefined` to remove
+    ///
+    /// # Errors
+    /// * Throws an error if the location index is out of bounds.
+    /// * Throws an error if the node data cannot be decoded.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AccountLeafPathBuilder(leafIndex, 4, blockNumber);
+    /// const nodeLocations = builder.getNodeLocations();
+    /// for (let i = 0; i < nodeLocations.length; i++) {
+    ///   const node = await client.getAccountInnerNode(nodeLocations[i], blockNumber);
+    ///   builder.setNodeAtIndex(i, node);
+    /// }
+    /// ```
     #[wasm_bindgen(js_name = setNodeAtIndex)]
     pub fn set_node_at_index(
         &mut self,
@@ -664,7 +1302,44 @@ impl AccountLeafPathBuilder {
             .map_err(|e| JsValue::from_str(&format!("Failed to set node: {}", e)))
     }
 
-    /// Build the leaf path with root.
+    /// Builds the account leaf path with the root included.
+    ///
+    /// Constructs the complete curve tree path from the target leaf to the root, including the root value.
+    /// This is used when generating zero-knowledge proofs about account states.
+    ///
+    /// # Returns
+    /// An `AccountLeafPathAndRoot` instance containing both the curve tree path and the root.
+    ///
+    /// # Errors
+    /// * Throws an error if required leaves, nodes, or root have not been set.
+    /// * Throws an error if the path cannot be constructed.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const builder = new AccountLeafPathBuilder(leafIndex, 4, blockNumber);
+    ///
+    /// // Set all leaves
+    /// const minLeaf = builder.getMinLeafIndex();
+    /// const maxLeaf = builder.getMaxLeafIndex();
+    /// for (let i = minLeaf; i < maxLeaf; i++) {
+    ///   const leaf = await client.getAccountLeaf(i, blockNumber);
+    ///   builder.setLeaf(i, leaf);
+    /// }
+    ///
+    /// // Set all inner nodes
+    /// const nodeLocations = builder.getNodeLocations();
+    /// for (let i = 0; i < nodeLocations.length; i++) {
+    ///   const node = await client.getAccountInnerNode(nodeLocations[i], blockNumber);
+    ///   builder.setNodeAtIndex(i, node);
+    /// }
+    ///
+    /// // Set the root
+    /// const root = await client.getAccountTreeRoot(blockNumber);
+    /// builder.setRoot(root);
+    ///
+    /// // Build the complete path with root
+    /// const pathAndRoot = builder.buildLeafPathWithRoot();
+    /// ```
     #[wasm_bindgen(js_name = buildLeafPathWithRoot)]
     pub fn build_leaf_path_with_root(&mut self) -> Result<AccountLeafPathAndRoot, JsValue> {
         let path = self

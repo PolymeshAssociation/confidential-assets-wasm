@@ -14,8 +14,28 @@ use wasm_bindgen::prelude::*;
 
 use crate::{jsvalue_to_identity_id, AccountAssetRegistration, AccountAssetState};
 
-/// Account keys containing both the account secret key and encryption secret key.
-/// This type is used for operations requiring the private keys.
+/// Contains the secret keys for a confidential account.
+///
+/// This type holds both the account secret key (used for generating zero-knowledge proofs)
+/// and the encryption secret key (used for decrypting settlement leg information). These keys
+/// are essential for all confidential asset operations including registration, minting,
+/// and settlements.
+///
+/// **Security Warning:** These keys should be kept secure and never shared. Loss of these
+/// keys means permanent loss of access to the confidential account.
+///
+/// # Example
+/// ```javascript
+/// // Generate from a deterministic seed
+/// const keys = AccountKeys.fromSeed("my-secure-seed-phrase");
+///
+/// // Generate from a random hex seed
+/// const randomSeed = generateRandomSeed();
+/// const keys = new AccountKeys(randomSeed);
+///
+/// // Get public keys for sharing
+/// const publicKeys = keys.publicKeys();
+/// ```
 #[wasm_bindgen]
 pub struct AccountKeys {
     pub(crate) inner: NativeAccountKeys,
@@ -23,8 +43,23 @@ pub struct AccountKeys {
 
 #[wasm_bindgen]
 impl AccountKeys {
-    /// Generate new account keys from a random seed string.
-    /// The seed should be a hexadecimal string.
+    /// Creates new account keys from a hexadecimal seed string.
+    ///
+    /// # Arguments
+    /// * `seed_hex` - A 32-byte hexadecimal string (64 hex characters), with or without "0x" prefix.
+    ///
+    /// # Returns
+    /// A new `AccountKeys` object containing the generated secret keys.
+    ///
+    /// # Errors
+    /// * Throws an error if the seed is not valid hexadecimal.
+    /// * Throws an error if the seed is not exactly 32 bytes (64 hex characters).
+    ///
+    /// # Example
+    /// ```javascript
+    /// const seed = generateRandomSeed(); // Returns a 64-character hex string
+    /// const keys = new AccountKeys(seed);
+    /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(seed_hex: &str) -> Result<AccountKeys, JsValue> {
         let seed_bytes = hex::decode(seed_hex)
@@ -46,8 +81,27 @@ impl AccountKeys {
         Ok(AccountKeys { inner })
     }
 
-    /// Create account keys from a seed string (convenience method that accepts any string).
-    /// The string will be hashed to create a deterministic seed.
+    /// Creates account keys from any seed string using deterministic hashing.
+    ///
+    /// This is a convenience method that accepts any string and hashes it to create
+    /// a deterministic 32-byte seed. The same input string will always produce the
+    /// same keys.
+    ///
+    /// # Arguments
+    /// * `seed` - Any string to use as the seed (will be hashed internally).
+    ///
+    /// # Returns
+    /// A new `AccountKeys` object.
+    ///
+    /// # Errors
+    /// * Throws an error if key generation fails.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const keys = AccountKeys.fromSeed("my-secure-passphrase");
+    /// // Same seed always produces the same keys
+    /// const keys2 = AccountKeys.fromSeed("my-secure-passphrase");
+    /// ```
     #[wasm_bindgen(js_name = fromSeed)]
     pub fn from_seed(seed: &str) -> Result<AccountKeys, JsValue> {
         let inner = NativeAccountKeys::from_seed(seed)
@@ -55,13 +109,44 @@ impl AccountKeys {
         Ok(AccountKeys { inner })
     }
 
-    /// Export account keys as a SCALE-encoded byte array
+    /// Serializes the account keys to a SCALE-encoded byte array.
+    ///
+    /// **Security Warning:** This exports the secret keys. The resulting bytes should
+    /// be encrypted before storage and never transmitted over insecure channels.
+    ///
+    /// # Returns
+    /// A `Uint8Array` containing the SCALE-encoded secret keys.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const bytes = keys.toBytes();
+    /// // Encrypt bytes before storing!
+    /// const encrypted = encryptData(bytes);
+    /// localStorage.setItem('encryptedKeys', encrypted);
+    /// ```
     #[wasm_bindgen(js_name = toBytes)]
     pub fn to_bytes(&self) -> Vec<u8> {
         self.inner.encode()
     }
 
-    /// Import account keys from a SCALE-encoded byte array
+    /// Deserializes account keys from a SCALE-encoded byte array.
+    ///
+    /// **Security Warning:** Only use this with bytes from a trusted, secure source.
+    ///
+    /// # Arguments
+    /// * `bytes` - A `Uint8Array` containing SCALE-encoded account keys.
+    ///
+    /// # Returns
+    /// The deserialized `AccountKeys` object.
+    ///
+    /// # Errors
+    /// * Throws an error if the byte array is invalid or corrupted.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const decrypted = decryptData(encryptedKeys);
+    /// const keys = AccountKeys.fromBytes(decrypted);
+    /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<AccountKeys, JsValue> {
         let inner = NativeAccountKeys::decode(&mut &bytes[..])
@@ -69,14 +154,40 @@ impl AccountKeys {
         Ok(AccountKeys { inner })
     }
 
-    /// Get the public keys corresponding to these account keys
+    /// Extracts the public keys from these account keys.
+    ///
+    /// Public keys can be safely shared and are used for account registration,
+    /// receiving settlements, and encryption.
+    ///
+    /// # Returns
+    /// An `AccountPublicKeys` object containing both the account public key and encryption public key.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const publicKeys = keys.publicKeys();
+    /// console.log('Account key:', publicKeys.accountPublicKey().toJson());
+    /// console.log('Encryption key:', publicKeys.encryptionPublicKey().toJson());
+    /// ```
     #[wasm_bindgen(js_name = publicKeys)]
     pub fn public_keys(&self) -> AccountPublicKeys {
         let keys = self.inner.public_keys();
         AccountPublicKeys::from_native(keys)
     }
 
-    /// Get the encryption key pair.
+    /// Extracts the encryption key pair from these account keys.
+    ///
+    /// The encryption key pair is used to decrypt settlement leg information and
+    /// encrypted transaction data.
+    ///
+    /// # Returns
+    /// An `EncryptionKeyPair` object containing the encryption secret key.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const encryptionKeys = keys.encryptionKeyPair();
+    /// // Use for decrypting settlement legs
+    /// const decrypted = settlementLegs.tryDecryptAsMediatorOrAuditor(encryptionKeys);
+    /// ```
     #[wasm_bindgen(js_name = encryptionKeyPair)]
     pub fn encryption_key_pair(&self) -> EncryptionKeyPair {
         EncryptionKeyPair {
@@ -84,7 +195,28 @@ impl AccountKeys {
         }
     }
 
-    /// Generate an account registration proof for the account keys.  The proof needs the identity id that the account keys will be linked to.
+    /// Generates a zero-knowledge proof for registering this account on-chain.
+    ///
+    /// This proof demonstrates that the account holder possesses the secret keys
+    /// corresponding to the public keys being registered, without revealing the secret keys.
+    ///
+    /// # Arguments
+    /// * `did` - The identity ID (DID) to link this account to. Accepts:
+    ///   - Hex string with or without "0x" prefix (e.g., "0x1234...")
+    ///   - 32-byte `Uint8Array`
+    ///
+    /// # Returns
+    /// An `AccountRegistrationProof` that can be submitted to the blockchain.
+    ///
+    /// # Errors
+    /// * Throws an error if the DID format is invalid.
+    /// * Throws an error if proof generation fails.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const proof = keys.registerAccountProof(myDid);
+    /// const result = await signer.registerAccount(proof);
+    /// ```
     #[wasm_bindgen(js_name = registerAccountProof)]
     pub fn register_account_proof(
         &self,
@@ -101,7 +233,35 @@ impl AccountKeys {
         Ok(AccountRegistrationProof { inner: proof })
     }
 
-    /// Generate an account asset registration proof for the account keys and a specific asset.  The proof needs the asset id and identity id.
+    /// Generates a zero-knowledge proof for registering this account for a specific asset.
+    ///
+    /// This proof allows the account to participate in confidential transactions for the
+    /// specified asset. After registration, the account can mint, transfer, and receive
+    /// the asset while maintaining confidentiality.
+    ///
+    /// # Arguments
+    /// * `asset_id` - The numeric identifier of the confidential asset.
+    /// * `did` - The identity ID (DID) of the account holder. Accepts:
+    ///   - Hex string with or without "0x" prefix (e.g., "0x1234...")
+    ///   - 32-byte `Uint8Array`
+    ///
+    /// # Returns
+    /// An `AccountAssetRegistration` containing both the proof and the initial account state.
+    ///
+    /// # Errors
+    /// * Throws an error if the DID format is invalid.
+    /// * Throws an error if proof generation fails.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const registration = keys.registerAccountAssetProof(assetId, myDid);
+    /// const proof = registration.getProof();
+    /// const result = await signer.registerAccountAsset(proof);
+    ///
+    /// // Track the account state
+    /// const accountState = registration.getAccountAssetState();
+    /// accountState.commitPendingState(result.leafIndex());
+    /// ```
     #[wasm_bindgen(js_name = registerAccountAssetProof)]
     pub fn register_account_asset_proof(
         &self,
@@ -135,13 +295,36 @@ impl AccountKeys {
     }
 }
 
-/// Encryption key pair.
+/// Contains the encryption secret key for decrypting confidential transaction data.
+///
+/// This type is used by mediators and auditors to decrypt settlement leg information.
+/// It can also be extracted from `AccountKeys` for accounts to decrypt their own
+/// transaction details.
+///
+/// # Example
+/// ```javascript
+/// // Extract from account keys
+/// const encKeyPair = accountKeys.encryptionKeyPair();
+///
+/// // Decrypt settlement legs as mediator/auditor
+/// const decryptedLegs = settlementLegs.tryDecryptAsMediatorOrAuditor(encKeyPair);
+/// ```
 #[wasm_bindgen]
 pub struct EncryptionKeyPair {
     pub(crate) inner: NativeEncryptionKeyPair,
 }
 
-/// An account registration proof.
+/// A zero-knowledge proof for registering a confidential account on-chain.
+///
+/// This proof demonstrates ownership of the account keys without revealing the secret keys.
+/// It must be submitted via `PolymeshSigner.registerAccount()` to create the account on-chain.
+///
+/// # Example
+/// ```javascript
+/// const proof = accountKeys.registerAccountProof(myDid);
+/// const result = await signer.registerAccount(proof);
+/// console.log('Account registered with leaf index:', result.leafIndex());
+/// ```
 #[wasm_bindgen]
 pub struct AccountRegistrationProof {
     pub(crate) inner: NativeAccountRegistrationProof<()>,
@@ -149,13 +332,35 @@ pub struct AccountRegistrationProof {
 
 #[wasm_bindgen]
 impl AccountRegistrationProof {
-    /// Export proof as a SCALE-encoded byte array
+    /// Serializes the proof to a SCALE-encoded byte array.
+    ///
+    /// # Returns
+    /// A `Uint8Array` containing the SCALE-encoded proof.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const bytes = proof.toBytes();
+    /// ```
     #[wasm_bindgen(js_name = toBytes)]
     pub fn to_bytes(&self) -> Vec<u8> {
         self.inner.encode()
     }
 
-    /// Import proof from a SCALE-encoded byte array
+    /// Deserializes a proof from a SCALE-encoded byte array.
+    ///
+    /// # Arguments
+    /// * `bytes` - A `Uint8Array` containing SCALE-encoded proof data.
+    ///
+    /// # Returns
+    /// The deserialized `AccountRegistrationProof`.
+    ///
+    /// # Errors
+    /// * Throws an error if the byte array is invalid or corrupted.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const proof = AccountRegistrationProof.fromBytes(proofBytes);
+    /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<AccountRegistrationProof, JsValue> {
         let inner = NativeAccountRegistrationProof::<()>::decode(&mut &bytes[..]).map_err(|e| {
@@ -165,7 +370,26 @@ impl AccountRegistrationProof {
     }
 }
 
-/// Public keys for an account (account public key and encryption public key)
+/// Contains both the account public key and encryption public key for a confidential account.
+///
+/// This type combines the two public keys needed for confidential asset operations:
+/// - The account public key identifies the account in the account curve tree
+/// - The encryption public key allows others to encrypt data for this account
+///
+/// These keys can be safely shared publicly and are required for others to send
+/// confidential assets to this account.
+///
+/// # Example
+/// ```javascript
+/// const publicKeys = accountKeys.publicKeys();
+///
+/// // Access individual keys
+/// const accountKey = publicKeys.accountPublicKey();
+/// const encryptionKey = publicKeys.encryptionPublicKey();
+///
+/// // Use in settlement legs
+/// const leg = new LegBuilder(senderKeys, publicKeys, assetState, amount);
+/// ```
 #[wasm_bindgen(getter_with_clone)]
 #[derive(Clone, Copy)]
 pub struct AccountPublicKeys {
@@ -193,13 +417,35 @@ impl AccountPublicKeys {
 
 #[wasm_bindgen]
 impl AccountPublicKeys {
-    /// Export public keys as a SCALE-encoded byte array
+    /// Serializes the public keys to a SCALE-encoded byte array.
+    ///
+    /// # Returns
+    /// A `Uint8Array` containing the SCALE-encoded public keys.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const bytes = publicKeys.toBytes();
+    /// ```
     #[wasm_bindgen(js_name = toBytes)]
     pub fn to_bytes(&self) -> Vec<u8> {
         self.to_native().encode()
     }
 
-    /// Import public keys from a SCALE-encoded byte array
+    /// Deserializes public keys from a SCALE-encoded byte array.
+    ///
+    /// # Arguments
+    /// * `bytes` - A `Uint8Array` containing SCALE-encoded public keys.
+    ///
+    /// # Returns
+    /// The deserialized `AccountPublicKeys`.
+    ///
+    /// # Errors
+    /// * Throws an error if the byte array is invalid or corrupted.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const publicKeys = AccountPublicKeys.fromBytes(publicKeyBytes);
+    /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<AccountPublicKeys, JsValue> {
         let inner = NativeAccountPublicKeys::decode(&mut &bytes[..])
@@ -207,19 +453,46 @@ impl AccountPublicKeys {
         Ok(AccountPublicKeys::from_native(inner))
     }
 
-    /// Get the account public key component
+    /// Extracts the account public key component.
+    ///
+    /// # Returns
+    /// The `AccountPublicKey` used for account identification in the curve tree.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const accountKey = publicKeys.accountPublicKey();
+    /// ```
     #[wasm_bindgen(js_name = accountPublicKey)]
     pub fn account_public_key(&self) -> AccountPublicKey {
         self.account
     }
 
-    /// Get the encryption public key component
+    /// Extracts the encryption public key component.
+    ///
+    /// # Returns
+    /// The `EncryptionPublicKey` used for encrypting data to this account.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const encryptionKey = publicKeys.encryptionPublicKey();
+    /// ```
     #[wasm_bindgen(js_name = encryptionPublicKey)]
     pub fn encryption_public_key(&self) -> EncryptionPublicKey {
         self.encryption
     }
 
-    /// Export as JSON string (for debugging)
+    /// Exports the public keys as a JSON string for debugging purposes.
+    ///
+    /// # Returns
+    /// A JSON string representation of the public keys.
+    ///
+    /// # Errors
+    /// * Throws an error if serialization to JSON fails.
+    ///
+    /// # Example
+    /// ```javascript
+    /// console.log('Public Keys:', publicKeys.toJson());
+    /// ```
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<String, JsValue> {
         let native = self.to_native();
@@ -228,7 +501,20 @@ impl AccountPublicKeys {
     }
 }
 
-/// Account public key (used for account commitments and proofs)
+/// The public key component used for account identification in the account curve tree.
+///
+/// This key is derived from the account secret key and is used to create account
+/// commitments and verify zero-knowledge proofs. It can be safely shared publicly.
+///
+/// # Example
+/// ```javascript
+/// // From AccountPublicKeys
+/// const accountKey = publicKeys.accountPublicKey();
+///
+/// // From hex string or bytes
+/// const accountKey = new AccountPublicKey("0x1234...");
+/// const accountKey = new AccountPublicKey(uint8Array);
+/// ```
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug)]
 pub struct AccountPublicKey {
@@ -244,7 +530,24 @@ impl AccountPublicKey {
 
 #[wasm_bindgen]
 impl AccountPublicKey {
-    /// New account public key from js value (32 byte array, or hex string)
+    /// Creates a new account public key from a hex string or byte array.
+    ///
+    /// # Arguments
+    /// * `js_value` - Either:
+    ///   - A hex string with or without "0x" prefix
+    ///   - A 32-byte `Uint8Array`
+    ///
+    /// # Returns
+    /// A new `AccountPublicKey` object.
+    ///
+    /// # Errors
+    /// * Throws an error if the input is not valid hexadecimal or is not 32 bytes.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const key1 = new AccountPublicKey("0x1234...");
+    /// const key2 = new AccountPublicKey(new Uint8Array(32));
+    /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(js_value: JsValue) -> Result<AccountPublicKey, JsValue> {
         let key = if let Some(js_str) = js_value.as_string() {
@@ -259,13 +562,35 @@ impl AccountPublicKey {
         Ok(AccountPublicKey { inner: key })
     }
 
-    /// Export account public key as a SCALE-encoded byte array
+    /// Serializes the account public key to a SCALE-encoded byte array.
+    ///
+    /// # Returns
+    /// A `Uint8Array` containing the SCALE-encoded public key.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const bytes = accountKey.toBytes();
+    /// ```
     #[wasm_bindgen(js_name = toBytes)]
     pub fn to_bytes(&self) -> Vec<u8> {
         self.inner.encode()
     }
 
-    /// Import account public key from a SCALE-encoded byte array
+    /// Deserializes an account public key from a SCALE-encoded byte array.
+    ///
+    /// # Arguments
+    /// * `bytes` - A `Uint8Array` containing SCALE-encoded account public key data.
+    ///
+    /// # Returns
+    /// The deserialized `AccountPublicKey`.
+    ///
+    /// # Errors
+    /// * Throws an error if the byte array is invalid or corrupted.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const accountKey = AccountPublicKey.fromBytes(keyBytes);
+    /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<AccountPublicKey, JsValue> {
         let inner = NativeAccountPublicKey::decode(&mut &bytes[..]).map_err(|e| {
@@ -274,7 +599,18 @@ impl AccountPublicKey {
         Ok(AccountPublicKey { inner })
     }
 
-    /// Export as JSON string (for debugging)
+    /// Exports the account public key as a JSON string for debugging purposes.
+    ///
+    /// # Returns
+    /// A JSON string representation of the account public key.
+    ///
+    /// # Errors
+    /// * Throws an error if serialization to JSON fails.
+    ///
+    /// # Example
+    /// ```javascript
+    /// console.log('Account Public Key:', accountKey.toJson());
+    /// ```
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<String, JsValue> {
         serde_json::to_string(&self.inner)
@@ -282,7 +618,24 @@ impl AccountPublicKey {
     }
 }
 
-/// Encryption public key (used for encrypting settlement leg information)
+/// The public key used for encrypting confidential transaction data.
+///
+/// This key allows others to encrypt settlement leg information and transaction
+/// details that only the holder of the corresponding secret key can decrypt.
+/// It's essential for maintaining confidentiality in settlements.
+///
+/// # Example
+/// ```javascript
+/// // From AccountPublicKeys
+/// const encKey = publicKeys.encryptionPublicKey();
+///
+/// // From hex string or bytes
+/// const encKey = new EncryptionPublicKey("0x1234...");
+/// const encKey = new EncryptionPublicKey(uint8Array);
+///
+/// // Use in AssetState
+/// const assetState = new AssetState(assetId, [mediatorEncKey], [auditorEncKey]);
+/// ```
 #[wasm_bindgen]
 #[derive(Clone, Copy)]
 pub struct EncryptionPublicKey {
@@ -298,7 +651,24 @@ impl EncryptionPublicKey {
 
 #[wasm_bindgen]
 impl EncryptionPublicKey {
-    /// New encryption public key from js value (32 byte array, or hex string)
+    /// Creates a new encryption public key from a hex string or byte array.
+    ///
+    /// # Arguments
+    /// * `js_value` - Either:
+    ///   - A hex string with or without "0x" prefix
+    ///   - A 32-byte `Uint8Array`
+    ///
+    /// # Returns
+    /// A new `EncryptionPublicKey` object.
+    ///
+    /// # Errors
+    /// * Throws an error if the input is not valid hexadecimal or is not 32 bytes.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const key1 = new EncryptionPublicKey("0x1234...");
+    /// const key2 = new EncryptionPublicKey(new Uint8Array(32));
+    /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(js_value: JsValue) -> Result<EncryptionPublicKey, JsValue> {
         let key = if let Some(js_str) = js_value.as_string() {
@@ -313,13 +683,35 @@ impl EncryptionPublicKey {
         Ok(EncryptionPublicKey { inner: key })
     }
 
-    /// Export encryption public key as a SCALE-encoded byte array
+    /// Serializes the encryption public key to a SCALE-encoded byte array.
+    ///
+    /// # Returns
+    /// A `Uint8Array` containing the SCALE-encoded public key.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const bytes = encryptionKey.toBytes();
+    /// ```
     #[wasm_bindgen(js_name = toBytes)]
     pub fn to_bytes(&self) -> Vec<u8> {
         self.inner.encode()
     }
 
-    /// Import encryption public key from a SCALE-encoded byte array
+    /// Deserializes an encryption public key from a SCALE-encoded byte array.
+    ///
+    /// # Arguments
+    /// * `bytes` - A `Uint8Array` containing SCALE-encoded encryption public key data.
+    ///
+    /// # Returns
+    /// The deserialized `EncryptionPublicKey`.
+    ///
+    /// # Errors
+    /// * Throws an error if the byte array is invalid or corrupted.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const encryptionKey = EncryptionPublicKey.fromBytes(keyBytes);
+    /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<EncryptionPublicKey, JsValue> {
         let inner = NativeEncryptionPublicKey::decode(&mut &bytes[..]).map_err(|e| {
@@ -328,7 +720,18 @@ impl EncryptionPublicKey {
         Ok(EncryptionPublicKey { inner })
     }
 
-    /// Export as JSON string (for debugging)
+    /// Exports the encryption public key as a JSON string for debugging purposes.
+    ///
+    /// # Returns
+    /// A JSON string representation of the encryption public key.
+    ///
+    /// # Errors
+    /// * Throws an error if serialization to JSON fails.
+    ///
+    /// # Example
+    /// ```javascript
+    /// console.log('Encryption Public Key:', encryptionKey.toJson());
+    /// ```
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<String, JsValue> {
         serde_json::to_string(&self.inner)
@@ -336,8 +739,25 @@ impl EncryptionPublicKey {
     }
 }
 
-/// Generate a random 32-byte seed for key generation
-/// Returns a hex-encoded string
+/// Generates a cryptographically secure random 32-byte seed for key generation.
+///
+/// This function uses the operating system's random number generator to produce
+/// a high-quality random seed suitable for generating account keys.
+///
+/// # Returns
+/// A 64-character hexadecimal string representing the 32-byte seed.
+///
+/// # Errors
+/// * May throw an error if the OS random number generator is unavailable (rare).
+///
+/// # Example
+/// ```javascript
+/// const seed = generateRandomSeed();
+/// console.log('Random seed:', seed); // e.g., "a1b2c3d4..."
+///
+/// // Use the seed to create account keys
+/// const keys = new AccountKeys(seed);
+/// ```
 #[wasm_bindgen(js_name = generateRandomSeed)]
 pub fn generate_random_seed() -> Result<String, JsValue> {
     let mut rng = rand::rngs::OsRng;
