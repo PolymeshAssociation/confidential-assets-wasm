@@ -5,6 +5,22 @@ use wasm_bindgen::prelude::*;
 
 use crate::keys::EncryptionPublicKey;
 
+/// Helper function to convert chain key data (Uint8Array or hex strings) to EncryptionPublicKey objects
+fn convert_chain_keys_to_encryption_keys(
+    keys_value: JsValue,
+) -> Result<Vec<EncryptionPublicKey>, JsValue> {
+    let keys = js_sys::Array::from(&keys_value);
+    let mut result = Vec::new();
+
+    for i in 0..keys.length() {
+        let key_data = keys.get(i);
+        let key = EncryptionPublicKey::new(key_data)?;
+        result.push(key);
+    }
+
+    Ok(result)
+}
+
 /// Represents the confidential asset state stored in the asset curve tree.
 ///
 /// This type contains the asset's unique identifier and the encryption public keys
@@ -12,12 +28,15 @@ use crate::keys::EncryptionPublicKey;
 /// to encrypt settlement legs so that mediators and auditors can decrypt and verify
 /// confidential transactions.
 ///
-/// # Example
+/// # Examples
 /// ```javascript
-/// // Typically obtained from on-chain data
-/// const assetState = await client.getAssetState(assetId);
+/// // From Polkadot.js chain data (recommended)
+/// const assetDetail = await api.query.confidentialAssets.dartAssetDetails(assetId);
+/// const assetState = new AssetState(assetId, assetDetail.mediators, assetDetail.auditors);
 ///
-/// // Or created manually if you have the mediator/auditor keys
+/// // From pre-converted keys
+/// const mediatorKey = new EncryptionPublicKey("0x1234...");
+/// const auditorKey = new EncryptionPublicKey("0x5678...");
 /// const assetState = new AssetState(assetId, [mediatorKey], [auditorKey]);
 ///
 /// // Use in settlement legs
@@ -31,34 +50,58 @@ pub struct AssetState {
 
 #[wasm_bindgen]
 impl AssetState {
-    /// Creates a new asset state with the specified mediators and auditors.
+    /// Creates a new asset state from raw chain data or pre-converted encryption keys.
+    ///
+    /// This constructor automatically converts raw key data from various sources into
+    /// `EncryptionPublicKey` objects. It's especially useful when querying the Polymesh chain
+    /// for mediators and auditors using Polkadot.js, which returns keys as `Codec` objects
+    /// with `.toU8a()` methods.
     ///
     /// # Arguments
     /// * `asset_id` - The unique identifier for this confidential asset (as a number).
-    /// * `mediators` - Array of `EncryptionPublicKey` objects for asset mediators who can decrypt and approve settlements.
-    /// * `auditors` - Array of `EncryptionPublicKey` objects for asset auditors who can decrypt and monitor transactions.
+    /// * `mediators` - Array of raw key data or `EncryptionPublicKey` objects. Each element can be:
+    ///   - An existing `EncryptionPublicKey` object
+    ///   - A `Uint8Array` (32 bytes)
+    ///   - A hex string with or without "0x" prefix
+    ///   - Any Polkadot.js `Codec` object with a `.toU8a()` method
+    /// * `auditors` - Array of raw key data in the same formats as mediators.
     ///
     /// # Returns
     /// A new `AssetState` object.
     ///
-    /// # Example
+    /// # Errors
+    /// * Throws an error if any key cannot be decoded or is invalid.
+    ///
+    /// # Examples
     /// ```javascript
+    /// // From Polkadot.js chain data (recommended)
+    /// const assetDetail = await api.query.confidentialAssets.dartAssetDetails(assetId);
+    /// const assetState = new AssetState(assetId, assetDetail.mediators, assetDetail.auditors);
+    ///
+    /// // From pre-converted EncryptionPublicKey objects
     /// const mediatorKey = new EncryptionPublicKey("0x1234...");
     /// const auditorKey = new EncryptionPublicKey("0x5678...");
     /// const assetState = new AssetState(assetId, [mediatorKey], [auditorKey]);
+    ///
+    /// // From hex strings or Uint8Arrays
+    /// const assetState = new AssetState(assetId, ["0xabc..."], [new Uint8Array(32)]);
+    ///
+    /// // Use in settlement legs
+    /// const leg = new LegBuilder(senderKeys, receiverKeys, assetState, amount);
     /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(
         asset_id: AssetId,
-        mediators: Vec<EncryptionPublicKey>,
-        auditors: Vec<EncryptionPublicKey>,
+        mediators: JsValue,
+        auditors: JsValue,
     ) -> Result<AssetState, JsValue> {
-        // Convert JsValue arrays to EncryptionPublicKey vectors
-        let mediator_keys: Vec<_> = mediators.into_iter().map(|js| js.inner).collect();
+        let mediator_keys = convert_chain_keys_to_encryption_keys(mediators)?;
+        let auditor_keys = convert_chain_keys_to_encryption_keys(auditors)?;
 
-        let auditor_keys: Vec<_> = auditors.into_iter().map(|js| js.inner).collect();
+        let mediator_inner: Vec<_> = mediator_keys.into_iter().map(|key| key.inner).collect();
+        let auditor_inner: Vec<_> = auditor_keys.into_iter().map(|key| key.inner).collect();
 
-        let inner = NativeAssetState::new(asset_id, &mediator_keys, &auditor_keys);
+        let inner = NativeAssetState::new(asset_id, &mediator_inner, &auditor_inner);
 
         Ok(AssetState { inner })
     }

@@ -530,36 +530,93 @@ impl AccountPublicKey {
 
 #[wasm_bindgen]
 impl AccountPublicKey {
-    /// Creates a new account public key from a hex string or byte array.
+    /// Creates a new account public key from various input formats.
     ///
     /// # Arguments
-    /// * `js_value` - Either:
-    ///   - A hex string with or without "0x" prefix
+    /// * `js_value` - Can be any of:
+    ///   - An existing `AccountPublicKey` object (will be cloned)
+    ///   - A hex string with or without "0x" prefix (e.g., "0x1234...")
     ///   - A 32-byte `Uint8Array`
+    ///   - A Polkadot.js `Codec` object with a `.toU8a()` method
     ///
     /// # Returns
     /// A new `AccountPublicKey` object.
     ///
     /// # Errors
-    /// * Throws an error if the input is not valid hexadecimal or is not 32 bytes.
+    /// * Throws an error if the input format is not recognized or invalid.
+    /// * Throws an error if the decoded key is not 32 bytes.
     ///
     /// # Example
     /// ```javascript
+    /// // From hex string
     /// const key1 = new AccountPublicKey("0x1234...");
+    ///
+    /// // From Uint8Array
     /// const key2 = new AccountPublicKey(new Uint8Array(32));
+    ///
+    /// // From existing AccountPublicKey (cloned)
+    /// const key3 = new AccountPublicKey(key1);
+    ///
+    /// // From Polkadot.js Codec
+    /// const assetDetail = await api.query.confidentialAssets.dartAssetDetails(assetId);
+    /// const auditor = assetDetail.auditors[0]; // Auditor key from chain storage
+    /// const key4 = new AccountPublicKey(auditor); // Automatically calls toU8a()
     /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(js_value: JsValue) -> Result<AccountPublicKey, JsValue> {
-        let key = if let Some(js_str) = js_value.as_string() {
-            NativeAccountPublicKey::from_str(&js_str)
-                .map_err(|e| JsValue::from_str(&format!("Failed to decode mediator key: {}", e)))?
-        } else {
-            let bytes = js_sys::Uint8Array::from(js_value).to_vec();
-            NativeAccountPublicKey::decode(&mut &bytes[..])
-                .map_err(|e| JsValue::from_str(&format!("Failed to decode mediator key: {}", e)))?
-        };
+        // Try string (hex format)
+        if let Some(js_str) = js_value.as_string() {
+            return NativeAccountPublicKey::from_str(&js_str)
+                .map(|key| AccountPublicKey { inner: key })
+                .map_err(|e| {
+                    JsValue::from_str(&format!(
+                        "Failed to decode account public key from hex string: {}",
+                        e
+                    ))
+                });
+        }
 
-        Ok(AccountPublicKey { inner: key })
+        // Try Uint8Array (check if it's a valid Uint8Array)
+        let bytes_array = js_sys::Uint8Array::new(&js_value);
+        if bytes_array.length() > 0 {
+            let bytes_vec = bytes_array.to_vec();
+            if !bytes_vec.is_empty() {
+                return NativeAccountPublicKey::decode(&mut &bytes_vec[..])
+                    .map(|key| AccountPublicKey { inner: key })
+                    .map_err(|e| {
+                        JsValue::from_str(&format!(
+                            "Failed to decode account public key from Uint8Array: {}",
+                            e
+                        ))
+                    });
+            }
+        }
+
+        // Try Polkadot.js Codec with toU8a() method
+        #[allow(unsafe_code, unused_unsafe)]
+        let to_u8a_fn = unsafe { js_sys::Reflect::get(&js_value, &JsValue::from_str("toU8a")) };
+        if let Ok(to_u8a_fn) = to_u8a_fn {
+            if to_u8a_fn.is_function() {
+                if let Ok(bytes_js) = js_sys::Function::from(to_u8a_fn).call0(&js_value) {
+                    let bytes_array = js_sys::Uint8Array::new(&bytes_js);
+                    if bytes_array.length() > 0 {
+                        let bytes_vec = bytes_array.to_vec();
+                        return NativeAccountPublicKey::decode(&mut &bytes_vec[..])
+                            .map(|key| AccountPublicKey { inner: key })
+                            .map_err(|e| {
+                                JsValue::from_str(&format!(
+                                    "Failed to decode account public key from Codec.toU8a(): {}",
+                                    e
+                                ))
+                            });
+                    }
+                }
+            }
+        }
+
+        Err(JsValue::from_str(
+            "Invalid AccountPublicKey input. Expected hex string, Uint8Array, Polkadot.js Codec with toU8a() method, or existing AccountPublicKey object"
+        ))
     }
 
     /// Serializes the account public key to a SCALE-encoded byte array.
@@ -651,36 +708,93 @@ impl EncryptionPublicKey {
 
 #[wasm_bindgen]
 impl EncryptionPublicKey {
-    /// Creates a new encryption public key from a hex string or byte array.
+    /// Creates a new encryption public key from various input formats.
     ///
     /// # Arguments
-    /// * `js_value` - Either:
-    ///   - A hex string with or without "0x" prefix
+    /// * `js_value` - Can be any of:
+    ///   - An existing `EncryptionPublicKey` object (will be cloned)
+    ///   - A hex string with or without "0x" prefix (e.g., "0x1234...")
     ///   - A 32-byte `Uint8Array`
+    ///   - A Polkadot.js `Codec` object with a `.toU8a()` method
     ///
     /// # Returns
     /// A new `EncryptionPublicKey` object.
     ///
     /// # Errors
-    /// * Throws an error if the input is not valid hexadecimal or is not 32 bytes.
+    /// * Throws an error if the input format is not recognized or invalid.
+    /// * Throws an error if the decoded key is not 32 bytes.
     ///
     /// # Example
     /// ```javascript
+    /// // From hex string
     /// const key1 = new EncryptionPublicKey("0x1234...");
+    ///
+    /// // From Uint8Array
     /// const key2 = new EncryptionPublicKey(new Uint8Array(32));
+    ///
+    /// // From existing EncryptionPublicKey (cloned)
+    /// const key3 = new EncryptionPublicKey(key1);
+    ///
+    /// // From Polkadot.js Codec
+    /// const assetDetail = await api.query.confidentialAssets.dartAssetDetails(assetId);
+    /// const mediator = assetDetail.mediators[0]; // Mediator key from chain storage
+    /// const key4 = new EncryptionPublicKey(mediator); // Automatically calls toU8a()
     /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(js_value: JsValue) -> Result<EncryptionPublicKey, JsValue> {
-        let key = if let Some(js_str) = js_value.as_string() {
-            NativeEncryptionPublicKey::from_str(&js_str)
-                .map_err(|e| JsValue::from_str(&format!("Failed to decode mediator key: {}", e)))?
-        } else {
-            let bytes = js_sys::Uint8Array::from(js_value).to_vec();
-            NativeEncryptionPublicKey::decode(&mut &bytes[..])
-                .map_err(|e| JsValue::from_str(&format!("Failed to decode mediator key: {}", e)))?
-        };
+        // Try string (hex format)
+        if let Some(js_str) = js_value.as_string() {
+            return NativeEncryptionPublicKey::from_str(&js_str)
+                .map(|key| EncryptionPublicKey { inner: key })
+                .map_err(|e| {
+                    JsValue::from_str(&format!(
+                        "Failed to decode encryption public key from hex string: {}",
+                        e
+                    ))
+                });
+        }
 
-        Ok(EncryptionPublicKey { inner: key })
+        // Try Uint8Array (check if it's a valid Uint8Array)
+        let bytes_array = js_sys::Uint8Array::new(&js_value);
+        if bytes_array.length() > 0 {
+            let bytes_vec = bytes_array.to_vec();
+            if !bytes_vec.is_empty() {
+                return NativeEncryptionPublicKey::decode(&mut &bytes_vec[..])
+                    .map(|key| EncryptionPublicKey { inner: key })
+                    .map_err(|e| {
+                        JsValue::from_str(&format!(
+                            "Failed to decode encryption public key from Uint8Array: {}",
+                            e
+                        ))
+                    });
+            }
+        }
+
+        // Try Polkadot.js Codec with toU8a() method
+        #[allow(unsafe_code, unused_unsafe)]
+        let to_u8a_fn = unsafe { js_sys::Reflect::get(&js_value, &JsValue::from_str("toU8a")) };
+        if let Ok(to_u8a_fn) = to_u8a_fn {
+            if to_u8a_fn.is_function() {
+                if let Ok(bytes_js) = js_sys::Function::from(to_u8a_fn).call0(&js_value) {
+                    let bytes_array = js_sys::Uint8Array::new(&bytes_js);
+                    if bytes_array.length() > 0 {
+                        let bytes_vec = bytes_array.to_vec();
+                        return NativeEncryptionPublicKey::decode(&mut &bytes_vec[..])
+                            .map(|key| EncryptionPublicKey { inner: key })
+                            .map_err(|e| {
+                                JsValue::from_str(&format!(
+                                    "Failed to decode encryption public key from Codec.toU8a(): {}",
+                                    e
+                                ))
+                            });
+                    }
+                }
+            }
+        }
+
+        Err(JsValue::from_str(
+            "Invalid EncryptionPublicKey input. Expected hex string, Uint8Array, Polkadot.js Codec with toU8a() method, or existing EncryptionPublicKey object"
+        ))
     }
 
     /// Serializes the encryption public key to a SCALE-encoded byte array.
