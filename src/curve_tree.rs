@@ -391,16 +391,78 @@ impl AssetLeafPath {
     }
 }
 
-/// LeafPathBuilder
+/// Generic leaf path builder for curve trees.
 ///
-/// 1. JS creates a LeafPathBuilder object using the leaf index: `const pathBuilder = new LeafPathBuilder(leafIndex, height, block_number);`
-/// 2. Get the list of node locations to query from the chain: `const nodeLocations = pathBuilder.getLocations();`
-/// 3. JS queries the chain for those locations: `const nodes = apiAt.query.confidentialAssets.accountInnerNodes.multi(nodeLocations);`
-/// 4. Calculate the sibling leaf indices: `const leafIndices = pathBuilder.getSiblingLeafIndices();`
-/// 5. JS queries the chain for the sibling leaves: `const siblingLeaves = apiAt.query.confidentialAssets.accountLeaves.multi(leafIndices);`
-/// 6. JS queries the chain for the the tree root: `const root = apiAt.query.confidentialAssets.accountCurveTreeRoots(block_number);`
-/// 7. Build the path with root: `const path_and_root = pathBuilder.build_with_root(root, leaves, nodes);`
-/// 8. Build only the path: `const path = pathBuilder.build(leaves, nodes);`
+/// A generic data structure that enables incremental construction of curve tree paths by querying
+/// on-chain data. This is an internal implementation detail used by `AssetLeafPathBuilder`,
+/// `AccountLeafPathBuilder`, and `FeeAccountLeafPathBuilder` to provide type-safe, specialized
+/// path builders for each tree type.
+///
+/// # Description
+/// `LeafPathBuilder` is a generic helper that manages the collection of tree data (leaves, inner nodes,
+/// and the root) needed to construct a complete path from a target leaf to the root. It automatically
+/// calculates which tree nodes and leaves are necessary for the path based on the target leaf index
+/// and tree height, then stores them in memory for later retrieval and path construction.
+///
+/// # Type Parameters
+/// * `L` - The branching factor (arity) of the curve tree. Determines how many children each node can have.
+///   For example, `ASSET_TREE_L = 4` means each node has up to 4 children.
+/// * `M` - The compression parameter for inner nodes. Specifies the maximum number of children
+///   that can be stored in a compressed inner node structure.
+/// * `C` - The curve tree configuration (e.g., `AssetTreeConfig`, `AccountTreeConfig`).
+///   Determines the cryptographic parameters and tree structure rules.
+///
+/// # Fields
+/// * `leaf_index` - The index of the target leaf for which the path is being built.
+/// * `height` - The height of the tree (number of levels from leaf to root).
+/// * `block_number` - The blockchain block number at which the tree state should be captured.
+/// * `node_locations` - A vector of all inner node locations that need to be queried and populated.
+/// * `nodes` - A mapping from node locations to their compressed inner node values.
+/// * `leaves` - A mapping from leaf indices to their compressed leaf values.
+/// * `leaf_range` - A tuple `(min_index, max_index)` representing the range of leaf indices required.
+/// * `leaf_indices` - A vector of all leaf indices that need to be queried and populated.
+/// * `root` - Optional storage for the tree root. Must be set before building a path with root.
+///
+/// # Workflow
+/// The typical workflow for using `LeafPathBuilder` (or its type-specialized variants) is:
+/// 1. Create a new builder with target leaf index, tree height, and block number
+/// 2. Query `node_locations` and `leaf_indices` to know what data to fetch from the blockchain
+/// 3. Fetch inner nodes from storage and populate them using `set_node()` or `set_node_at_index()`
+/// 4. Fetch leaves from storage and populate them using `set_leaf()`
+/// 5. Fetch and set the tree root using `set_root()`
+/// 6. Call the appropriate build method to construct the final path
+///
+/// # Internal Implementation Note
+/// This is primarily used as a `CurveTreeBackend` implementation, which allows the curve tree
+/// logic to retrieve stored leaves and nodes during path construction. It should not be used
+/// directly from user code; instead, use the specialized `AssetLeafPathBuilder`,
+/// `AccountLeafPathBuilder`, or `FeeAccountLeafPathBuilder` types.
+///
+/// # Example (Rust)
+/// ```rust, ignore
+/// use polymesh_dart::BlockNumber;
+/// // Create a new builder for a leaf at index 42 in a tree of height 4 at block 1000
+/// let mut builder = LeafPathBuilder::new(42, 4, BlockNumber(1000));
+///
+/// // Get the node locations to query
+/// let node_locations = builder.get_locations();
+/// // Query blockchain storage for each location and populate
+/// for location in node_locations {
+///     // fetch node from blockchain...
+///     builder.set_node(&location, Some(node_bytes))?;
+/// }
+///
+/// // Get leaf indices to query
+/// let leaf_indices = builder.get_leaf_indices();
+/// // Query blockchain storage for each leaf
+/// for leaf_idx in leaf_indices {
+///     // fetch leaf from blockchain...
+///     builder.set_leaf(leaf_idx, Some(leaf_bytes))?;
+/// }
+///
+/// // Set the root
+/// builder.set_root(&root_bytes);
+/// ```
 #[derive(Clone, Debug)]
 pub struct LeafPathBuilder<const L: usize, const M: usize, C: CurveTreeConfig> {
     pub leaf_index: LeafIndex,
@@ -461,7 +523,36 @@ fn calculate_node_locations<const L: usize>(
 }
 
 impl<const L: usize, const M: usize, C: CurveTreeConfig> LeafPathBuilder<L, M, C> {
-    /// Create a new LeafPathBuilder
+    /// Creates a new `LeafPathBuilder` instance initialized with the given parameters.
+    ///
+    /// This method automatically calculates which tree nodes and leaves are required to construct
+    /// a path from the target leaf to the root, and sets up the internal data structures to store them.
+    ///
+    /// # Arguments
+    /// * `leaf_index` - The `LeafIndex` of the target leaf in the tree. This is the leaf for which
+    ///   the path will be constructed. Typically obtained from an asset or account state.
+    /// * `height` - The `NodeLevel` representing the height of the tree (number of levels from leaf to root).
+    ///   For example, `4` for a 4-level tree.
+    /// * `block_number` - The `BlockNumber` at which the tree state should be captured. All queried
+    ///   nodes and leaves should be from this specific block.
+    ///
+    /// # Returns
+    /// A new `LeafPathBuilder` instance with:
+    /// - Automatically calculated node locations that need to be queried
+    /// - Automatically calculated leaf indices that need to be queried
+    /// - Empty storage for nodes and leaves (must be populated via `set_node()` and `set_leaf()`)
+    /// - Empty root storage (must be set via `set_root()`)
+    ///
+    /// # Example (Rust)
+    /// ```rust, ignore
+    /// let builder = LeafPathBuilder::new(
+    ///     LeafIndex(42),      // target leaf
+    ///     NodeLevel(4),       // tree height
+    ///     BlockNumber(1000)   // block number
+    /// );
+    /// let required_nodes = builder.get_locations();
+    /// let required_leaves = builder.get_leaf_indices();
+    /// ```
     pub fn new(leaf_index: LeafIndex, height: NodeLevel, block_number: BlockNumber) -> Self {
         let (node_locations, leaf_indices, leaf_range) =
             calculate_node_locations::<L>(leaf_index, height);
@@ -478,32 +569,138 @@ impl<const L: usize, const M: usize, C: CurveTreeConfig> LeafPathBuilder<L, M, C
         }
     }
 
-    /// Get the list of node locations to query
+    /// Retrieves the list of inner node locations that must be queried from the blockchain.
+    ///
+    /// These locations represent all the inner nodes on the path from the target leaf to the root,
+    /// including all necessary sibling nodes. This list should be used to query the blockchain's
+    /// confidentialAssets storage for inner nodes.
+    ///
+    /// # Returns
+    /// A `Vec<NodeLocation<L>>` containing all the node locations needed. Each location can be
+    /// SCALE-encoded and used as a key in on-chain storage queries.
+    ///
+    /// # Example (Rust)
+    /// ```rust, ignore
+    /// let builder = LeafPathBuilder::new(leaf_index, height, block_number);
+    /// let locations = builder.get_locations();
+    /// // For each location, query: api.query.confidentialAssets.curveTreeInnerNodes(location)
+    /// ```
     pub fn get_locations(&self) -> Vec<NodeLocation<L>> {
         self.node_locations.clone()
     }
 
-    /// Get the leaf indices
+    /// Retrieves the list of leaf indices that must be queried from the blockchain.
+    ///
+    /// These are all the sibling leaves along the path to the target leaf, plus the target leaf itself.
+    /// All these leaves must be fetched from the blockchain and populated using `set_leaf()`.
+    ///
+    /// # Returns
+    /// A `Vec<LeafIndex>` containing all the leaf indices needed. These indices can be used to
+    /// query the blockchain's confidentialAssets storage for leaf values.
+    ///
+    /// # Example (Rust)
+    /// ```rust, ignore
+    /// let builder = LeafPathBuilder::new(leaf_index, height, block_number);
+    /// let leaf_indices = builder.get_leaf_indices();
+    /// // For each index, query: api.query.confidentialAssets.curveTreeLeaves(index, block_number)
+    /// ```
     pub fn get_leaf_indices(&self) -> Vec<LeafIndex> {
         self.leaf_indices.clone()
     }
 
-    /// Get the min leaf index
+    /// Retrieves the minimum leaf index in the required range.
+    ///
+    /// Combined with `get_max_leaf_index()`, this defines a contiguous range of leaf indices
+    /// that need to be fetched. This is useful for efficient batch queries of consecutive leaves.
+    ///
+    /// # Returns
+    /// A `LeafIndex` representing the inclusive lower bound of the leaf range.
+    ///
+    /// # Example (Rust)
+    /// ```rust, ignore
+    /// let builder = LeafPathBuilder::new(leaf_index, height, block_number);
+    /// let min = builder.get_min_leaf_index();
+    /// let max = builder.get_max_leaf_index();
+    /// // Query all leaves in range [min, max)
+    /// ```
     pub fn get_min_leaf_index(&self) -> LeafIndex {
         self.leaf_range.0
     }
 
-    /// Get the max leaf index
+    /// Retrieves the maximum leaf index in the required range.
+    ///
+    /// Combined with `get_min_leaf_index()`, this defines a contiguous range of leaf indices
+    /// that need to be fetched. The range is [min, max) (exclusive on the upper bound).
+    ///
+    /// # Returns
+    /// A `LeafIndex` representing the exclusive upper bound of the leaf range.
+    ///
+    /// # Example (Rust)
+    /// ```rust, ignore
+    /// let builder = LeafPathBuilder::new(leaf_index, height, block_number);
+    /// let min = builder.get_min_leaf_index();
+    /// let max = builder.get_max_leaf_index();
+    /// // Query all leaves in range [min, max)
+    /// for i in min.0..max.0 {
+    ///     // fetch and set leaf at index i
+    /// }
+    /// ```
     pub fn get_max_leaf_index(&self) -> LeafIndex {
         self.leaf_range.1
     }
 
-    /// Set the root.
+    /// Stores the tree root value in the builder.
+    ///
+    /// The root must be set before building a path that includes the root. This is typically the
+    /// value returned by querying the blockchain's `confidentialAssets.curveTreeRoots` storage
+    /// for the specified block number.
+    ///
+    /// # Arguments
+    /// * `root` - A byte slice containing the SCALE-encoded tree root value retrieved from the blockchain.
+    ///   This should be the root at the same block number specified during builder construction.
+    ///
+    /// # Side Effects
+    /// Stores an internal clone of the provided root bytes for later use during path construction.
+    ///
+    /// # Example (Rust)
+    /// ```rust, ignore
+    /// let mut builder = LeafPathBuilder::new(leaf_index, height, block_number);
+    /// let root_bytes = /* fetch from blockchain */;
+    /// builder.set_root(&root_bytes);
+    /// ```
     pub fn set_root(&mut self, root: &[u8]) {
         self.root = Some(root.to_vec());
     }
 
-    /// Set a leaf at the given index.
+    /// Stores a leaf value at the specified index, or removes it if `None` is provided.
+    ///
+    /// This method decodes the provided SCALE-encoded leaf bytes and stores it internally.
+    /// All leaves returned by `get_leaf_indices()` must be set before building a path.
+    ///
+    /// # Arguments
+    /// * `leaf_index` - The `LeafIndex` at which to store the leaf. Should be one of the indices
+    ///   returned by `get_leaf_indices()`.
+    /// * `leaf` - An `Option<JsValue>` containing:
+    ///   - `Some(js_value)` - A SCALE-encoded leaf value to store (will be decoded internally)
+    ///   - `None` - To remove a previously stored leaf at this index
+    ///
+    /// # Returns
+    /// `Ok(())` if the leaf was successfully decoded and stored, or removed.
+    ///
+    /// # Errors
+    /// * Returns an error if the provided leaf bytes cannot be decoded as a valid `CompressedLeafValue<C>`.
+    ///   Error message will include details about the decoding failure.
+    ///
+    /// # Example (Rust)
+    /// ```rust, ignore
+    /// let mut builder = LeafPathBuilder::new(leaf_index, height, block_number);
+    /// let leaf_indices = builder.get_leaf_indices();
+    /// for &idx in &leaf_indices {
+    ///     let leaf_bytes = /* fetch from blockchain */;
+    ///     // Create a JsValue from the bytes (in actual Wasm code)
+    ///     builder.set_leaf(idx, Some(leaf_js_value))?;
+    /// }
+    /// ```
     pub fn set_leaf(&mut self, leaf_index: LeafIndex, leaf: Option<JsValue>) -> Result<(), Error> {
         if let Some(leaf) = leaf {
             let leaf = js_sys::Uint8Array::from(leaf).to_vec();
@@ -517,7 +714,37 @@ impl<const L: usize, const M: usize, C: CurveTreeConfig> LeafPathBuilder<L, M, C
         Ok(())
     }
 
-    /// Set a node at the given location index.
+    /// Stores an inner node at the specified location index, or removes it if `None` is provided.
+    ///
+    /// The location index corresponds to the position in the vector returned by `get_locations()`.
+    /// This method decodes the provided SCALE-encoded node bytes and stores it internally.
+    ///
+    /// # Arguments
+    /// * `location_index` - A `usize` representing the position in the node locations vector.
+    ///   Must be less than the length of the vector returned by `get_locations()`.
+    /// * `node` - An `Option<JsValue>` containing:
+    ///   - `Some(js_value)` - A SCALE-encoded inner node to store (will be decoded internally)
+    ///   - `None` - To remove a previously stored node at this location index
+    ///
+    /// # Returns
+    /// `Ok(())` if the node was successfully decoded and stored, or removed.
+    ///
+    /// # Errors
+    /// * `Error` with message "Location index X out of bounds (max Y)" if the index exceeds the
+    ///   size of the node locations vector.
+    /// * `Error` if the provided node bytes cannot be decoded as a valid `CompressedInner<M, C>`.
+    ///   Error message will include details about the decoding failure.
+    ///
+    /// # Example (Rust)
+    /// ```rust, ignore
+    /// let mut builder = LeafPathBuilder::new(leaf_index, height, block_number);
+    /// let locations = builder.get_locations();
+    /// for (idx, location) in locations.iter().enumerate() {
+    ///     let node_bytes = /* fetch from blockchain using location */;
+    ///     // Create a JsValue from the bytes (in actual Wasm code)
+    ///     builder.set_node_at_index(idx, Some(node_js_value))?;
+    /// }
+    /// ```
     pub fn set_node_at_index(
         &mut self,
         location_index: usize,
@@ -534,7 +761,34 @@ impl<const L: usize, const M: usize, C: CurveTreeConfig> LeafPathBuilder<L, M, C
         self.set_node(&location, node)
     }
 
-    /// Set a node at the given location.
+    /// Stores an inner node at the specified location, or removes it if `None` is provided.
+    ///
+    /// This is an alternative to `set_node_at_index()` when you have the `NodeLocation` directly
+    /// rather than its index. This method decodes the provided SCALE-encoded node bytes and stores it.
+    ///
+    /// # Arguments
+    /// * `location` - A reference to a `NodeLocation<L>` where the node should be stored.
+    /// * `node` - An `Option<JsValue>` containing:
+    ///   - `Some(js_value)` - A SCALE-encoded inner node to store (will be decoded internally)
+    ///   - `None` - To remove a previously stored node at this location
+    ///
+    /// # Returns
+    /// `Ok(())` if the node was successfully decoded and stored, or removed.
+    ///
+    /// # Errors
+    /// * `Error` if the provided node bytes cannot be decoded as a valid `CompressedInner<M, C>`.
+    ///   Error message will include details about the decoding failure.
+    ///
+    /// # Example (Rust)
+    /// ```rust, ignore
+    /// let mut builder = LeafPathBuilder::new(leaf_index, height, block_number);
+    /// let locations = builder.get_locations();
+    /// for location in locations {
+    ///     let node_bytes = /* fetch from blockchain using location */;
+    ///     // Create a JsValue from the bytes (in actual Wasm code)
+    ///     builder.set_node(&location, Some(node_js_value))?;
+    /// }
+    /// ```
     pub fn set_node(
         &mut self,
         location: &NodeLocation<L>,
@@ -552,7 +806,52 @@ impl<const L: usize, const M: usize, C: CurveTreeConfig> LeafPathBuilder<L, M, C
         Ok(())
     }
 
-    /// Set the leaves and nodes.
+    /// Batch stores multiple leaves and nodes at once.
+    ///
+    /// This is a convenience method for populating the builder with all required leaves and nodes
+    /// in a single call. The leaves and nodes are expected to be in the same order as returned
+    /// by `get_leaf_indices()` and `get_locations()` respectively.
+    ///
+    /// # Arguments
+    /// * `leaves` - A `Vec<JsValue>` containing SCALE-encoded leaf values, in the same order as
+    ///   `get_leaf_indices()`. Each value will be decoded and stored at the corresponding index.
+    /// * `nodes` - A `Vec<JsValue>` containing SCALE-encoded inner nodes, in the same order as
+    ///   `get_locations()`. Each value will be decoded and stored at the corresponding location.
+    ///
+    /// # Returns
+    /// `Ok(())` if all leaves and nodes were successfully decoded and stored.
+    ///
+    /// # Errors
+    /// * `Error` if any leaf or node cannot be decoded.
+    /// * `Error` if a location index is out of bounds (if the nodes vector is longer than expected).
+    /// Errors are returned on the first failure encountered during iteration.
+    ///
+    /// # Panics
+    /// This method will panic if:
+    /// - The `leaves` vector length does not match `get_leaf_indices().len()`
+    /// - The `nodes` vector length does not match `get_locations().len()`
+    ///
+    /// # Example (Rust)
+    /// ```rust, ignore
+    /// let mut builder = LeafPathBuilder::new(leaf_index, height, block_number);
+    ///
+    /// // Fetch all leaves
+    /// let leaf_indices = builder.get_leaf_indices();
+    /// let mut leaves = Vec::new();
+    /// for &idx in &leaf_indices {
+    ///     leaves.push(/* fetch and encode leaf */);
+    /// }
+    ///
+    /// // Fetch all nodes
+    /// let locations = builder.get_locations();
+    /// let mut nodes = Vec::new();
+    /// for location in &locations {
+    ///     nodes.push(/* fetch and encode node */);
+    /// }
+    ///
+    /// // Set them all at once
+    /// builder.set_leaves_and_nodes(leaves, nodes)?;
+    /// ```
     pub fn set_leaves_and_nodes(
         &mut self,
         leaves: Vec<JsValue>,

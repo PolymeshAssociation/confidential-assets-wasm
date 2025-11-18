@@ -21,11 +21,37 @@ pub mod signer;
 
 pub use signer::*;
 
-/// A client connection to a Polymesh node
+/// A client connection to a Polymesh node.
 ///
-/// This is the main entry point for interacting with the Polymesh blockchain.
-/// It provides methods to query on-chain data, submit transactions, and access
-/// the various curve trees (account, asset, and fee account trees).
+/// This is the main entry point for interacting with the Polymesh blockchain and the DART
+/// confidential asset system. It provides methods to:
+/// - Connect to a Polymesh node and manage the connection
+/// - Create and manage signers for submitting transactions
+/// - Query on-chain confidential asset and account data
+/// - Access curve trees (account, asset, and fee account trees) for building zero-knowledge proofs
+/// - Retrieve account identities and asset states
+///
+/// # Transaction Finalization
+/// By default, all transactions wait for finalization before returning. This can be disabled
+/// via the `finalize` setter for faster testing (transactions return after being included in a block).
+///
+/// # Example
+/// ```javascript
+/// // Connect to a Polymesh node
+/// const client = await PolymeshClient.connect("ws://localhost:9944");
+///
+/// // Disable finalization for faster testing
+/// client.finalize = false;
+///
+/// // Create a signer and get its identity
+/// const signer = client.newSigner("//TestAccount");
+/// const did = await signer.identity();
+/// console.log('Account DID:', did);
+///
+/// // Query asset state
+/// const assetState = await client.getAssetState(1);
+/// console.log('Asset ID:', assetState.assetId());
+/// ```
 #[wasm_bindgen]
 pub struct PolymeshClient {
     pub(crate) api: Api,
@@ -219,9 +245,33 @@ impl PolymeshClient {
         Ok(())
     }
 
-    /// Get the identity of a give account public key, if any.
+    /// Get the identity of a given account public key, if any.
     ///
-    /// The identity DID is returned as a 32 byte array.
+    /// This method queries the blockchain to find the Polymesh identity (DID) associated
+    /// with a given account public key. Each account can be linked to at most one identity.
+    ///
+    /// # Arguments
+    /// * `account` - An `AccountPublicKey` to look up the associated identity for.
+    ///
+    /// # Returns
+    /// A hexadecimal string representing the DID (e.g., `"0x1234..."`), or `null` if no
+    /// identity is found for this account.
+    ///
+    /// # Errors
+    /// * Throws an error if the blockchain query fails.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const publicKeys = accountKeys.publicKeys();
+    /// const accountKey = publicKeys.accountPublicKey();
+    ///
+    /// const did = await client.getAccountIdentity(accountKey);
+    /// if (did !== null) {
+    ///     console.log('Account is linked to DID:', did);
+    /// } else {
+    ///     console.log('Account has no linked identity');
+    /// }
+    /// ```
     #[wasm_bindgen(js_name = getAccountIdentity)]
     pub async fn get_account_identity(
         &self,
@@ -241,7 +291,37 @@ impl PolymeshClient {
         }
     }
 
-    /// Get an asset's `AssetState` by its Asset ID.
+    /// Get an asset's state by its Asset ID.
+    ///
+    /// This method retrieves the full state of a confidential asset from the blockchain,
+    /// including the asset ID, mediators, and auditors. The asset state is needed to build
+    /// settlement proofs and other operations involving the asset.
+    ///
+    /// # Arguments
+    /// * `asset_id` - The numeric ID of the asset to query.
+    ///
+    /// # Returns
+    /// An `AssetState` object containing:
+    /// - The asset ID
+    /// - The list of mediators' encryption public keys
+    /// - The list of auditors' encryption public keys
+    ///
+    /// # Errors
+    /// * Throws an error if the asset doesn't exist on-chain.
+    /// * Throws an error if the blockchain query fails.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const assetId = 1;
+    /// const assetState = await client.getAssetState(assetId);
+    ///
+    /// console.log('Asset ID:', assetState.assetId());
+    /// console.log('Mediators:', assetState.mediatorCount());
+    /// console.log('Auditors:', assetState.auditorCount());
+    ///
+    /// // Use in settlement legs
+    /// const leg = new LegBuilder(sender, receiver, assetState, amount);
+    /// ```
     #[wasm_bindgen(js_name = getAssetState)]
     pub async fn get_asset_state(&self, asset_id: AssetId) -> Result<AssetState, JsValue> {
         // Get DART asset details.
@@ -270,6 +350,45 @@ impl PolymeshClient {
     }
 
     /// Get settlement encrypted legs.
+    ///
+    /// This method retrieves all the encrypted legs of a settlement from the blockchain.
+    /// Legs represent individual asset transfers within the settlement. Each leg is encrypted
+    /// so that only parties with the appropriate keys (sender, receiver, mediators, auditors) can decrypt.
+    ///
+    /// # Arguments
+    /// * `settlement_ref` - The settlement reference. Accepts:
+    ///   - Hex string with or without "0x" prefix (e.g., `"0x1234..."`)
+    ///   - 32-byte `Uint8Array`
+    ///
+    /// # Returns
+    /// A `SettlementLegsEncrypted` object containing all the encrypted legs of the settlement.
+    ///
+    /// # Errors
+    /// * Throws an error if the settlement reference format is invalid.
+    /// * Throws an error if the settlement doesn't exist on-chain.
+    /// * Throws an error if the blockchain query fails.
+    ///
+    /// # Example
+    /// ```javascript
+    /// // After creating a settlement
+    /// const result = await issuer.createSettlement(settlementProof);
+    /// const settlementRef = result.settlementRef();
+    ///
+    /// // Retrieve the settlement legs
+    /// const legs = await client.getSettlementLegs(settlementRef);
+    /// console.log('Settlement has', legs.legCount(), 'legs');
+    ///
+    /// // Retrieve and decrypt individual legs
+    /// for (let i = 0; i < legs.legCount(); i++) {
+    ///     const encryptedLeg = legs.getLeg(i);
+    ///
+    ///     // Try to decrypt as sender
+    ///     const decryptedLeg = encryptedLeg.tryDecrypt(senderKeys);
+    ///     if (decryptedLeg !== null) {
+    ///         console.log('Leg', i, ':', decryptedLeg);
+    ///     }
+    /// }
+    /// ```
     #[wasm_bindgen(js_name = getSettlementLegs)]
     pub async fn get_settlement_legs(
         &self,
@@ -303,6 +422,30 @@ impl PolymeshClient {
     }
 
     /// Get an account leaf at the given index for a specific block number.
+    ///
+    /// This low-level method retrieves a single leaf from the account curve tree.
+    /// Leaves represent commitments to account states. This is typically used internally
+    /// by `AccountLeafPathBuilder` when building curve tree paths.
+    ///
+    /// # Arguments
+    /// * `leaf_index` - The index of the leaf to retrieve.
+    /// * `block_number` - The block number at which to query the tree state.
+    ///
+    /// # Returns
+    /// A `Uint8Array` containing the SCALE-encoded leaf, or `null` if the leaf doesn't exist.
+    ///
+    /// # Errors
+    /// * Throws an error if the block number is invalid or too old.
+    /// * Throws an error if the blockchain query fails.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const blockNumber = 12345;
+    /// const leaf = await client.getAccountLeaf(0, blockNumber);
+    /// if (leaf !== null) {
+    ///     console.log('Leaf found, size:', leaf.length, 'bytes');
+    /// }
+    /// ```
     #[wasm_bindgen(js_name = getAccountLeaf)]
     pub async fn get_account_leaf(
         &self,
@@ -340,6 +483,22 @@ impl PolymeshClient {
     }
 
     /// Get an account inner node at the given location for a specific block number.
+    ///
+    /// This low-level method retrieves a single inner node from the account curve tree.
+    /// Inner nodes are internal nodes in the tree structure connecting leaves to the root.
+    /// This is typically used internally by `AccountLeafPathBuilder` when building curve tree paths.
+    ///
+    /// # Arguments
+    /// * `location` - A `Uint8Array` containing the SCALE-encoded location of the node in the tree.
+    /// * `block_number` - The block number at which to query the tree state.
+    ///
+    /// # Returns
+    /// A `Uint8Array` containing the SCALE-encoded inner node, or `null` if the node doesn't exist.
+    ///
+    /// # Errors
+    /// * Throws an error if the location cannot be decoded.
+    /// * Throws an error if the block number is invalid.
+    /// * Throws an error if the blockchain query fails.
     #[wasm_bindgen(js_name = getAccountInnerNode)]
     pub async fn get_account_inner_node(
         &self,
@@ -390,7 +549,28 @@ impl PolymeshClient {
         Ok(None)
     }
 
-    /// Get the Account tree root.
+    /// Get the account curve tree root at a specific block number.
+    ///
+    /// The root is the top-level commitment to all account states in the account tree.
+    /// Roots are computed at each block when account states are modified. This is used when
+    /// building and validating zero-knowledge proofs about account states.
+    ///
+    /// # Arguments
+    /// * `block_number` - The block number for which to retrieve the tree root.
+    ///
+    /// # Returns
+    /// A `Uint8Array` containing the SCALE-encoded root.
+    ///
+    /// # Errors
+    /// * Throws an error if no root exists for the specified block number.
+    /// * Throws an error if the blockchain query fails.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const blockNumber = 12345;
+    /// const root = await client.getAccountTreeRoot(blockNumber);
+    /// console.log('Account tree root size:', root.length, 'bytes');
+    /// ```
     #[wasm_bindgen(js_name = getAccountTreeRoot)]
     pub async fn get_account_tree_root(
         &self,
@@ -414,6 +594,30 @@ impl PolymeshClient {
     }
 
     /// Get an asset leaf at the given index for a specific block number.
+    ///
+    /// This low-level method retrieves a single leaf from the asset curve tree.
+    /// Leaves represent commitments to asset states (including mediators and auditors).
+    /// This is typically used internally by `AssetLeafPathBuilder` when building curve tree paths.
+    ///
+    /// # Arguments
+    /// * `leaf_index` - The index of the leaf to retrieve.
+    /// * `block_number` - The block number at which to query the tree state.
+    ///
+    /// # Returns
+    /// A `Uint8Array` containing the SCALE-encoded leaf, or `null` if the leaf doesn't exist.
+    ///
+    /// # Errors
+    /// * Throws an error if the block number is invalid or too old.
+    /// * Throws an error if the blockchain query fails.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const blockNumber = 12345;
+    /// const leaf = await client.getAssetLeaf(0, blockNumber);
+    /// if (leaf !== null) {
+    ///     console.log('Asset leaf found, size:', leaf.length, 'bytes');
+    /// }
+    /// ```
     #[wasm_bindgen(js_name = getAssetLeaf)]
     pub async fn get_asset_leaf(
         &self,
@@ -451,6 +655,22 @@ impl PolymeshClient {
     }
 
     /// Get an asset inner node at the given location for a specific block number.
+    ///
+    /// This low-level method retrieves a single inner node from the asset curve tree.
+    /// Inner nodes are internal nodes in the tree structure connecting leaves to the root.
+    /// This is typically used internally by `AssetLeafPathBuilder` when building curve tree paths.
+    ///
+    /// # Arguments
+    /// * `location` - A `Uint8Array` containing the SCALE-encoded location of the node in the tree.
+    /// * `block_number` - The block number at which to query the tree state.
+    ///
+    /// # Returns
+    /// A `Uint8Array` containing the SCALE-encoded inner node, or `null` if the node doesn't exist.
+    ///
+    /// # Errors
+    /// * Throws an error if the location cannot be decoded.
+    /// * Throws an error if the block number is invalid.
+    /// * Throws an error if the blockchain query fails.
     #[wasm_bindgen(js_name = getAssetInnerNode)]
     pub async fn get_asset_inner_node(
         &self,
@@ -499,7 +719,28 @@ impl PolymeshClient {
         Ok(None)
     }
 
-    /// Get the Asset tree root.
+    /// Get the asset curve tree root at a specific block number.
+    ///
+    /// The root is the top-level commitment to all asset states in the asset tree.
+    /// Roots are computed at each block when asset states are modified. This is used when
+    /// building and validating settlement proofs that reference specific asset states.
+    ///
+    /// # Arguments
+    /// * `block_number` - The block number for which to retrieve the tree root.
+    ///
+    /// # Returns
+    /// A `Uint8Array` containing the SCALE-encoded root.
+    ///
+    /// # Errors
+    /// * Throws an error if no root exists for the specified block number.
+    /// * Throws an error if the blockchain query fails.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const blockNumber = 12345;
+    /// const root = await client.getAssetTreeRoot(blockNumber);
+    /// console.log('Asset tree root size:', root.length, 'bytes');
+    /// ```
     #[wasm_bindgen(js_name = getAssetTreeRoot)]
     pub async fn get_asset_tree_root(
         &self,
