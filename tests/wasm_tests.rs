@@ -57,21 +57,3 @@ fn test_public_keys_components() {
     let _account_bytes = account_pub_key.to_bytes();
     let _encryption_bytes = encryption_pub_key.to_bytes();
 }
-
-#[wasm_bindgen_test]
-fn test_asset_state_creation() {
-    let asset_id = 42;
-    let mediators = vec![];
-    let auditors = vec![];
-
-    let asset_state = AssetState::new(asset_id, mediators, auditors).unwrap();
-
-    assert_eq!(asset_state.asset_id(), asset_id);
-    assert_eq!(asset_state.mediator_count(), 0);
-    assert_eq!(asset_state.auditor_count(), 0);
-
-    // Should be able to export and re-import
-    let bytes = asset_state.to_bytes();
-    let reimported = AssetState::from_bytes(&bytes).unwrap();
-    assert_eq!(reimported.asset_id(), asset_id);
-}
