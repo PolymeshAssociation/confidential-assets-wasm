@@ -73,7 +73,7 @@ rand = { version = "0.8", default-features = false, features = [
   "alloc",
   "getrandom",
 ] }
-getrandom = { version = "0.3", features = ["wasm_js"] }
+getrandom = { version = "0.2", features = ["js"] }
 thiserror = "1.0"
 
 # Other dependencies
@@ -90,7 +90,7 @@ wasm-bindgen-test = "0.3"
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 polymesh-api = { version = "3.6", features = ["serde"], optional = true }
-polymesh-api-client = { version = "3.10.0" }
+polymesh-api-client = { version = "3.10.0", optional = true }
 
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -103,7 +103,7 @@ polymesh-api-client = { version = "3.10.0", default-features = false, features =
   "v14",
   "wasm",
   "serde",
-] }
+], optional = true }
 
 [features]
 default = ["polymesh-client"]
@@ -114,6 +114,7 @@ download_metadata = ["polymesh-api/download_metadata"]
 # Enable `PolymeshClient` support.
 polymesh-client = [
   "download_metadata",
+  "polymesh-api-client",
   "polymesh-api",
   "async-trait",
   "futures-util",

@@ -1,5 +1,6 @@
 use thiserror::Error;
 
+#[cfg(feature = "polymesh-client")]
 use polymesh_api_client::Error as PolymeshClientError;
 
 #[derive(Error, Debug)]
@@ -38,6 +39,7 @@ impl Error {
     }
 }
 
+#[cfg(feature = "polymesh-client")]
 impl From<PolymeshClientError> for Error {
     fn from(e: PolymeshClientError) -> Self {
         Error::PolymeshClientError(e.to_string())
