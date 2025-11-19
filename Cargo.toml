@@ -48,7 +48,7 @@ polymesh-dart = { version = "0.1.0", default-features = false, features = [
   "std",
   "asm",
   "serde",
-  "parallel",
+  #"parallel",
   "backend_bp",
 ] }
 
