@@ -50,7 +50,6 @@ polymesh-dart = { version = "0.1.0", default-features = false, features = [
   "serde",
   "parallel",
   "backend_bp",
-  "async_tree",
 ] }
 
 async-trait = { version = "0.1", optional = true }
@@ -116,6 +115,7 @@ polymesh-client = [
   "download_metadata",
   "polymesh-api-client",
   "polymesh-api",
+  "polymesh-dart/async_tree",
   "async-trait",
   "futures-util",
   "tokio",
