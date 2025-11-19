@@ -623,6 +623,7 @@ impl SettlementLegEncrypted {
     ///
     /// # Arguments
     /// * `encryption_key` - The encryption key pair for the mediator or auditor.
+    /// * `max_asset_id` - Optional maximum asset ID to limit decryption scope.
     ///
     /// # Returns
     /// * `Some(SettlementLeg)` if decryption succeeded.
@@ -631,7 +632,8 @@ impl SettlementLegEncrypted {
     /// # Example
     /// ```javascript
     /// const mediatorKeys = accountKeys.encryptionKeyPair();
-    /// const decrypted = encryptedLeg.tryDecryptAsMediatorOrAuditor(mediatorKeys);
+    /// const maxAssetId = 500; // Optional limit
+    /// const decrypted = encryptedLeg.tryDecryptAsMediatorOrAuditor(mediatorKeys, maxAssetId);
     /// if (decrypted) {
     ///     console.log('Can see transfer details as mediator/auditor');
     ///     console.log('Amount:', decrypted.amount);
@@ -641,10 +643,11 @@ impl SettlementLegEncrypted {
     pub fn try_decrypt_as_mediator_or_auditor(
         &self,
         encryption_key: &EncryptionKeyPair,
+        max_asset_id: Option<AssetId>,
     ) -> Result<Option<SettlementLeg>, JsValue> {
         if let Some((leg, _role)) = self
             .inner
-            .try_decrypt_with_key(&encryption_key.inner, None, None)
+            .try_decrypt_with_key(&encryption_key.inner, None, max_asset_id)
             .ok()
         {
             Ok(Some(SettlementLeg::from_native(leg)))
