@@ -4,8 +4,9 @@ use polymesh_dart::{
     AccountAssetRegistrationProof as NativeAccountAssetRegistrationProof,
     AccountKeys as NativeAccountKeys, AccountPublicKey as NativeAccountPublicKey,
     AccountPublicKeys as NativeAccountPublicKeys,
-    AccountRegistrationProof as NativeAccountRegistrationProof,
+    AccountRegistrationProof as NativeAccountRegistrationProof, AssetId,
     EncryptionKeyPair as NativeEncryptionKeyPair, EncryptionPublicKey as NativeEncryptionPublicKey,
+    LegId, LegRef, LegRole, MediatorAffirmationProof as NativeMediatorAffirmationProof,
 };
 use rand::RngCore as _;
 use rand_chacha::ChaChaRng;
@@ -13,7 +14,10 @@ use rand_core::SeedableRng;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
-use crate::{jsvalue_to_identity_id, AccountAssetRegistration, AccountAssetState};
+use crate::{
+    jsvalue_to_balance, jsvalue_to_identity_id, jsvalue_to_settlement_ref,
+    AccountAssetRegistration, AccountAssetState, MediatorAffirmationProof, SettlementLegEncrypted,
+};
 
 /// Contains the secret keys for a confidential account.
 ///
@@ -313,6 +317,87 @@ impl AccountKeys {
 #[wasm_bindgen]
 pub struct EncryptionKeyPair {
     pub(crate) inner: NativeEncryptionKeyPair,
+}
+
+#[wasm_bindgen]
+impl EncryptionKeyPair {
+    /// Generate mediator affirmation for a settlement leg.
+    ///
+    /// # Arguments
+    /// * `settlement_ref` - The settlement reference (can be hex string or Uint8Array).
+    /// * `leg_id` - The identifier of the settlement leg.
+    /// * `leg_enc` - The encrypted settlement leg.
+    /// * `accept` - Boolean indicating whether to accept (true) or reject (false) the leg.
+    /// * `asset_id` - The asset ID of the settlement leg.
+    /// * `amount` - The expected amount (can be null/undefined to skip check).
+    ///
+    /// # Returns
+    /// A `MediatorAffirmationProof` that can be submitted to the blockchain.
+    ///
+    /// # Errors
+    /// * Throws an error if decryption fails.
+    /// * Throws an error if asset ID or amount do not match.
+    /// * Throws an error if the account is not a mediator for the leg.
+    #[wasm_bindgen(js_name = mediatorAffirmationProof)]
+    pub fn mediator_affirmation_proof(
+        &self,
+        settlement_ref: JsValue,
+        leg_id: LegId,
+        leg_enc: &SettlementLegEncrypted,
+        accept: bool,
+        asset_id: AssetId,
+        amount: JsValue,
+    ) -> Result<MediatorAffirmationProof, JsValue> {
+        let settlement_ref = jsvalue_to_settlement_ref(&settlement_ref)?;
+        let leg_ref = LegRef::new(settlement_ref, leg_id);
+        let mut rng = rand::rngs::OsRng;
+        let leg_enc = &leg_enc.inner;
+
+        // Decrypt leg.
+        let (leg, leg_role) = leg_enc
+            .try_decrypt_with_key(&self.inner, None, None)
+            .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
+
+        // Verify asset id matches.
+        if leg.asset_id != asset_id {
+            return Err(JsValue::from_str("Settlement leg asset id does not match"));
+        }
+        // Verify amount matches if provided.
+        if !amount.is_null_or_undefined() {
+            let amount = jsvalue_to_balance(&amount)?;
+            if leg.amount != amount {
+                return Err(JsValue::from_str("Settlement leg amount does not match"));
+            }
+        }
+
+        // Only mediators can affirm/reject
+        let key_index = match leg_role {
+            LegRole::Mediator(idx) => idx,
+            _ => {
+                return Err(JsValue::from_str(
+                    "Only mediators can affirm or reject settlement legs",
+                ))
+            }
+        };
+
+        let proof = NativeMediatorAffirmationProof::new(
+            &mut rng,
+            &leg_ref,
+            asset_id,
+            &leg_enc,
+            &self.inner,
+            key_index,
+            accept,
+        )
+        .map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to generate mediator affirmation proof: {}",
+                e
+            ))
+        })?;
+
+        Ok(MediatorAffirmationProof { inner: proof })
+    }
 }
 
 /// A zero-knowledge proof for registering a confidential account on-chain.
