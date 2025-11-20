@@ -672,6 +672,8 @@ impl SettlementLegEncrypted {
 /// ```javascript
 /// const leg = encryptedLeg.tryDecrypt(accountKeys);
 /// if (leg) {
+///     console.log('Decrypted leg details:');
+///     console.log('Role:', leg.role);
 ///     console.log('Sender:', leg.sender.toJson());
 ///     console.log('Receiver:', leg.receiver.toJson());
 ///     console.log('Asset ID:', leg.assetId);
@@ -681,7 +683,7 @@ impl SettlementLegEncrypted {
 #[wasm_bindgen(getter_with_clone, inspectable)]
 #[derive(Clone, Debug)]
 pub struct SettlementLeg {
-    pub role: Option<String>,
+    pub role: String,
     pub sender: AccountPublicKey,
     pub receiver: AccountPublicKey,
     #[wasm_bindgen(js_name = "assetId")]
@@ -692,12 +694,12 @@ pub struct SettlementLeg {
 impl SettlementLeg {
     pub fn from_native(leg: NativeLeg, role: NativeLegRole) -> SettlementLeg {
         SettlementLeg {
-            role: Some(match role {
+            role: match role {
                 NativeLegRole::Sender => "Sender".to_string(),
                 NativeLegRole::Receiver => "Receiver".to_string(),
                 NativeLegRole::Mediator(_) => "Mediator".to_string(),
                 NativeLegRole::Auditor(_) => "Auditor".to_string(),
-            }),
+            },
             sender: AccountPublicKey::from_native(leg.sender),
             receiver: AccountPublicKey::from_native(leg.receiver),
             asset_id: leg.asset_id,
