@@ -10,6 +10,7 @@ use polymesh_dart::{
 use rand::RngCore as _;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 use crate::{jsvalue_to_identity_id, AccountAssetRegistration, AccountAssetState};
@@ -390,11 +391,13 @@ impl AccountRegistrationProof {
 /// // Use in settlement legs
 /// const leg = new LegBuilder(senderKeys, publicKeys, assetState, amount);
 /// ```
-#[wasm_bindgen(getter_with_clone)]
-#[derive(Clone, Copy)]
+#[wasm_bindgen]
+#[derive(Clone, Copy, Serialize, Deserialize)]
 pub struct AccountPublicKeys {
-    pub encryption: EncryptionPublicKey,
-    pub account: AccountPublicKey,
+    #[serde(rename = "encryptionPublicKey")]
+    pub(crate) encryption: EncryptionPublicKey,
+    #[serde(rename = "accountPublicKey")]
+    pub(crate) account: AccountPublicKey,
 }
 
 impl AccountPublicKeys {
@@ -417,6 +420,59 @@ impl AccountPublicKeys {
 
 #[wasm_bindgen]
 impl AccountPublicKeys {
+    /// Creates `AccountPublicKeys` from various input formats.
+    ///
+    /// # Arguments
+    /// * `js_value` - Can be any of:
+    ///   - A 64-byte `Uint8Array`
+    ///   - JS map/object with `accountPublicKey` and `encryptionPublicKey` properties
+    ///
+    /// # Returns
+    /// A new `AccountPublicKeys` object.
+    ///
+    /// # Errors
+    /// * Throws an error if the input format is not recognized or invalid.
+    ///
+    /// # Example
+    /// ```javascript
+    /// // From Uint8Array
+    /// const publicKeys = new AccountPublicKeys(uint8Array);
+    ///
+    /// // From JS object
+    /// const publicKeys = new AccountPublicKeys({
+    ///   accountPublicKey: "0x1234...",
+    ///   encryptionPublicKey: "0x5678..."
+    /// });
+    ///
+    /// // Use in settlement legs
+    /// const leg = new LegBuilder(senderKeys, publicKeys, assetState, amount);
+    /// ```
+    #[wasm_bindgen(constructor)]
+    pub fn new(keys: JsValue) -> Result<AccountPublicKeys, JsValue> {
+        // Try Uint8Array (check if it's a valid Uint8Array)
+        let bytes_array = js_sys::Uint8Array::new(&keys);
+        if bytes_array.length() > 0 {
+            let bytes_vec = bytes_array.to_vec();
+            if !bytes_vec.is_empty() {
+                let native = NativeAccountPublicKeys::decode(&mut &bytes_vec[..]).map_err(|e| {
+                    JsValue::from_str(&format!(
+                        "Failed to decode account public keys from Uint8Array: {}",
+                        e
+                    ))
+                })?;
+                return Ok(AccountPublicKeys::from_native(native));
+            }
+        }
+
+        // Try JS map/object by using `serde_wasm_bindgen`
+        serde_wasm_bindgen::from_value(keys).map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to decode account public keys from object: {}",
+                e
+            ))
+        })
+    }
+
     /// Serializes the public keys to a SCALE-encoded byte array.
     ///
     /// # Returns
@@ -495,9 +551,30 @@ impl AccountPublicKeys {
     /// ```
     #[wasm_bindgen(js_name = toJson)]
     pub fn to_json(&self) -> Result<String, JsValue> {
-        let native = self.to_native();
-        serde_json::to_string(&native)
+        serde_json::to_string(self)
             .map_err(|e| JsValue::from_str(&format!("Failed to serialize to JSON: {}", e)))
+    }
+
+    /// Exports the public keys as a JsValue for interoperability.
+    #[wasm_bindgen(js_name = toJs)]
+    pub fn to_js(&self) -> Result<JsValue, JsValue> {
+        serde_wasm_bindgen::to_value(self).map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to serialize AccountPublicKeys to JsValue: {}",
+                e
+            ))
+        })
+    }
+
+    /// Import public keys from a JsValue.
+    #[wasm_bindgen(js_name = fromJs)]
+    pub fn from_js(js_value: JsValue) -> Result<AccountPublicKeys, JsValue> {
+        serde_wasm_bindgen::from_value(js_value).map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to deserialize AccountPublicKeys from JsValue: {}",
+                e
+            ))
+        })
     }
 }
 
@@ -516,7 +593,8 @@ impl AccountPublicKeys {
 /// const accountKey = new AccountPublicKey(uint8Array);
 /// ```
 #[wasm_bindgen]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct AccountPublicKey {
     pub(crate) inner: NativeAccountPublicKey,
 }
@@ -534,7 +612,6 @@ impl AccountPublicKey {
     ///
     /// # Arguments
     /// * `js_value` - Can be any of:
-    ///   - An existing `AccountPublicKey` object (will be cloned)
     ///   - A hex string with or without "0x" prefix (e.g., "0x1234...")
     ///   - A 32-byte `Uint8Array`
     ///   - A Polkadot.js `Codec` object with a `.toU8a()` method
@@ -553,9 +630,6 @@ impl AccountPublicKey {
     ///
     /// // From Uint8Array
     /// const key2 = new AccountPublicKey(new Uint8Array(32));
-    ///
-    /// // From existing AccountPublicKey (cloned)
-    /// const key3 = new AccountPublicKey(key1);
     ///
     /// // From Polkadot.js Codec
     /// const assetDetail = await api.query.confidentialAssets.dartAssetDetails(assetId);
@@ -673,6 +747,29 @@ impl AccountPublicKey {
         serde_json::to_string(&self.inner)
             .map_err(|e| JsValue::from_str(&format!("Failed to serialize to JSON: {}", e)))
     }
+
+    /// Exports the account public key as a JsValue for interoperability.
+    #[wasm_bindgen(js_name = toJs)]
+    pub fn to_js(&self) -> Result<JsValue, JsValue> {
+        serde_wasm_bindgen::to_value(&self.inner).map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to serialize AccountPublicKeys to JsValue: {}",
+                e
+            ))
+        })
+    }
+
+    /// Import account public key from a JsValue.
+    #[wasm_bindgen(js_name = fromJs)]
+    pub fn from_js(js_value: JsValue) -> Result<AccountPublicKeys, JsValue> {
+        let inner = serde_wasm_bindgen::from_value(js_value).map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to deserialize AccountPublicKeys from JsValue: {}",
+                e
+            ))
+        })?;
+        Ok(AccountPublicKeys::from_native(inner))
+    }
 }
 
 /// The public key used for encrypting confidential transaction data.
@@ -694,7 +791,8 @@ impl AccountPublicKey {
 /// const assetState = new AssetState(assetId, [mediatorEncKey], [auditorEncKey]);
 /// ```
 #[wasm_bindgen]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct EncryptionPublicKey {
     pub(crate) inner: NativeEncryptionPublicKey,
 }
@@ -712,7 +810,6 @@ impl EncryptionPublicKey {
     ///
     /// # Arguments
     /// * `js_value` - Can be any of:
-    ///   - An existing `EncryptionPublicKey` object (will be cloned)
     ///   - A hex string with or without "0x" prefix (e.g., "0x1234...")
     ///   - A 32-byte `Uint8Array`
     ///   - A Polkadot.js `Codec` object with a `.toU8a()` method
@@ -731,9 +828,6 @@ impl EncryptionPublicKey {
     ///
     /// // From Uint8Array
     /// const key2 = new EncryptionPublicKey(new Uint8Array(32));
-    ///
-    /// // From existing EncryptionPublicKey (cloned)
-    /// const key3 = new EncryptionPublicKey(key1);
     ///
     /// // From Polkadot.js Codec
     /// const assetDetail = await api.query.confidentialAssets.dartAssetDetails(assetId);
@@ -850,6 +944,29 @@ impl EncryptionPublicKey {
     pub fn to_json(&self) -> Result<String, JsValue> {
         serde_json::to_string(&self.inner)
             .map_err(|e| JsValue::from_str(&format!("Failed to serialize to JSON: {}", e)))
+    }
+
+    /// Exports the encryption public key as a JsValue for interoperability.
+    #[wasm_bindgen(js_name = toJs)]
+    pub fn to_js(&self) -> Result<JsValue, JsValue> {
+        serde_wasm_bindgen::to_value(&self.inner).map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to serialize EncryptionPublicKey to JsValue: {}",
+                e
+            ))
+        })
+    }
+
+    /// Import encryption public key from a JsValue.
+    #[wasm_bindgen(js_name = fromJs)]
+    pub fn from_js(js_value: JsValue) -> Result<EncryptionPublicKey, JsValue> {
+        let inner = serde_wasm_bindgen::from_value(js_value).map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to deserialize EncryptionPublicKey from JsValue: {}",
+                e
+            ))
+        })?;
+        Ok(EncryptionPublicKey { inner })
     }
 }
 
