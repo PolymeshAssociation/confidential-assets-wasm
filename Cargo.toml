@@ -105,7 +105,7 @@ polymesh-api-client = { version = "3.10.0", default-features = false, features =
 ], optional = true }
 
 [features]
-default = ["polymesh-client"]
+default = []
 
 # Enable this feature to compile against a dev-chain.
 download_metadata = ["polymesh-api/download_metadata"]
