@@ -229,6 +229,7 @@ dependencies = [
  "educe",
  "num-bigint",
  "num-traits",
+ "rayon",
  "zeroize",
 ]
 
@@ -362,6 +363,7 @@ dependencies = [
  "digest 0.10.7",
  "num-bigint",
  "parity-scale-codec",
+ "rayon",
  "serde_with",
 ]
 
@@ -416,6 +418,7 @@ checksum = "246a225cc6131e9ee4f24619af0f19d67761fff15d7ccc22e42b80846e69449a"
 dependencies = [
  "num-traits",
  "rand",
+ "rayon",
 ]
 
 [[package]]
@@ -764,6 +767,7 @@ dependencies = [
  "log",
  "rand",
  "rand_core",
+ "rayon",
  "sha2 0.10.9",
  "sha3 0.9.1",
  "thiserror 2.0.17",
@@ -916,6 +920,31 @@ checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
 dependencies = [
  "libc",
 ]
+
+[[package]]
+name = "crossbeam-deque"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9dd111b7b7f7d55b72c0a6ae361660ee5853c9af73f70c3c2ef6858b950e2e51"
+dependencies = [
+ "crossbeam-epoch",
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-epoch"
+version = "0.9.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b82ac4a3c2ca9c3460964f020e1402edd5753411d7737aa39c3714ad1b5420e"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-utils"
+version = "0.8.21"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "crunchy"
@@ -1169,7 +1198,7 @@ dependencies = [
 [[package]]
 name = "dock_crypto_utils"
 version = "0.22.0"
-source = "git+https://github.com/PolymeshAssociation/crypto#46a8105d5d0021bd8b7e5540093102b1f8f31087"
+source = "git+https://github.com/PolymeshAssociation/crypto#71fe0e595bd0317a3486e2d84118835ddc1019e0"
 dependencies = [
  "aead",
  "ahash",
@@ -1186,6 +1215,8 @@ dependencies = [
  "integer-sqrt",
  "itertools 0.14.0",
  "num",
+ "rayon",
+ "serde",
  "sha2 0.10.9",
  "zeroize",
 ]
@@ -1193,7 +1224,7 @@ dependencies = [
 [[package]]
 name = "dock_merlin"
 version = "3.0.0"
-source = "git+https://github.com/PolymeshAssociation/crypto#46a8105d5d0021bd8b7e5540093102b1f8f31087"
+source = "git+https://github.com/PolymeshAssociation/crypto#71fe0e595bd0317a3486e2d84118835ddc1019e0"
 dependencies = [
  "ark-serialize 0.5.0",
  "ark-std 0.5.0",
@@ -2709,6 +2740,7 @@ version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35bd024e8b2ff75562e5f34e7f4905839deb4b22955ef5e73d2fea1b9813cb23"
 dependencies = [
+ "num-bigint",
  "num-complex",
  "num-integer",
  "num-iter",
@@ -2777,6 +2809,7 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f83d14da390562dca69fc84082e73e548e1ad308d24accdedd2720017cb37824"
 dependencies = [
+ "num-bigint",
  "num-integer",
  "num-traits",
 ]
@@ -3131,7 +3164,7 @@ dependencies = [
 [[package]]
 name = "polymesh-dart"
 version = "0.1.0"
-source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#6fb6927f4e21b1be557b8834bdca6c19b3a63a65"
+source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#ba08b7048b2e7f8f949bf94b51aad863af7ee1bf"
 dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -3152,6 +3185,7 @@ dependencies = [
  "polymesh-dart-common",
  "rand_chacha",
  "rand_core",
+ "rayon",
  "relations",
  "scale-info",
  "schnorr_pok",
@@ -3165,7 +3199,7 @@ dependencies = [
 [[package]]
 name = "polymesh-dart-bp"
 version = "0.1.0"
-source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#6fb6927f4e21b1be557b8834bdca6c19b3a63a65"
+source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#ba08b7048b2e7f8f949bf94b51aad863af7ee1bf"
 dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -3177,12 +3211,14 @@ dependencies = [
  "digest 0.10.7",
  "dock_crypto_utils",
  "hex",
+ "lazy_static",
  "log",
  "once_cell",
  "polymesh-dart-common",
  "rand",
  "rand_chacha",
  "rand_core",
+ "rayon",
  "relations",
  "schnorr_pok",
  "thiserror 2.0.17",
@@ -3192,7 +3228,7 @@ dependencies = [
 [[package]]
 name = "polymesh-dart-common"
 version = "0.1.0"
-source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#6fb6927f4e21b1be557b8834bdca6c19b3a63a65"
+source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#ba08b7048b2e7f8f949bf94b51aad863af7ee1bf"
 
 [[package]]
 name = "polymesh-dart-wasm"
@@ -3389,6 +3425,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "rayon"
+version = "1.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "368f01d005bf8fd9b1206fb6fa653e6c4a81ceb1466406b81792d87c5677a58f"
+dependencies = [
+ "either",
+ "rayon-core",
+]
+
+[[package]]
+name = "rayon-core"
+version = "1.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22e18b0f0062d30d4230b2e85ff77fdfe4326feb054b9783a3460d8435c8ab91"
+dependencies = [
+ "crossbeam-deque",
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3464,6 +3520,7 @@ dependencies = [
  "dock_crypto_utils",
  "log",
  "rand",
+ "rayon",
  "sha3 0.10.8",
  "thiserror 2.0.17",
  "zeroize",
@@ -3741,7 +3798,7 @@ dependencies = [
 [[package]]
 name = "schnorr_pok"
 version = "0.22.0"
-source = "git+https://github.com/PolymeshAssociation/crypto#46a8105d5d0021bd8b7e5540093102b1f8f31087"
+source = "git+https://github.com/PolymeshAssociation/crypto#71fe0e595bd0317a3486e2d84118835ddc1019e0"
 dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -3750,6 +3807,8 @@ dependencies = [
  "cfg_eval",
  "digest 0.10.7",
  "dock_crypto_utils",
+ "rayon",
+ "serde",
  "zeroize",
 ]
 

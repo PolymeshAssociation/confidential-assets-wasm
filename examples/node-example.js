@@ -334,7 +334,7 @@ async function main() {
         // Try to decrypt leg with mediator keys
         console.log('   Trying to decrypt leg with mediator keys...');
         const decrypted_leg_mediator = encryptedLeg.tryDecryptAsMediatorOrAuditor(mediatorEncryptionKey);
-        if (decrypted_leg_mediator !== null) {
+        if (decrypted_leg_mediator) {
             const leg = decrypted_leg_mediator;
             console.log(`   ✓ Decrypted leg:`);
             console.log('     Sender Public Key:', leg.sender.toJson());
