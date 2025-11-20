@@ -1,8 +1,8 @@
 use codec::{Decode, Encode};
 use polymesh_dart::{
     AssetId, Balance, Leg as NativeLeg, LegBuilder as NativeLegBuilder,
-    LegEncrypted as NativeLegEncrypted, SettlementBuilder as NativeSettlementBuilder,
-    SettlementProof as NativeSettlementProof,
+    LegEncrypted as NativeLegEncrypted, LegRole as NativeLegRole,
+    SettlementBuilder as NativeSettlementBuilder, SettlementProof as NativeSettlementProof,
 };
 use wasm_bindgen::prelude::*;
 
@@ -374,7 +374,7 @@ impl SettlementLegsEncrypted {
         for leg_enc in &self.inner {
             let leg = leg_enc
                 .try_decrypt(&account_keys.inner)
-                .map(|(leg, _role)| SettlementLeg::from_native(leg));
+                .map(|(leg, role)| SettlementLeg::from_native(leg, role));
             legs.push(leg);
         }
         SettlementLegs { legs }
@@ -407,7 +407,7 @@ impl SettlementLegsEncrypted {
             let leg = leg_enc
                 .try_decrypt_with_key(&encryption_key.inner, None, None)
                 .ok()
-                .map(|(leg, _role)| SettlementLeg::from_native(leg));
+                .map(|(leg, role)| SettlementLeg::from_native(leg, role));
             legs.push(leg);
         }
 
@@ -610,8 +610,8 @@ impl SettlementLegEncrypted {
         &self,
         account_keys: &AccountKeys,
     ) -> Result<Option<SettlementLeg>, JsValue> {
-        if let Some((leg, _role)) = self.inner.try_decrypt(&account_keys.inner) {
-            Ok(Some(SettlementLeg::from_native(leg)))
+        if let Some((leg, role)) = self.inner.try_decrypt(&account_keys.inner) {
+            Ok(Some(SettlementLeg::from_native(leg, role)))
         } else {
             Ok(None)
         }
@@ -645,12 +645,12 @@ impl SettlementLegEncrypted {
         encryption_key: &EncryptionKeyPair,
         max_asset_id: Option<AssetId>,
     ) -> Result<Option<SettlementLeg>, JsValue> {
-        if let Some((leg, _role)) = self
+        if let Some((leg, role)) = self
             .inner
             .try_decrypt_with_key(&encryption_key.inner, None, max_asset_id)
             .ok()
         {
-            Ok(Some(SettlementLeg::from_native(leg)))
+            Ok(Some(SettlementLeg::from_native(leg, role)))
         } else {
             Ok(None)
         }
@@ -681,6 +681,7 @@ impl SettlementLegEncrypted {
 #[wasm_bindgen(getter_with_clone, inspectable)]
 #[derive(Clone, Debug)]
 pub struct SettlementLeg {
+    pub role: Option<String>,
     pub sender: AccountPublicKey,
     pub receiver: AccountPublicKey,
     #[wasm_bindgen(js_name = "assetId")]
@@ -689,8 +690,14 @@ pub struct SettlementLeg {
 }
 
 impl SettlementLeg {
-    pub fn from_native(leg: NativeLeg) -> SettlementLeg {
+    pub fn from_native(leg: NativeLeg, role: NativeLegRole) -> SettlementLeg {
         SettlementLeg {
+            role: Some(match role {
+                NativeLegRole::Sender => "Sender".to_string(),
+                NativeLegRole::Receiver => "Receiver".to_string(),
+                NativeLegRole::Mediator(_) => "Mediator".to_string(),
+                NativeLegRole::Auditor(_) => "Auditor".to_string(),
+            }),
             sender: AccountPublicKey::from_native(leg.sender),
             receiver: AccountPublicKey::from_native(leg.receiver),
             asset_id: leg.asset_id,
