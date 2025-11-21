@@ -2,17 +2,36 @@
 
 Get up and running with Polymesh DART WASM bindings in minutes!
 
+## ⚠️ Important: Chain Integration is Optional
+
+This library generates zero-knowledge proofs for confidential transactions. You have flexibility in how you submit these proofs to the blockchain:
+
+- **With Polkadot.js (Recommended)**: Lightweight, flexible, minimal dependencies
+- **With PolymeshClient** (Testing/Development only): Requires `./build_with_rust_client.sh` script
+- **Your own chain client**: Use any solution that works for you
+
+The core WASM APIs (proof generation, key management) work independently and don't require PolymeshClient.
+
 ## Installation
 
 ### For NPM/Yarn users
 
 ```bash
 npm install @polymesh/dart-wasm
-# or
-yarn add @polymesh/dart-wasm
 ```
 
-### For local development
+This installs the default build with core proof generation APIs.
+
+### For local development with PolymeshClient (optional)
+
+If you want to use `PolymeshClient` and `PolymeshSigner` for testing:
+
+```bash
+cd polymesh-dart-wasm
+./build_with_rust_client.sh
+```
+
+### Standard local development build
 
 ```bash
 cd polymesh-dart-wasm
@@ -52,7 +71,10 @@ Create an HTML file:
             // Display results
             document.getElementById('output').textContent = 
                 'Seed: ' + seed + '\n\n' +
-                'Public Keys:\n' + pubKeys.toJson();
+                'Public Keys:\n' + JSON.stringify({
+                  accountKey: pubKeys.accountPublicKey().toJson(),
+                  encryptionKey: pubKeys.encryptionPublicKey().toJson()
+                }, null, 2);
         };
     </script>
 </body>
@@ -71,7 +93,7 @@ Create `app.js`:
 
 ```javascript
 const { AccountKeys, generateRandomSeed } = 
-    require('@polymesh/dart-wasm');
+    require('./pkg-node/polymesh_dart_wasm.js');
 
 // Generate account keys
 const seed = generateRandomSeed();
@@ -80,7 +102,8 @@ console.log('Seed:', seed);
 const keys = new AccountKeys(seed);
 const pubKeys = keys.publicKeys();
 
-console.log('Public Keys:', pubKeys.toJson());
+console.log('Account public key:', pubKeys.accountPublicKey().toJson());
+console.log('Encryption public key:', pubKeys.encryptionPublicKey().toJson());
 ```
 
 Run it:
@@ -95,6 +118,8 @@ Create `app.ts`:
 ```typescript
 import init, { 
     AccountKeys, 
+    AccountPublicKeys,
+    AssetState,
     generateRandomSeed 
 } from '@polymesh/dart-wasm';
 
@@ -103,12 +128,13 @@ async function main() {
     await init();
     
     // Generate keys
-    const seed = generateRandomSeed();
-    const keys = new AccountKeys(seed);
-    const pubKeys = keys.publicKeys();
+    const seed: string = generateRandomSeed();
+    const keys: AccountKeys = new AccountKeys(seed);
+    const pubKeys: AccountPublicKeys = keys.publicKeys();
     
     console.log('Seed:', seed);
-    console.log('Public Keys:', pubKeys.toJson());
+    console.log('Account key:', pubKeys.accountPublicKey().toJson());
+    console.log('Encryption key:', pubKeys.encryptionPublicKey().toJson());
 }
 
 main().catch(console.error);
@@ -131,7 +157,7 @@ import { AccountKeys, generateRandomSeed } from '@polymesh/dart-wasm';
 const seed = generateRandomSeed();
 const keys = new AccountKeys(seed);
 
-// Export for storage
+// Export for storage (encrypt before storing!)
 const keyBytes = keys.toBytes();
 localStorage.setItem('dartKeys', JSON.stringify(Array.from(keyBytes)));
 localStorage.setItem('dartSeed', seed);
@@ -149,49 +175,54 @@ const pubKeys = keys.publicKeys();
 const accountPubKey = pubKeys.accountPublicKey();
 const encryptionPubKey = pubKeys.encryptionPublicKey();
 
-// Export as bytes for transmission
-const accountBytes = accountPubKey.toBytes();
-const encryptionBytes = encryptionPubKey.toBytes();
-
-// Or as JSON for display
+// Export as JSON for display
 console.log('Share these public keys:');
-console.log(pubKeys.toJson());
+console.log({
+  account: accountPubKey.toJson(),
+  encryption: encryptionPubKey.toJson()
+});
 ```
 
-### 3. Work with Asset States
+### 3. Register Account on-Chain (Proof Generation)
 
 ```javascript
-import { AssetState } from '@polymesh/dart-wasm';
+import { AccountKeys } from '@polymesh/dart-wasm';
 
-// Create an asset with ID 42, no mediators/auditors
+// Your keys and DID
+const keys = new AccountKeys(seed);
+const myDid = '0x1234...'; // Your identity
+
+// Generate registration proof (without submitting to chain)
+const proof = keys.registerAccountProof(myDid);
+const proofBytes = proof.toBytes();
+const proofHex = proof.toHex();
+
+console.log('Generated proof - ready to submit to chain');
+// Now use your chain client (Polkadot.js, PolymeshClient, etc.)
+// to submit this proof
+```
+
+### 4. Work with Asset States
+
+```javascript
+import { AssetState, EncryptionPublicKey } from '@polymesh/dart-wasm';
+
+// Option A: From Polkadot.js chain query
 const assetId = 42;
-const asset = new AssetState(assetId, [], []);
+const assetDetail = await api.query.confidentialAssets.dartAssetDetails(assetId);
+const assetState = new AssetState(assetId, assetDetail.mediators, assetDetail.auditors);
 
-console.log('Asset ID:', asset.assetId());
-console.log('Mediators:', asset.mediatorCount());
-console.log('Auditors:', asset.auditorCount());
+// Option B: From raw hex strings
+const mediatorKey = new EncryptionPublicKey('0xabcd...');
+const auditorKey = new EncryptionPublicKey('0x5678...');
+const assetState = new AssetState(assetId, [mediatorKey], [auditorKey]);
+
+console.log('Asset ID:', assetState.assetId());
+console.log('Mediators:', assetState.mediatorCount());
+console.log('Auditors:', assetState.auditorCount());
 
 // Export asset state
-const assetBytes = asset.toBytes();
-```
-
-### 4. Handle Proofs
-
-```javascript
-import { AccountAssetRegistrationProof } from '@polymesh/dart-wasm';
-
-// Assume you have a proof from somewhere
-const proofBytes = getProofFromSomewhere();
-
-// Import the proof
-const proof = AccountAssetRegistrationProof.fromBytes(proofBytes);
-
-// Export as hex for display/transmission
-const proofHex = proof.toHex();
-console.log('Proof (hex):', proofHex);
-
-// Later: Import from hex
-const reimportedProof = AccountAssetRegistrationProof.fromHex(proofHex);
+const assetBytes = assetState.toBytes();
 ```
 
 ### 5. Deterministic Key Generation
@@ -202,7 +233,10 @@ const keys1 = AccountKeys.fromSeed('my-password');
 const keys2 = AccountKeys.fromSeed('my-password');
 
 // These will be identical
-console.log(keys1.publicKeys().toJson() === keys2.publicKeys().toJson()); // true
+console.assert(
+  keys1.publicKeys().accountPublicKey().toJson() === 
+  keys2.publicKeys().accountPublicKey().toJson()
+);
 ```
 
 ## Next Steps
@@ -211,6 +245,9 @@ console.log(keys1.publicKeys().toJson() === keys2.publicKeys().toJson()); // tru
 2. **Explore Examples**: Check the `examples/` directory for more complex scenarios
 3. **Development Guide**: Read [DEVELOPMENT.md](DEVELOPMENT.md) for integration patterns
 4. **Learn DART**: Review the [P-DART paper](https://assets.polymesh.network/P-DART-v1.pdf) for protocol details
+5. **Chain Integration**: 
+   - See [README.md - Using with Polkadot.js](README.md#using-with-polkadotjs-without-polymeshclient) for examples
+   - See [DEVELOPMENT.md](DEVELOPMENT.md) for PolymeshClient integration (optional)
 
 ## Troubleshooting
 
@@ -234,10 +271,43 @@ const keys = new AccountKeys(seed); // Now this works
 
 Update your bundler config to support WASM modules. See [DEVELOPMENT.md](DEVELOPMENT.md) for specific bundler configurations.
 
+### Issue: "Proof generation" or "Proof verification" errors
+
+Ensure your input data is valid:
+- DIDs should be 32 bytes (64 hex characters)
+- Asset IDs should be valid numbers
+- Keys should come from the same seed generation
+- AssetState mediators/auditors should match chain data
+
 ## Getting Help
 
 - **Issues**: [GitHub Issues](https://github.com/PolymeshAssociation/polymesh-dart/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/PolymeshAssociation/polymesh-dart/discussions)
 - **Documentation**: [Full API Docs](README.md)
+
+## PolymeshClient vs. Polkadot.js
+
+**Use Polkadot.js if you:**
+- Are building production applications
+- Want minimal dependencies
+- Are already using Polkadot.js in your project
+- Want maximum flexibility with chain interactions
+- Want the smallest bundle size (recommended)
+
+**Use PolymeshClient if you:**
+- Are testing or developing proof generation
+- Want convenience Polymesh-specific operations
+- Are building desktop or Node.js applications (not browser)
+- Don't mind the extra build step (`./build_with_rust_client.sh`)
+- Don't mind the larger bundle size
+
+**To use PolymeshClient**, you must build with:
+```bash
+./build_with_rust_client.sh
+```
+
+This is NOT the default build. The default `./build.sh` creates a minimal bundle with just proof generation APIs.
+
+Both approaches work equally well with the core WASM proof generation!
 
 Happy building! 🚀

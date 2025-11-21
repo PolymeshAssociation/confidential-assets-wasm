@@ -17,6 +17,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     asset::AssetState, identity_id_to_jsvalue, jsvalue_to_bytes, settlement_ref_to_jsvalue,
+    MediatorAffirmationProof,
 };
 use crate::{block_hash_to_jsvalue, error::Error};
 use crate::{
@@ -1048,6 +1049,83 @@ impl PolymeshSigner {
                 e
             ))
         })
+    }
+
+    /// Mediator affirmation of a settlement leg.
+    ///
+    /// This transaction allows a mediator to affirm their role in a settlement leg.
+    ///
+    /// # Arguments
+    /// * `proof` - A `MediatorAffirmationProof` generated from
+    ///   `mediatorKey.mediatorAffirmationProof(settlementRef, legId, encryptedLeg, accept, assetId, amount)`.
+    ///
+    /// # Returns
+    /// A hexadecimal string representing the block hash where the affirmation was included.
+    ///
+    /// # Errors
+    /// * Throws an error if the proof validation fails.
+    /// * Throws an error if the settlement or leg doesn't exist.
+    /// * Throws an error if the transaction submission fails.
+    ///
+    /// # Example
+    /// ```javascript
+    /// // As a mediator, affirm your role in the settlement leg
+    /// const legs = await client.getSettlementLegs(settlementRef);
+    /// const encryptedLeg = legs.getLeg(0);
+    ///
+    /// // Generate mediator affirmation proof
+    /// const proof = mediatorKey.mediatorAffirmationProof(
+    ///    settlementRef,
+    ///    0,  // leg_id
+    ///    encryptedLeg,
+    ///    true,  // accept the leg
+    ///    assetId,
+    ///    null  // amount (pass null to use the amount from the encrypted leg)
+    /// );
+    ///
+    /// // Submit the affirmation
+    /// const blockHash = await signer.mediatorAffirmation(proof);
+    /// console.log('Mediator affirmed at block:', blockHash);
+    /// ```
+    #[wasm_bindgen(js_name = mediatorAffirmation)]
+    pub async fn mediator_affirmation(
+        &mut self,
+        proof: &MediatorAffirmationProof,
+    ) -> Result<JsValue, JsValue> {
+        let mut res = self
+            .submit_and_watch(
+                self.api
+                    .call()
+                    .confidential_assets()
+                    .mediator_affirmation(scale_convert(&proof.inner))
+                    .map_err(|e| {
+                        JsValue::from_str(&format!(
+                            "Failed to create mediator affirmation call: {}",
+                            e
+                        ))
+                    })?,
+            )
+            .await
+            .map_err(|e| {
+                JsValue::from_str(&format!(
+                    "Failed to submit mediator affirmation call: {}",
+                    e
+                ))
+            })?;
+
+        // Check if the transaction was successful
+        res.ok()
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Mediator affirmation call failed: {}", e)))?;
+
+        // Get the block hash.
+        let hash = res.wait_in_block().await.map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to wait for mediator affirmation call to be included: {}",
+                e
+            ))
+        })?;
+        Ok(block_hash_to_jsvalue(hash))
     }
 }
 
