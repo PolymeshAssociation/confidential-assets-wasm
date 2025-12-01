@@ -143,7 +143,7 @@ async function main() {
     try {
         const mediators = [];
         const auditors = [mediatorEncryptionPublicKey]; // Just use mediator as auditor for this example.
-        const results = await issuer.createAsset(mediators, auditors, "Test Confidential Asset");
+        const results = await issuer.createAsset("Test name", "TST", 2, mediators, auditors, "Test Confidential Asset metadata");
         const assetState = results.assetState();
         assetId = assetState.assetId();
         console.log('   ✓ Confidential asset created with Asset ID:', assetId);

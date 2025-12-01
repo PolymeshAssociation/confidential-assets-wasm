@@ -364,6 +364,9 @@ impl PolymeshSigner {
     /// Only the specified mediators and auditors can decrypt transaction details.
     ///
     /// # Arguments
+    /// * `name` - The name of the asset (string).
+    /// * `symbol` - The ticker symbol for the asset (string).
+    /// * `decimals` - The number of decimal places for the asset (u8).
     /// * `mediators` - Array of `EncryptionPublicKey` objects for mediators. Mediators have special
     ///   privileges in the asset system. Pass an empty array if no mediators are needed.
     /// * `auditors` - Array of `EncryptionPublicKey` objects for auditors. Auditors can decrypt
@@ -400,6 +403,9 @@ impl PolymeshSigner {
     #[wasm_bindgen(js_name = createAsset)]
     pub async fn create_asset(
         &mut self,
+        name: String,
+        symbol: String,
+        decimals: u8,
         mediators: Vec<EncryptionPublicKey>,
         auditors: Vec<EncryptionPublicKey>,
         data: JsValue,
@@ -424,7 +430,14 @@ impl PolymeshSigner {
                 self.api
                     .call()
                     .confidential_assets()
-                    .create_asset(scale_convert(&mediators), scale_convert(&auditors), data)
+                    .create_asset(
+                        scale_convert(&name),
+                        scale_convert(&symbol),
+                        decimals,
+                        scale_convert(&mediators),
+                        scale_convert(&auditors),
+                        data,
+                    )
                     .map_err(|e| {
                         JsValue::from_str(&format!("Failed to create create asset call: {}", e))
                     })?,

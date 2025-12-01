@@ -751,7 +751,7 @@ dependencies = [
 [[package]]
 name = "bulletproofs"
 version = "2.0.0"
-source = "git+https://github.com/PolymeshAssociation/curve-trees?branch=polymesh#69e3f62610fb07adb037d6ba5e274a44fc7aca34"
+source = "git+https://github.com/PolymeshAssociation/curve-trees?branch=polymesh#34f04cb2282ab85ede06f4dc7d8e5a582465719c"
 dependencies = [
  "ahash",
  "ark-ec 0.5.0",
@@ -3164,7 +3164,7 @@ dependencies = [
 [[package]]
 name = "polymesh-dart"
 version = "0.1.0"
-source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#a6fc262c8a1bbd60f237caaa94bb1e22b68c177a"
+source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#01910a4a3c403aecbf9a7ef7c9c2f5c240d3944a"
 dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -3199,7 +3199,7 @@ dependencies = [
 [[package]]
 name = "polymesh-dart-bp"
 version = "0.1.0"
-source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#a6fc262c8a1bbd60f237caaa94bb1e22b68c177a"
+source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#01910a4a3c403aecbf9a7ef7c9c2f5c240d3944a"
 dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -3228,7 +3228,7 @@ dependencies = [
 [[package]]
 name = "polymesh-dart-common"
 version = "0.1.0"
-source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#a6fc262c8a1bbd60f237caaa94bb1e22b68c177a"
+source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#01910a4a3c403aecbf9a7ef7c9c2f5c240d3944a"
 
 [[package]]
 name = "polymesh-dart-wasm"
@@ -3505,7 +3505,7 @@ checksum = "7a2d987857b319362043e95f5353c0535c1f58eec5336fdfcf626430af7def58"
 [[package]]
 name = "relations"
 version = "0.1.0"
-source = "git+https://github.com/PolymeshAssociation/curve-trees?branch=polymesh#69e3f62610fb07adb037d6ba5e274a44fc7aca34"
+source = "git+https://github.com/PolymeshAssociation/curve-trees?branch=polymesh#34f04cb2282ab85ede06f4dc7d8e5a582465719c"
 dependencies = [
  "ark-crypto-primitives",
  "ark-ec 0.5.0",
@@ -3520,6 +3520,8 @@ dependencies = [
  "dock_crypto_utils",
  "log",
  "rand",
+ "rand_chacha",
+ "rand_core",
  "rayon",
  "sha3 0.10.8",
  "thiserror 2.0.17",
