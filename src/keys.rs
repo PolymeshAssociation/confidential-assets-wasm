@@ -6,7 +6,8 @@ use polymesh_dart::{
     AccountPublicKeys as NativeAccountPublicKeys,
     AccountRegistrationProof as NativeAccountRegistrationProof, AssetId,
     EncryptionKeyPair as NativeEncryptionKeyPair, EncryptionPublicKey as NativeEncryptionPublicKey,
-    LegId, LegRef, LegRole, MediatorAffirmationProof as NativeMediatorAffirmationProof,
+    LegId, LegRef, LegRole, MasterSeed as NativeMasterSeed,
+    MediatorAffirmationProof as NativeMediatorAffirmationProof,
 };
 use rand::RngCore as _;
 use rand_chacha::ChaChaRng;
@@ -14,10 +15,56 @@ use rand_core::SeedableRng;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
+use zeroize::{Zeroize, ZeroizeOnDrop};
+
 use crate::{
     jsvalue_to_balance, jsvalue_to_identity_id, jsvalue_to_settlement_ref,
     AccountAssetRegistration, AccountAssetState, MediatorAffirmationProof, SettlementLegEncrypted,
 };
+
+/// MasterSeed for deriving account keys.
+#[wasm_bindgen]
+pub struct MasterSeed {
+    pub(crate) inner: NativeMasterSeed,
+}
+
+#[wasm_bindgen]
+impl MasterSeed {
+    /// Creates a new MasterSeed from a hexadecimal seed string.
+    ///
+    /// # Arguments
+    /// * `seed` - A seed phrase or "0x"-prefixed hexadecimal string used to derive the master seed.
+    ///
+    /// # Returns
+    /// A new `MasterSeed` object containing the generated seed.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const masterSeed = new MasterSeed("my-secure-seed-phrase");
+    /// ```
+    #[wasm_bindgen(constructor)]
+    pub fn new(seed: &str) -> Result<MasterSeed, JsValue> {
+        Ok(MasterSeed {
+            inner: NativeMasterSeed::from_seed(seed),
+        })
+    }
+
+    /// Derive a new AccountKeys from this MasterSeed.
+    ///
+    /// # Arguments
+    /// * `path` - The derivation path string (e.g., "m/44'/595'/0'/0/0").
+    ///
+    /// # Returns
+    /// A new `AccountKeys` object derived from the master seed.
+    #[wasm_bindgen(js_name = deriveAccountKeys)]
+    pub fn derive_account_keys(&self, path: &str) -> Result<AccountKeys, JsValue> {
+        let inner = self
+            .inner
+            .derive_account_keys(path)
+            .map_err(|e| JsValue::from_str(&format!("Failed to derive account keys: {}", e)))?;
+        Ok(AccountKeys { inner })
+    }
+}
 
 /// Contains the secret keys for a confidential account.
 ///
@@ -42,6 +89,7 @@ use crate::{
 /// const publicKeys = keys.publicKeys();
 /// ```
 #[wasm_bindgen]
+#[derive(Clone, Debug, Encode, Decode, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub struct AccountKeys {
     pub(crate) inner: NativeAccountKeys,
 }
@@ -111,51 +159,6 @@ impl AccountKeys {
     pub fn from_seed(seed: &str) -> Result<AccountKeys, JsValue> {
         let inner = NativeAccountKeys::from_seed(seed)
             .map_err(|e| JsValue::from_str(&format!("Failed to create keys from seed: {}", e)))?;
-        Ok(AccountKeys { inner })
-    }
-
-    /// Serializes the account keys to a SCALE-encoded byte array.
-    ///
-    /// **Security Warning:** This exports the secret keys. The resulting bytes should
-    /// be encrypted before storage and never transmitted over insecure channels.
-    ///
-    /// # Returns
-    /// A `Uint8Array` containing the SCALE-encoded secret keys.
-    ///
-    /// # Example
-    /// ```javascript
-    /// const bytes = keys.toBytes();
-    /// // Encrypt bytes before storing!
-    /// const encrypted = encryptData(bytes);
-    /// localStorage.setItem('encryptedKeys', encrypted);
-    /// ```
-    #[wasm_bindgen(js_name = toBytes)]
-    pub fn to_bytes(&self) -> Vec<u8> {
-        self.inner.encode()
-    }
-
-    /// Deserializes account keys from a SCALE-encoded byte array.
-    ///
-    /// **Security Warning:** Only use this with bytes from a trusted, secure source.
-    ///
-    /// # Arguments
-    /// * `bytes` - A `Uint8Array` containing SCALE-encoded account keys.
-    ///
-    /// # Returns
-    /// The deserialized `AccountKeys` object.
-    ///
-    /// # Errors
-    /// * Throws an error if the byte array is invalid or corrupted.
-    ///
-    /// # Example
-    /// ```javascript
-    /// const decrypted = decryptData(encryptedKeys);
-    /// const keys = AccountKeys.fromBytes(decrypted);
-    /// ```
-    #[wasm_bindgen(js_name = fromBytes)]
-    pub fn from_bytes(bytes: &[u8]) -> Result<AccountKeys, JsValue> {
-        let inner = NativeAccountKeys::decode(&mut &bytes[..])
-            .map_err(|e| JsValue::from_str(&format!("Failed to decode account keys: {}", e)))?;
         Ok(AccountKeys { inner })
     }
 
@@ -298,6 +301,14 @@ impl AccountKeys {
 
         Ok(AccountAssetRegistration { proof, state })
     }
+
+    /// Clears the secret keys from memory by zeroing them out.
+    ///
+    /// The `AccountKeys` instance can't be used after calling this method.
+    #[wasm_bindgen(js_name = clear)]
+    pub fn clear(mut self) {
+        self.inner.zeroize();
+    }
 }
 
 /// Contains the encryption secret key for decrypting confidential transaction data.
@@ -315,6 +326,7 @@ impl AccountKeys {
 /// const decryptedLegs = settlementLegs.tryDecryptAsMediatorOrAuditor(encKeyPair);
 /// ```
 #[wasm_bindgen]
+#[derive(Clone, Debug, Encode, Decode, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
 pub struct EncryptionKeyPair {
     pub(crate) inner: NativeEncryptionKeyPair,
 }
@@ -397,6 +409,14 @@ impl EncryptionKeyPair {
         })?;
 
         Ok(MediatorAffirmationProof { inner: proof })
+    }
+
+    /// Clears the encryption secret key from memory by zeroing it out.
+    ///
+    /// The `EncryptionKeyPair` instance can't be used after calling this method.
+    #[wasm_bindgen(js_name = clear)]
+    pub fn clear(mut self) {
+        self.inner.zeroize();
     }
 }
 

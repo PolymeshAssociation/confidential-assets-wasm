@@ -3164,7 +3164,7 @@ dependencies = [
 [[package]]
 name = "polymesh-dart"
 version = "0.1.0"
-source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#01910a4a3c403aecbf9a7ef7c9c2f5c240d3944a"
+source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#e16bce0a478d8f977c999c8c35b2b500aa3fd89c"
 dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -3199,7 +3199,7 @@ dependencies = [
 [[package]]
 name = "polymesh-dart-bp"
 version = "0.1.0"
-source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#01910a4a3c403aecbf9a7ef7c9c2f5c240d3944a"
+source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#e16bce0a478d8f977c999c8c35b2b500aa3fd89c"
 dependencies = [
  "ark-ec 0.5.0",
  "ark-ff 0.5.0",
@@ -3228,7 +3228,7 @@ dependencies = [
 [[package]]
 name = "polymesh-dart-common"
 version = "0.1.0"
-source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#01910a4a3c403aecbf9a7ef7c9c2f5c240d3944a"
+source = "git+https://github.com/PolymeshAssociation/polymesh-dart?branch=main#e16bce0a478d8f977c999c8c35b2b500aa3fd89c"
 
 [[package]]
 name = "polymesh-dart-wasm"
@@ -3258,6 +3258,7 @@ dependencies = [
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
  "wasm-logger",
+ "zeroize",
 ]
 
 [[package]]

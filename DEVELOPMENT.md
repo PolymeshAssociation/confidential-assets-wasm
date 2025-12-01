@@ -269,12 +269,20 @@ async function main() {
   // 3. Generate DART keys
   const dartKeys = new AccountKeys(generateRandomSeed());
 
+  console.log('Creating account keys for test mediator...');
+  const mediatorKeys = AccountKeys.fromSeed("Test-Mediator-seed");
+  const mediatorEncryptionKey = mediatorKeys.encryptionKeyPair();
+  const mediatorPublicKeys = mediatorKeys.publicKeys();
+  const mediatorEncryptionPublicKey = mediatorPublicKeys.encryptionPublicKey();
+
   // 4. Register account
   const accountProof = dartKeys.registerAccountProof(issuerDid);
   await issuer.registerAccount(accountProof);
 
   // 5. Create asset and register account for asset
-  const assetId = await issuer.createAsset("TestAsset");
+  const mediators = [];
+  const auditors = [mediatorEncryptionKey];
+  const assetId = await issuer.createAsset("TestAsset", "TST", 2);
   const registration = dartKeys.registerAccountAssetProof(assetId, issuerDid);
   
   const leafIndex = await issuer.registerAccountAsset(registration.getProof());
