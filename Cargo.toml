@@ -12,34 +12,34 @@ crate-type = ["cdylib", "rlib"]
 
 [patch.crates-io]
 # Curve tree dependencies
-#curve_tree_bulletproofs = { package = "bulletproofs", path = "../../curve-trees/bulletproofs" }
-#curve_tree_relations = { package = "relations", path = "../../curve-trees/relations" }
-#ark-ec-divisors = { package = "ark-ec-divisors", path = "../../curve-trees/ark-ec-divisors"}
-#ark-dlog-gadget = { package = "ark-dlog-gadget", path = "../../curve-trees/ark-dlog-gadget"}
+#curve_tree_bulletproofs = { package = "bulletproofs", path = "../curve-trees/bulletproofs" }
+#curve_tree_relations = { package = "relations", path = "../curve-trees/relations" }
+#ark-ec-divisors = { package = "ark-ec-divisors", path = "../curve-trees/ark-ec-divisors"}
+#ark-dlog-gadget = { package = "ark-dlog-gadget", path = "../curve-trees/ark-dlog-gadget"}
 # If want to pull code for curve-trees from git, comment above 2 relations and uncomment below 2
 curve_tree_bulletproofs = { package = "bulletproofs", git = "https://github.com/PolymeshAssociation/curve-trees", branch = "polymesh" }
 curve_tree_relations = { package = "relations", git = "https://github.com/PolymeshAssociation/curve-trees", branch = "polymesh" }
 ark-ec-divisors = { package = "ark-ec-divisors", git = "https://github.com/PolymeshAssociation/curve-trees", branch = "polymesh" }
 ark-dlog-gadget = { package = "ark-dlog-gadget", git = "https://github.com/PolymeshAssociation/curve-trees", branch = "polymesh" }
 
-#dock_crypto_utils = { path = "../../crypto/utils" }
-#schnorr_pok = { path = "../../crypto/schnorr_pok" }
+#dock_crypto_utils = { path = "../crypto/utils" }
+#schnorr_pok = { path = "../crypto/schnorr_pok" }
 dock_crypto_utils = { git = "https://github.com/PolymeshAssociation/crypto", branch = "main" }
 schnorr_pok = { git = "https://github.com/PolymeshAssociation/crypto", branch = "main" }
 
-#polymesh-dart = { path = "../../polymesh-dart" }
-#polymesh-dart-bp = { path = "../../polymesh-dart/dart-bp" }
-#polymesh-dart-common = { path = "../../polymesh-dart/dart-common" }
+#polymesh-dart = { path = "../polymesh-dart" }
+#polymesh-dart-bp = { path = "../polymesh-dart/dart-bp" }
+#polymesh-dart-common = { path = "../polymesh-dart/dart-common" }
 polymesh-dart = { git = "https://github.com/PolymeshAssociation/polymesh-dart", branch = "main" }
 polymesh-dart-bp = { git = "https://github.com/PolymeshAssociation/polymesh-dart", branch = "main" }
 polymesh-dart-common = { git = "https://github.com/PolymeshAssociation/polymesh-dart", branch = "main" }
 
 # Polymesh changes to Arkworks.
-#ark-serialize = { path = "../../arkworks-algebra/serialize" }
-#ark-ec = { path = "../../arkworks-algebra/ec" }
-#ark-ff = { path = "../../arkworks-algebra/ff" }
-#ark-pallas = { path = "../../arkworks-algebra/curves/pallas" }
-#ark-vesta = { path = "../../arkworks-algebra/curves/vesta" }
+#ark-serialize = { path = "../arkworks-algebra/serialize" }
+#ark-ec = { path = "../arkworks-algebra/ec" }
+#ark-ff = { path = "../arkworks-algebra/ff" }
+#ark-pallas = { path = "../arkworks-algebra/curves/pallas" }
+#ark-vesta = { path = "../arkworks-algebra/curves/vesta" }
 ark-serialize = { git = "https://github.com/PolymeshAssociation/arkworks-algebra.git", branch = "polymesh-master" }
 ark-ec = { git = "https://github.com/PolymeshAssociation/arkworks-algebra.git", branch = "polymesh-master" }
 ark-ff = { git = "https://github.com/PolymeshAssociation/arkworks-algebra.git", branch = "polymesh-master" }
@@ -81,7 +81,7 @@ thiserror = "1.0"
 
 # Other dependencies
 codec = { package = "parity-scale-codec", version = "3.2.2", default-features = false }
-bounded-collections = { version = "0.1.4", default-features = false }
+bounded-collections = { version = "0.3.2", default-features = false }
 
 rand_core = { version = "0.6", default-features = false }
 rand_chacha = { version = "0.3", default-features = false }
@@ -93,17 +93,17 @@ wasm-bindgen-test = "0.3"
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-polymesh-api = { version = "3.6", features = ["serde"], optional = true }
-polymesh-api-client = { version = "3.10.0", optional = true }
+polymesh-api = { version = "3.13.1", features = ["serde", "polymesh_v8"], optional = true }
+polymesh-api-client = { version = "3.11.1", optional = true }
 
 # web:
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-polymesh-api = { version = "3.6", default-features = false, features = [
-  "polymesh_v7",
+polymesh-api = { version = "3.13.1", default-features = false, features = [
+  "polymesh_v8",
   "wasm",
   "serde",
 ], optional = true }
-polymesh-api-client = { version = "3.10.0", default-features = false, features = [
+polymesh-api-client = { version = "3.11.1", default-features = false, features = [
   "v14",
   "wasm",
   "serde",

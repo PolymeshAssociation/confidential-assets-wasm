@@ -1,7 +1,7 @@
 use codec::{Decode, Encode};
 use polymesh_dart::{
     AssetId, Balance, Leg as NativeLeg, LegBuilder as NativeLegBuilder,
-    LegEncrypted as NativeLegEncrypted, LegRole as NativeLegRole,
+    LegEncrypted as NativeLegEncrypted, LegRole as NativeLegRole, LegRoleKind as NativeLegRoleKind,
     SettlementBuilder as NativeSettlementBuilder, SettlementProof as NativeSettlementProof,
 };
 use wasm_bindgen::prelude::*;
@@ -694,11 +694,11 @@ pub struct SettlementLeg {
 impl SettlementLeg {
     pub fn from_native(leg: NativeLeg, role: NativeLegRole) -> SettlementLeg {
         SettlementLeg {
-            role: match role {
-                NativeLegRole::Sender => "Sender".to_string(),
-                NativeLegRole::Receiver => "Receiver".to_string(),
-                NativeLegRole::Mediator(_) => "Mediator".to_string(),
-                NativeLegRole::Auditor(_) => "Auditor".to_string(),
+            role: match role.kind {
+                NativeLegRoleKind::Sender => "Sender".to_string(),
+                NativeLegRoleKind::Receiver => "Receiver".to_string(),
+                NativeLegRoleKind::Mediator => "Mediator".to_string(),
+                NativeLegRoleKind::Auditor => "Auditor".to_string(),
             },
             sender: AccountPublicKey::from_native(leg.sender),
             receiver: AccountPublicKey::from_native(leg.receiver),

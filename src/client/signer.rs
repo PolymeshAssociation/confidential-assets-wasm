@@ -179,10 +179,9 @@ impl PolymeshSigner {
                                 self.api
                                     .call()
                                     .balances()
-                                    .set_balance(
+                                    .force_set_balance(
                                         account_id.into(),
                                         100_000_000_000, // Free balance: 100,000 POLYX
-                                        0,               // Reserved balance
                                     )
                                     .map_err(Error::from)?
                                     .into(),

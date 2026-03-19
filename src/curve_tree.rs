@@ -10,7 +10,7 @@ use polymesh_dart::{
         AccountTreeConfig, AssetTreeConfig, CompressedCurveTreeRoot, CompressedInner,
         CompressedLeafValue, CurveTreeBackend, CurveTreeConfig, CurveTreeLookup, CurveTreePath,
         CurveTreeWithBackend, DefaultCurveTreeUpdater, FeeAccountTreeConfig, LeafPathAndRoot,
-        NodeLocation, SelRerandParameters,
+        NodeLocation, SelRerandProofParametersNew,
     },
     BlockNumber, ChildIndex, LeafIndex, NodeLevel, WrappedCanonical, ACCOUNT_TREE_L,
     ACCOUNT_TREE_M, ASSET_TREE_L, ASSET_TREE_M, FEE_ACCOUNT_TREE_L, FEE_ACCOUNT_TREE_M,
@@ -880,7 +880,9 @@ impl<const L: usize, const M: usize, C: CurveTreeConfig> CurveTreeBackend<L, M, 
         ))
     }
 
-    fn parameters(&self) -> &SelRerandParameters<C::P0, C::P1> {
+    fn parameters(
+        &self,
+    ) -> &SelRerandProofParametersNew<C::P0, C::P1, C::DLogParams0, C::DLogParams1> {
         C::parameters()
     }
 

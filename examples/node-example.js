@@ -354,13 +354,16 @@ async function main() {
     try {
         const leaf = issuerAccountState.leafIndex();
         console.log('Get the path to the issuer account leaf: ', leaf);
+        const timed_leaf_path = Date.now();
         const issuerAccountLeafPath = await accountCurveTree.getLeafPathAndRoot(leaf);
+        console.log('   Leaf path retrieval took', Date.now() - timed_leaf_path, 'ms');
 
         // The issuer's account balance before affirming
         console.log('   Issuer Account Asset State before affirming:', issuerAccountState.balance());
 
         // Generate sender affirmation proof
         console.log('Generating sender affirmation proof for issuer account...');
+        const timed_proof = Date.now();
         const senderAffirmProof = issuerAccountState.senderAffirmProof(
             issuerKeys,
             issuerAccountLeafPath,
@@ -369,6 +372,7 @@ async function main() {
             encryptedLeg,
             assetId,
         );
+        console.log('   Proof generation took', Date.now() - timed_proof, 'ms');
         console.log('   ✓ Generated sender affirmation proof');
         console.log('   Sender affirmation Proof Bytes Length:', senderAffirmProof.toBytes().length);
 
@@ -395,13 +399,16 @@ async function main() {
     try {
         const leaf = investorAccountState.leafIndex();
         console.log('Get the path to the investor account leaf: ', leaf);
+        const timed_leaf_path = Date.now();
         const investorAccountLeafPath = await accountCurveTree.getLeafPathAndRoot(leaf);
+        console.log('   Leaf path retrieval took', Date.now() - timed_leaf_path, 'ms');
 
         // The investor's account balance before affirming
         console.log('   Investor Account Asset State before affirming:', investorAccountState.balance());
 
         // Generate receiver affirmation proof
         console.log('Generating receiver affirmation proof for investor account...');
+        const timed_proof = Date.now();
         const receiverAffirmProof = investorAccountState.receiverAffirmProof(
             investorKeys,
             investorAccountLeafPath,
@@ -410,6 +417,7 @@ async function main() {
             encryptedLeg,
             assetId,
         );
+        console.log('   Proof generation took', Date.now() - timed_proof, 'ms');
         console.log('   ✓ Generated receiver affirmation proof');
         console.log('   Receiver affirmation Proof Bytes Length:', receiverAffirmProof.toBytes().length);
 
@@ -438,13 +446,16 @@ async function main() {
     try {
         const leaf = investorAccountState.leafIndex();
         console.log('Get the path to the investor account leaf: ', leaf);
+        const timed_leaf_path = Date.now();
         const investorAccountLeafPath = await accountCurveTree.getLeafPathAndRoot(leaf);
+        console.log('   Leaf path retrieval took', Date.now() - timed_leaf_path, 'ms');
 
         // The investor's account balance before claiming
         console.log('   Investor Account Asset State before claiming:', investorAccountState.balance());
 
         // Generate claim proof
         console.log('Generating claim proof for investor account...');
+        const timed_proof = Date.now();
         const claimProof = investorAccountState.receiverClaimProof(
             investorKeys,
             investorAccountLeafPath,
@@ -453,6 +464,7 @@ async function main() {
             encryptedLeg,
             assetId,
         );
+        console.log('   Proof generation took', Date.now() - timed_proof, 'ms');
         console.log('   ✓ Generated claim proof');
         console.log('   Claim Proof Bytes Length:', claimProof.toBytes().length);
 

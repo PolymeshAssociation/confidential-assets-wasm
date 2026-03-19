@@ -344,7 +344,7 @@ impl AccountAssetState {
 
         // Decrypt leg.
         let (leg, leg_enc_rand) = leg_enc
-            .decrypt_with_randomness(LegRole::Sender, keys)
+            .decrypt_with_randomness(LegRole::sender(), keys)
             .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
         // Verify asset id matches.
         if leg.asset_id != asset_id {
@@ -437,7 +437,7 @@ impl AccountAssetState {
 
         // Decrypt leg.
         let (leg, leg_enc_rand) = leg_enc
-            .decrypt_with_randomness(LegRole::Sender, keys)
+            .decrypt_with_randomness(LegRole::sender(), keys)
             .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
 
         // Verify asset id matches.
@@ -531,7 +531,7 @@ impl AccountAssetState {
 
         // Decrypt leg.
         let (leg, leg_enc_rand) = leg_enc
-            .decrypt_with_randomness(LegRole::Sender, keys)
+            .decrypt_with_randomness(LegRole::sender(), keys)
             .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
 
         // Verify asset id matches.
@@ -629,7 +629,7 @@ impl AccountAssetState {
 
         // Decrypt leg.
         let (leg, leg_enc_rand) = leg_enc
-            .decrypt_with_randomness(LegRole::Receiver, keys)
+            .decrypt_with_randomness(LegRole::receiver(), keys)
             .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
 
         // Verify asset id matches.
@@ -731,7 +731,7 @@ impl AccountAssetState {
 
         // Decrypt leg.
         let (leg, leg_enc_rand) = leg_enc
-            .decrypt_with_randomness(LegRole::Receiver, keys)
+            .decrypt_with_randomness(LegRole::receiver(), keys)
             .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
 
         // Verify asset id matches.

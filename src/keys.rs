@@ -6,7 +6,7 @@ use polymesh_dart::{
     AccountPublicKeys as NativeAccountPublicKeys,
     AccountRegistrationProof as NativeAccountRegistrationProof, AssetId,
     EncryptionKeyPair as NativeEncryptionKeyPair, EncryptionPublicKey as NativeEncryptionPublicKey,
-    LegId, LegRef, LegRole, MasterSeed as NativeMasterSeed,
+    LegId, LegRef, LegRole, LegRoleKind, MasterSeed as NativeMasterSeed,
     MediatorAffirmationProof as NativeMediatorAffirmationProof,
 };
 use rand::RngCore as _;
@@ -384,7 +384,10 @@ impl EncryptionKeyPair {
 
         // Only mediators can affirm/reject
         let key_index = match leg_role {
-            LegRole::Mediator(idx) => idx,
+            LegRole {
+                kind: LegRoleKind::Mediator,
+                index: Some(idx),
+            } => idx,
             _ => {
                 return Err(JsValue::from_str(
                     "Only mediators can affirm or reject settlement legs",
