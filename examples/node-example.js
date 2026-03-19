@@ -85,7 +85,9 @@ async function main() {
     const issuerAccountDid = await client.getAccountIdentity(issuerPublicKeys.accountPublicKey());
     if (issuerAccountDid === null) {
         console.log('   No account identity found for issuer keys, registering account keys...');
+        const timed_registration_proof = Date.now();
         const issuerRegistrationProof = issuerKeys.registerAccountProof(issuer_did);
+        console.log('   Registration proof generation took', Date.now() - timed_registration_proof, 'ms');
         console.log('   Registration proof bytes length:', issuerRegistrationProof.toBytes().length);
         const txHash = await issuer.registerAccount(issuerRegistrationProof);
         console.log('   ✓ Account keys registered with tx hash:', txHash);
@@ -105,7 +107,9 @@ async function main() {
     const investorAccountDid = await client.getAccountIdentity(investorPublicKeys.accountPublicKey());
     if (investorAccountDid === null) {
         console.log('   No account identity found for investor keys, registering account keys...');
+        const timed_registration_proof = Date.now();
         const investorRegistrationProof = investorKeys.registerAccountProof(investor_did);
+        console.log('   Registration proof generation took', Date.now() - timed_registration_proof, 'ms');
         console.log('   Registration proof bytes length:', investorRegistrationProof.toBytes().length);
         const txHash = await investor.registerAccount(investorRegistrationProof);
         console.log('   ✓ Account keys registered with tx hash:', txHash);
@@ -128,7 +132,9 @@ async function main() {
     const mediatorAccountDid = await client.getAccountIdentity(mediatorPublicKeys.accountPublicKey());
     if (mediatorAccountDid === null) {
         console.log('   No account identity found for mediator keys, registering account keys...');
+        const timed_registration_proof = Date.now();
         const mediatorRegistrationProof = mediatorKeys.registerAccountProof(mediator_did);
+        console.log('   Registration proof generation took', Date.now() - timed_registration_proof, 'ms');
         console.log('   Registration proof bytes length:', mediatorRegistrationProof.toBytes().length);
         const txHash = await mediator.registerAccount(mediatorRegistrationProof);
         console.log('   ✓ Account keys registered with tx hash:', txHash);
@@ -157,9 +163,15 @@ async function main() {
         process.exit(1);
     }
 
+    // Warm-up the curve tree parameters data in memory by generate one proof.
+    // Need to do this before generating the account registration proof to get a more accurate time for the proof generation.
+    const assetRegistrationWarmup = issuerKeys.registerAccountAssetProof(assetId, issuer_did);
+
     // Register the issuer's account with the new asset.
     console.log('Registering issuer account with the new asset...');
+    const timed_registration_proof = Date.now();
     const assetRegistration = issuerKeys.registerAccountAssetProof(assetId, issuer_did);
+    console.log('   Registration proof generation took', Date.now() - timed_registration_proof, 'ms');
     var issuerAccountState = assetRegistration.getAccountAssetState();
     console.log('   Account asset registration proof bytes length:', assetRegistration.getProofBytes().length);
     try {
@@ -189,18 +201,22 @@ async function main() {
     try {
         const leaf = issuerAccountState.leafIndex();
         console.log('Get the path to the issuer account leaf: ', leaf);
+        const timed_leaf_path = Date.now();
         const issuerAccountLeafPath = await accountCurveTree.getLeafPathAndRoot(leaf);
+        console.log('   Leaf path retrieval took', Date.now() - timed_leaf_path, 'ms');
 
         // The issuer's account balance before minting
         console.log('   Issuer Account Asset State before minting:', issuerAccountState.balance());
 
         // Generate minting proof
         console.log('Generating asset minting proof for issuer account...');
+        const timed_proof = Date.now();
         const mintingProof = issuerAccountState.assetMintingProof(
             issuerKeys,
             issuerAccountLeafPath,
             mintAmount
         );
+        console.log('   Proof generation took', Date.now() - timed_proof, 'ms');
         console.log('   ✓ Generated asset minting proof');
         console.log('   Minting Proof Bytes Length:', mintingProof.toBytes().length);
 
@@ -225,7 +241,9 @@ async function main() {
 
     // Register the investor's account with the new asset.
     console.log('Registering investor account with the new asset...');
+    const timed_registration2_proof = Date.now();
     const investorAssetRegistration = investorKeys.registerAccountAssetProof(assetId, investor_did);
+    console.log('   Registration proof generation took', Date.now() - timed_registration2_proof, 'ms');
     var investorAccountState = investorAssetRegistration.getAccountAssetState();
     console.log('   Account asset registration proof bytes length:', investorAssetRegistration.getProofBytes().length);
     try {
@@ -251,20 +269,27 @@ async function main() {
 
     // Get the last block number and root from the asset curve tree.
     const blockNumber = await assetCurveTree.getLastBlockNumber();
+    const timed_root = Date.now();
     const assetTreeRoot = await assetCurveTree.getRoot(blockNumber);
+    console.log('   Asset curve tree root retrieval took', Date.now() - timed_root, 'ms');
 
     // Get the asset state and asset path.
+    const timed_asset_state = Date.now();
     const assetState = await client.getAssetState(assetId); // Using the Rust client here to create the `AssetState` object from on-chain data.
+    console.log('   Asset state retrieval took', Date.now() - timed_asset_state, 'ms');
     // The `AssetState` object can be recreated from the AssetDetails on-chain.
     // const assetDetails = api.query().confidentialAssets.dartAssetDetails(assetId);
     // const assetState = new AssetState(assetId, assetDetails.mediators, assetDetails.auditors); // The mediator/auditors encryption keys would need to be converted from the on-chain type.
     const assetLeafIndex = assetState.leafIndex();
+    const timed_asset_path = Date.now();
     const assetPath = await assetCurveTree.getLeafPath(assetLeafIndex);
+    console.log('   Asset path retrieval took', Date.now() - timed_asset_path, 'ms');
 
     // Build a settlement proof to transfer some asset from issuer to investor.
     console.log('Building settlement proof to transfer asset from issuer to investor...');
 
     // Create a settlement builder
+    const timed_settlement_build = Date.now();
     const settlementBuilder = new SettlementBuilder("Test memo", blockNumber, assetTreeRoot);
 
     // Add the asset path to the settlement builder
@@ -277,6 +302,8 @@ async function main() {
 
     // Build the settlement proof
     const settlementProof = settlementBuilder.build();
+    console.log('   Settlement proof build took', Date.now() - timed_settlement_build, 'ms');
+
     console.log('   ✓ Built settlement proof');
     console.log('   Settlement Proof Bytes Length:', settlementProof.toBytes().length);
     console.log('');
