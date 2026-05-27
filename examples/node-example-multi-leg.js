@@ -233,6 +233,7 @@ async function main() {
         const mintingProof = issuerAccountState.assetMintingProof(
             issuerKeys,
             issuerAccountLeafPath,
+						issuer_did,
             mintAmount
         );
         console.log('   ✓ Generated asset minting proof');

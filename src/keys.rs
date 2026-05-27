@@ -279,12 +279,11 @@ impl AccountKeys {
         let mut rng = rand::rngs::OsRng;
         let did = jsvalue_to_identity_id(&did)?;
 
-        let account = self.inner.acct.clone();
         let params = get_account_curve_tree_parameters();
 
         let (proof, state) = NativeAccountAssetRegistrationProof::new(
             &mut rng,
-            &account,
+            &self.inner,
             asset_id,
             0,
             &did.0[..],
@@ -302,37 +301,6 @@ impl AccountKeys {
         Ok(AccountAssetRegistration { proof, state })
     }
 
-    /// Clears the secret keys from memory by zeroing them out.
-    ///
-    /// The `AccountKeys` instance can't be used after calling this method.
-    #[wasm_bindgen(js_name = clear)]
-    pub fn clear(mut self) {
-        self.inner.zeroize();
-    }
-}
-
-/// Contains the encryption secret key for decrypting confidential transaction data.
-///
-/// This type is used by mediators and auditors to decrypt settlement leg information.
-/// It can also be extracted from `AccountKeys` for accounts to decrypt their own
-/// transaction details.
-///
-/// # Example
-/// ```javascript
-/// // Extract from account keys
-/// const encKeyPair = accountKeys.encryptionKeyPair();
-///
-/// // Decrypt settlement legs as mediator/auditor
-/// const decryptedLegs = settlementLegs.tryDecryptAsMediatorOrAuditor(encKeyPair);
-/// ```
-#[wasm_bindgen]
-#[derive(Clone, Debug, Encode, Decode, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
-pub struct EncryptionKeyPair {
-    pub(crate) inner: NativeEncryptionKeyPair,
-}
-
-#[wasm_bindgen]
-impl EncryptionKeyPair {
     /// Generate mediator affirmation for a settlement leg.
     ///
     /// # Arguments
@@ -367,7 +335,7 @@ impl EncryptionKeyPair {
 
         // Decrypt leg.
         let (leg, leg_role) = leg_enc
-            .try_decrypt_with_key(&self.inner, None, None)
+            .try_decrypt_with_key(&self.inner.enc, None, None)
             .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
 
         // Verify asset id matches.
@@ -395,11 +363,13 @@ impl EncryptionKeyPair {
             }
         };
 
+        let med_enc = leg_enc
+            .mediator_encryption(key_index)
+            .map_err(|e| JsValue::from_str(&format!("Failed to get mediator encryption: {}", e)))?;
         let proof = NativeMediatorAffirmationProof::new(
             &mut rng,
             &leg_ref,
-            asset_id,
-            &leg_enc,
+            &med_enc,
             &self.inner,
             key_index,
             accept,
@@ -414,6 +384,37 @@ impl EncryptionKeyPair {
         Ok(MediatorAffirmationProof { inner: proof })
     }
 
+    /// Clears the secret keys from memory by zeroing them out.
+    ///
+    /// The `AccountKeys` instance can't be used after calling this method.
+    #[wasm_bindgen(js_name = clear)]
+    pub fn clear(mut self) {
+        self.inner.zeroize();
+    }
+}
+
+/// Contains the encryption secret key for decrypting confidential transaction data.
+///
+/// This type is used by mediators and auditors to decrypt settlement leg information.
+/// It can also be extracted from `AccountKeys` for accounts to decrypt their own
+/// transaction details.
+///
+/// # Example
+/// ```javascript
+/// // Extract from account keys
+/// const encKeyPair = accountKeys.encryptionKeyPair();
+///
+/// // Decrypt settlement legs as mediator/auditor
+/// const decryptedLegs = settlementLegs.tryDecryptAsMediatorOrAuditor(encKeyPair);
+/// ```
+#[wasm_bindgen]
+#[derive(Clone, Debug, Encode, Decode, PartialEq, Eq, Zeroize, ZeroizeOnDrop)]
+pub struct EncryptionKeyPair {
+    pub(crate) inner: NativeEncryptionKeyPair,
+}
+
+#[wasm_bindgen]
+impl EncryptionKeyPair {
     /// Clears the encryption secret key from memory by zeroing it out.
     ///
     /// The `EncryptionKeyPair` instance can't be used after calling this method.

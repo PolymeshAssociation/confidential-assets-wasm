@@ -906,8 +906,8 @@ impl<const L: usize, const M: usize, C: CurveTreeConfig> CurveTreeBackend<L, M, 
         }
     }
 
-    fn height(&self) -> NodeLevel {
-        self.height
+    fn height(&self, _block_number: Option<BlockNumber>) -> Result<NodeLevel, Error> {
+        Ok(self.height)
     }
 
     fn allocate_leaf_index(&mut self) -> LeafIndex {

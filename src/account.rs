@@ -7,15 +7,16 @@ use polymesh_dart::{
     ReceiverClaimProof as NativeReceiverClaimProof,
     SenderAffirmationProof as NativeSenderAffirmationProof,
     SenderCounterUpdateProof as NativeSenderCounterUpdateProof,
-    SenderReversalProof as NativeSenderReversalProof,
+    SenderRevertAffirmationProof as NativeSenderRevertAffirmationProof,
 };
 use polymesh_dart::{AssetId, LegRole};
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    balance_to_jsvalue, jsvalue_to_balance, jsvalue_to_settlement_ref, AccountKeys,
-    AccountLeafPathAndRoot, ReceiverAffirmationProof, ReceiverClaimProof, SenderAffirmationProof,
-    SenderCounterUpdateProof, SenderReversalProof, SettlementLegEncrypted,
+    balance_to_jsvalue, jsvalue_to_balance, jsvalue_to_identity_id, jsvalue_to_settlement_ref,
+    AccountKeys, AccountLeafPathAndRoot, ReceiverAffirmationProof, ReceiverClaimProof,
+    SenderAffirmationProof, SenderCounterUpdateProof, SenderRevertAffirmationProof,
+    SettlementLegEncrypted,
 };
 
 /// Manages the confidential account state for a specific asset.
@@ -226,6 +227,9 @@ impl AccountAssetState {
     /// * `keys` - The account keys proving ownership of this account.
     /// * `path` - The curve tree path from the account leaf to the tree root, obtained
     ///   from `AccountCurveTree.getLeafPathAndRoot()`.
+    /// * `did` - The identity ID (DID) of the account holder. Accepts:
+    ///   - Hex string with or without "0x" prefix (e.g., "0x1234...")
+    ///   - 32-byte `Uint8Array`
     /// * `amount` - The amount to mint. Accepts:
     ///   - JavaScript number (e.g., `1000`)
     ///   - JavaScript BigInt (e.g., `1000n`)
@@ -248,6 +252,7 @@ impl AccountAssetState {
     /// const mintingProof = issuerAccountState.assetMintingProof(
     ///   issuerKeys,
     ///   path,
+    ///   issuerDid,
     ///   mintAmount
     /// );
     ///
@@ -259,17 +264,24 @@ impl AccountAssetState {
         &mut self,
         keys: &AccountKeys,
         path: &AccountLeafPathAndRoot,
+        did: JsValue,
         amount: JsValue,
     ) -> Result<AssetMintingProof, JsValue> {
+        let did = jsvalue_to_identity_id(&did)?;
         let amount = jsvalue_to_balance(&amount)?;
         let mut rng = rand::rngs::OsRng;
-        let account = &keys.inner.acct;
 
-        let proof =
-            NativeAssetMintingProof::new(&mut rng, account, &mut self.inner, &path.path, amount)
-                .map_err(|e| {
-                    JsValue::from_str(&format!("Failed to generate asset minting proof: {}", e))
-                })?;
+        let proof = NativeAssetMintingProof::new(
+            &mut rng,
+            &keys.inner,
+            &did.0,
+            &mut self.inner,
+            &path.path,
+            amount,
+        )
+        .map_err(|e| {
+            JsValue::from_str(&format!("Failed to generate asset minting proof: {}", e))
+        })?;
 
         Ok(AssetMintingProof { inner: proof })
     }
@@ -343,8 +355,8 @@ impl AccountAssetState {
         let leg_enc = &leg_enc.inner;
 
         // Decrypt leg.
-        let (leg, leg_enc_rand) = leg_enc
-            .decrypt_with_randomness(LegRole::sender(), keys)
+        let leg = leg_enc
+            .decrypt(LegRole::sender(), keys)
             .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
         // Verify asset id matches.
         if leg.asset_id != asset_id {
@@ -363,11 +375,10 @@ impl AccountAssetState {
 
         let proof = NativeSenderAffirmationProof::new(
             &mut rng,
-            &keys.acct,
+            &keys,
             &leg_ref,
             amount,
             &leg_enc,
-            &leg_enc_rand,
             &mut self.inner,
             &path.path,
         )
@@ -436,8 +447,8 @@ impl AccountAssetState {
         let leg_enc = &leg_enc.inner;
 
         // Decrypt leg.
-        let (leg, leg_enc_rand) = leg_enc
-            .decrypt_with_randomness(LegRole::sender(), keys)
+        let leg = leg_enc
+            .decrypt(LegRole::sender(), keys)
             .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
 
         // Verify asset id matches.
@@ -454,10 +465,9 @@ impl AccountAssetState {
 
         let proof = NativeSenderCounterUpdateProof::new(
             &mut rng,
-            &keys.acct,
+            &keys,
             &leg_ref,
             &leg_enc,
-            &leg_enc_rand,
             &mut self.inner,
             &path.path,
         )
@@ -488,7 +498,7 @@ impl AccountAssetState {
     /// * `amount` - Optional amount for validation. Pass `null` or `undefined` to skip.
     ///
     /// # Returns
-    /// A `SenderReversalProof` that can be submitted to the blockchain.
+    /// A `SenderRevertAffirmationProof` that can be submitted to the blockchain.
     ///
     /// # Errors
     /// * Throws an error if the encrypted leg cannot be decrypted.
@@ -522,7 +532,7 @@ impl AccountAssetState {
         leg_enc: &SettlementLegEncrypted,
         asset_id: AssetId,
         amount: JsValue,
-    ) -> Result<SenderReversalProof, JsValue> {
+    ) -> Result<SenderRevertAffirmationProof, JsValue> {
         let settlement_ref = jsvalue_to_settlement_ref(&settlement_ref)?;
         let leg_ref = LegRef::new(settlement_ref, leg_id);
         let keys = &keys.inner;
@@ -530,8 +540,8 @@ impl AccountAssetState {
         let leg_enc = &leg_enc.inner;
 
         // Decrypt leg.
-        let (leg, leg_enc_rand) = leg_enc
-            .decrypt_with_randomness(LegRole::sender(), keys)
+        let leg = leg_enc
+            .decrypt(LegRole::sender(), keys)
             .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
 
         // Verify asset id matches.
@@ -547,13 +557,12 @@ impl AccountAssetState {
         }
         let amount = leg.amount;
 
-        let proof = NativeSenderReversalProof::new(
+        let proof = NativeSenderRevertAffirmationProof::new(
             &mut rng,
-            &keys.acct,
+            &keys,
             &leg_ref,
             amount,
             &leg_enc,
-            &leg_enc_rand,
             &mut self.inner,
             &path.path,
         )
@@ -561,7 +570,7 @@ impl AccountAssetState {
             JsValue::from_str(&format!("Failed to generate sender revert proof: {}", e))
         })?;
 
-        Ok(SenderReversalProof { inner: proof })
+        Ok(SenderRevertAffirmationProof { inner: proof })
     }
 
     /// Generates a zero-knowledge proof for the receiver to affirm their participation
@@ -628,8 +637,8 @@ impl AccountAssetState {
         let leg_enc = &leg_enc.inner;
 
         // Decrypt leg.
-        let (leg, leg_enc_rand) = leg_enc
-            .decrypt_with_randomness(LegRole::receiver(), keys)
+        let leg = leg_enc
+            .decrypt(LegRole::receiver(), keys)
             .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
 
         // Verify asset id matches.
@@ -646,10 +655,9 @@ impl AccountAssetState {
 
         let proof = NativeReceiverAffirmationProof::new(
             &mut rng,
-            &keys.acct,
+            &keys,
             &leg_ref,
             &leg_enc,
-            &leg_enc_rand,
             &mut self.inner,
             &path.path,
         )
@@ -730,8 +738,8 @@ impl AccountAssetState {
         let leg_enc = &leg_enc.inner;
 
         // Decrypt leg.
-        let (leg, leg_enc_rand) = leg_enc
-            .decrypt_with_randomness(LegRole::receiver(), keys)
+        let leg = leg_enc
+            .decrypt(LegRole::receiver(), keys)
             .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
 
         // Verify asset id matches.
@@ -749,11 +757,10 @@ impl AccountAssetState {
 
         let proof = NativeReceiverClaimProof::new(
             &mut rng,
-            &keys.acct,
+            &keys,
             &leg_ref,
             amount,
             &leg_enc,
-            &leg_enc_rand,
             &mut self.inner,
             &path.path,
         )

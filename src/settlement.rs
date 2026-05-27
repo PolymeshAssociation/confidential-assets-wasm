@@ -1,14 +1,15 @@
 use codec::{Decode, Encode};
 use polymesh_dart::{
     AssetId, Balance, Leg as NativeLeg, LegBuilder as NativeLegBuilder,
-    LegEncrypted as NativeLegEncrypted, LegRole as NativeLegRole, LegRoleKind as NativeLegRoleKind,
-    SettlementBuilder as NativeSettlementBuilder, SettlementProof as NativeSettlementProof,
+    LegConfig as NativeLegConfig, LegEncrypted as NativeLegEncrypted, LegRole as NativeLegRole,
+    LegRoleKind as NativeLegRoleKind, SettlementBuilder as NativeSettlementBuilder,
+    SettlementProof as NativeSettlementProof,
 };
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    bytes_to_jsvalue, jsvalue_to_balance, jsvalue_to_bytes, AccountKeys, AccountPublicKey,
-    AccountPublicKeys, AssetLeafPath, AssetState, AssetTreeRoot, EncryptionKeyPair,
+    bytes_to_jsvalue, jsvalue_to_balance, jsvalue_to_bytes, AccountKeys, AccountPublicKeys,
+    AssetLeafPath, AssetState, AssetTreeRoot, EncryptionKeyPair, EncryptionPublicKey,
 };
 
 mod leg;
@@ -191,6 +192,8 @@ impl LegBuilder {
             receiver: self.receiver.to_native(),
             asset: self.asset.inner.clone(),
             amount: self.amount,
+            config: NativeLegConfig::default(),
+            public_enc_keys: vec![],
         }
     }
 }
@@ -663,8 +666,8 @@ impl SettlementLegEncrypted {
 /// The fields are accessible as properties in JavaScript.
 ///
 /// # Properties
-/// * `sender` - The sender's account public key (`AccountPublicKey`)
-/// * `receiver` - The receiver's account public key (`AccountPublicKey`)
+/// * `sender` - The sender's account public keys (`AccountPublicKeys`)
+/// * `receiver` - The receiver's account public keys (`AccountPublicKeys`)
 /// * `assetId` - The asset identifier (number)
 /// * `amount` - The transfer amount (number)
 ///
@@ -684,8 +687,8 @@ impl SettlementLegEncrypted {
 #[derive(Clone, Debug)]
 pub struct SettlementLeg {
     pub role: String,
-    pub sender: AccountPublicKey,
-    pub receiver: AccountPublicKey,
+    pub sender: EncryptionPublicKey,
+    pub receiver: EncryptionPublicKey,
     #[wasm_bindgen(js_name = "assetId")]
     pub asset_id: AssetId,
     pub amount: Balance,
@@ -700,8 +703,8 @@ impl SettlementLeg {
                 NativeLegRoleKind::Mediator => "Mediator".to_string(),
                 NativeLegRoleKind::Auditor => "Auditor".to_string(),
             },
-            sender: AccountPublicKey::from_native(leg.sender),
-            receiver: AccountPublicKey::from_native(leg.receiver),
+            sender: EncryptionPublicKey::from_native(leg.sender),
+            receiver: EncryptionPublicKey::from_native(leg.receiver),
             asset_id: leg.asset_id,
             amount: leg.amount,
         }
@@ -829,7 +832,7 @@ impl SettlementProof {
             .inner
             .legs
             .iter()
-            .map(|proof| proof.leg_enc.clone())
+            .map(|proof| proof.leg_enc().clone())
             .collect();
 
         SettlementLegsEncrypted { inner: legs }

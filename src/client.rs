@@ -324,16 +324,16 @@ impl PolymeshClient {
     /// ```
     #[wasm_bindgen(js_name = getAssetState)]
     pub async fn get_asset_state(&self, asset_id: AssetId) -> Result<AssetState, JsValue> {
-        // Get DART asset details.
-        let details = self
+        // Get DART asset mediator and auditor keys from the blockchain
+        let keys = self
             .api
             .query()
             .confidential_assets()
-            .dart_asset_details(asset_id)
+            .keys(asset_id)
             .await
             .map_err(|e| {
                 JsValue::from_str(&format!(
-                    "Failed to query DART asset details for Asset ID {}: {}",
+                    "Failed to query DART asset keys for Asset ID {}: {}",
                     asset_id, e
                 ))
             })?
@@ -343,8 +343,7 @@ impl PolymeshClient {
         Ok(AssetState {
             inner: NativeAssetState {
                 asset_id,
-                auditors: scale_convert(&details.auditors),
-                mediators: scale_convert(&details.mediators),
+                keys: scale_convert(&keys),
             },
         })
     }

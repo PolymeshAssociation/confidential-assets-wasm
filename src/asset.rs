@@ -4,6 +4,7 @@ use polymesh_dart::AssetState as NativeAssetState;
 use wasm_bindgen::prelude::*;
 
 use crate::keys::EncryptionPublicKey;
+use crate::AccountPublicKeys;
 
 /// Helper function to convert chain key data (Uint8Array or hex strings) to EncryptionPublicKey objects
 fn convert_chain_keys_to_encryption_keys(
@@ -16,6 +17,22 @@ fn convert_chain_keys_to_encryption_keys(
         let key_data = keys.get(i);
         let key = EncryptionPublicKey::new(key_data)?;
         result.push(key);
+    }
+
+    Ok(result)
+}
+
+/// Helper function to convert chain public keys (Uint8Array or hex strings) to AccountPublicKeys objects
+fn convert_chain_keys_to_account_public_keys(
+    keys_value: JsValue,
+) -> Result<Vec<AccountPublicKeys>, JsValue> {
+    let keys = js_sys::Array::from(&keys_value);
+    let mut result = Vec::new();
+
+    for i in 0..keys.length() {
+        let key_data = keys.get(i);
+        let account_keys = AccountPublicKeys::new(key_data)?;
+        result.push(account_keys);
     }
 
     Ok(result)
@@ -75,13 +92,17 @@ impl AssetState {
     /// # Examples
     /// ```javascript
     /// // From Polkadot.js chain data (recommended)
-    /// const assetDetail = await api.query.confidentialAssets.dartAssetDetails(assetId);
-    /// const assetState = new AssetState(assetId, assetDetail.mediators, assetDetail.auditors);
+    /// const assetKeys = await api.query.confidentialAssets.keys(assetId);
+    /// // TODO: FIXUP.
+    /// const assetState = new AssetState(assetId, assetKeys);
     ///
     /// // From pre-converted EncryptionPublicKey objects
-    /// const mediatorKey = new EncryptionPublicKey("0x1234...");
+    /// const mediatorKeys = new AccountPublicKeys({
+    ///   accountPublicKey: "0x1234...",
+    ///   encryptionPublicKey: "0x5678..."
+    /// });
     /// const auditorKey = new EncryptionPublicKey("0x5678...");
-    /// const assetState = new AssetState(assetId, [mediatorKey], [auditorKey]);
+    /// const assetState = new AssetState(assetId, [mediatorKeys], [auditorKey]);
     ///
     /// // From hex strings or Uint8Arrays
     /// const assetState = new AssetState(assetId, ["0xabc..."], [new Uint8Array(32)]);
@@ -95,13 +116,21 @@ impl AssetState {
         mediators: JsValue,
         auditors: JsValue,
     ) -> Result<AssetState, JsValue> {
-        let mediator_keys = convert_chain_keys_to_encryption_keys(mediators)?;
+        let mediator_keys = convert_chain_keys_to_account_public_keys(mediators)?;
         let auditor_keys = convert_chain_keys_to_encryption_keys(auditors)?;
 
-        let mediator_inner: Vec<_> = mediator_keys.into_iter().map(|key| key.inner).collect();
+        let mediator_inner: Vec<_> = mediator_keys
+            .into_iter()
+            .map(|key| (key.account.inner, key.encryption.inner))
+            .collect();
         let auditor_inner: Vec<_> = auditor_keys.into_iter().map(|key| key.inner).collect();
 
-        let inner = NativeAssetState::new(asset_id, &mediator_inner, &auditor_inner);
+        let inner = NativeAssetState::new::<()>(asset_id, &mediator_inner, &auditor_inner).map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to create AssetState: {}. Ensure assetId is a valid number and keys are properly formatted.",
+                e
+            ))
+        })?;
 
         Ok(AssetState { inner })
     }
@@ -191,7 +220,7 @@ impl AssetState {
     /// ```
     #[wasm_bindgen(js_name = mediatorCount)]
     pub fn mediator_count(&self) -> usize {
-        self.inner.mediators.len()
+        self.inner.keys.mediators.len()
     }
 
     /// Gets the number of auditors associated with this asset.
@@ -205,7 +234,7 @@ impl AssetState {
     /// ```
     #[wasm_bindgen(js_name = auditorCount)]
     pub fn auditor_count(&self) -> usize {
-        self.inner.auditors.len()
+        self.inner.keys.enc_keys.len()
     }
 
     /// Exports the asset state as a JSON string for debugging purposes.

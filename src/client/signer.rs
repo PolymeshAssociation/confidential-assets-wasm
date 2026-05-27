@@ -1,4 +1,4 @@
-use bounded_collections::{BoundedBTreeSet, TryCollect};
+use bounded_collections::{BoundedBTreeMap, BoundedBTreeSet, TryCollect};
 
 use polymesh_api::{
     types::{
@@ -11,19 +11,21 @@ use polymesh_api_client::{
     AccountId, BlockHash, DefaultSigner, IdentityId, Signer, TransactionResults,
 };
 use polymesh_dart::{
-    AssetState as NativeAssetState, BatchedAccountAssetRegistrationProof, SettlementRef,
+    AssetKeys as NativeAssetKeys, AssetState as NativeAssetState,
+    BatchedAccountAssetRegistrationProof, SettlementRef,
 };
 use wasm_bindgen::prelude::*;
 
 use crate::{
     asset::AssetState, identity_id_to_jsvalue, jsvalue_to_bytes, settlement_ref_to_jsvalue,
-    MediatorAffirmationProof,
+    AccountPublicKeys, MediatorAffirmationProof,
 };
 use crate::{block_hash_to_jsvalue, error::Error};
 use crate::{
     keys::{AccountRegistrationProof, EncryptionPublicKey},
     AccountAssetRegistrationProof, ReceiverAffirmationProof, ReceiverClaimProof,
-    SenderAffirmationProof, SenderCounterUpdateProof, SenderReversalProof, SettlementProof,
+    SenderAffirmationProof, SenderCounterUpdateProof, SenderRevertAffirmationProof,
+    SettlementProof,
 };
 use crate::{scale_convert, AssetMintingProof};
 
@@ -390,8 +392,13 @@ impl PolymeshSigner {
     /// const issuer = client.newSigner("//TestIssuer");
     ///
     /// // Create asset with mediator and auditor
+    /// const mediatorKeys = new AccountPublicKeys({
+    ///   accountPublicKey: "0x1234...",
+    ///   encryptionPublicKey: "0x5678..."
+    /// });
+    /// const auditorKey = new EncryptionPublicKey("0x5678...");
     /// const mediators = []; // No mediators
-    /// const auditors = [mediatorEncryptionKey]; // Auditor key
+    /// const auditors = [auditorKey]; // Auditor key
     /// const result = await issuer.createAsset(mediators, auditors, "My Confidential Asset");
     ///
     /// const assetId = result.assetId();
@@ -405,13 +412,13 @@ impl PolymeshSigner {
         name: String,
         symbol: String,
         decimals: u8,
-        mediators: Vec<EncryptionPublicKey>,
+        mediators: Vec<AccountPublicKeys>,
         auditors: Vec<EncryptionPublicKey>,
         data: JsValue,
     ) -> Result<CreateAssetResult, JsValue> {
-        let mediators: BoundedBTreeSet<_, _> = mediators
+        let mediators: BoundedBTreeMap<_, _, _> = mediators
             .into_iter()
-            .map(|k| k.inner)
+            .map(|k| (k.account.inner, k.encryption.inner))
             .try_collect()
             .map_err(|e| JsValue::from_str(&format!("Too many asset mediators: {}", e)))?;
         let auditors: BoundedBTreeSet<_, _> =
@@ -420,6 +427,15 @@ impl PolymeshSigner {
                 .map(|k| k.inner)
                 .try_collect()
                 .map_err(|e| JsValue::from_str(&format!("Too many asset auditors: {}", e)))?;
+
+        // Return the Create Asset result.
+        let asset_keys =
+            NativeAssetKeys::new_bounded::<()>(&mediators, &auditors).map_err(|e| {
+                JsValue::from_str(&format!(
+                    "Failed to create AssetState from event data: {}",
+                    e
+                ))
+            })?;
 
         // Conver `data` from a JS string or byte array.
         let data = jsvalue_to_bytes(&data)?;
@@ -475,8 +491,10 @@ impl PolymeshSigner {
                 }) = event.event
                 {
                     // Return the Create Asset result.
-                    let asset_state =
-                        NativeAssetState::new_bounded(asset_id, &mediators, &auditors);
+                    let asset_state = NativeAssetState {
+                        asset_id,
+                        keys: asset_keys,
+                    };
                     return Ok(CreateAssetResult {
                         asset_state: AssetState { inner: asset_state },
                         block_hash,
@@ -881,14 +899,14 @@ impl PolymeshSigner {
     #[wasm_bindgen(js_name = senderRevert)]
     pub async fn sender_revert(
         &mut self,
-        proof: &SenderReversalProof,
+        proof: &SenderRevertAffirmationProof,
     ) -> Result<AccountStateResult, JsValue> {
         let res = self
             .submit_and_watch(
                 self.api
                     .call()
                     .confidential_assets()
-                    .sender_revert(scale_convert(&proof.inner))
+                    .sender_revert_affirmation(scale_convert(&proof.inner))
                     .map_err(|e| {
                         JsValue::from_str(&format!("Failed to create sender revert call: {}", e))
                     })?,

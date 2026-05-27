@@ -10,9 +10,8 @@ use polymesh_dart::{
         CurveTreeParameters, DefaultCurveTreeUpdater, FeeAccountTreeConfig, NodeLocation,
         NodePosition,
     },
-    BlockNumber, LeafIndex, NodeLevel, ACCOUNT_TREE_HEIGHT, ACCOUNT_TREE_L, ACCOUNT_TREE_M,
-    ASSET_TREE_HEIGHT, ASSET_TREE_L, ASSET_TREE_M, FEE_ACCOUNT_TREE_HEIGHT, FEE_ACCOUNT_TREE_L,
-    FEE_ACCOUNT_TREE_M,
+    BlockNumber, LeafIndex, NodeLevel, ACCOUNT_TREE_L, ACCOUNT_TREE_M, ASSET_TREE_L, ASSET_TREE_M,
+    FEE_ACCOUNT_TREE_L, FEE_ACCOUNT_TREE_M,
 };
 
 use polymesh_api::{
@@ -145,13 +144,13 @@ impl AsyncCurveTreeBackend<ASSET_TREE_L, ASSET_TREE_M, AssetTreeConfig>
     }
 
     async fn get_block_number(&self) -> Result<BlockNumber, Self::Error> {
-        let last_block_number = self
+        let last_update = self
             .api
             .query()
             .confidential_assets()
             .asset_curve_tree_last_update()
             .await?;
-        Ok(last_block_number)
+        Ok(last_update.block_number)
     }
 
     async fn fetch_root(&self, block_number: Option<BlockNumber>) -> Result<AssetTreeRoot> {
@@ -178,8 +177,29 @@ impl AsyncCurveTreeBackend<ASSET_TREE_L, ASSET_TREE_M, AssetTreeConfig>
         }
     }
 
-    async fn height(&self) -> NodeLevel {
-        ASSET_TREE_HEIGHT
+    async fn height(&self, block_number: Option<BlockNumber>) -> Result<NodeLevel, Error> {
+        let block_hash = match block_number {
+            Some(num) => self.api.get_block_hash(num).await?,
+            None => None,
+        };
+
+        if let Some(block_hash) = block_hash {
+            let height = self
+                .api
+                .query_at(block_hash)
+                .confidential_assets()
+                .asset_curve_tree_height()
+                .await?;
+            Ok(height)
+        } else {
+            let height = self
+                .api
+                .query()
+                .confidential_assets()
+                .asset_curve_tree_height()
+                .await?;
+            Ok(height)
+        }
     }
 
     async fn allocate_leaf_index(&mut self) -> LeafIndex {
@@ -323,13 +343,13 @@ impl AsyncCurveTreeBackend<ACCOUNT_TREE_L, ACCOUNT_TREE_M, AccountTreeConfig>
     }
 
     async fn get_block_number(&self) -> Result<BlockNumber, Self::Error> {
-        let last_block_number = self
+        let last_update = self
             .api
             .query()
             .confidential_assets()
             .account_curve_tree_last_update()
             .await?;
-        Ok(last_block_number)
+        Ok(last_update.block_number)
     }
 
     async fn fetch_root(&self, block_number: Option<BlockNumber>) -> Result<AccountTreeRoot> {
@@ -356,8 +376,29 @@ impl AsyncCurveTreeBackend<ACCOUNT_TREE_L, ACCOUNT_TREE_M, AccountTreeConfig>
         }
     }
 
-    async fn height(&self) -> NodeLevel {
-        ACCOUNT_TREE_HEIGHT
+    async fn height(&self, block_number: Option<BlockNumber>) -> Result<NodeLevel, Error> {
+        let block_hash = match block_number {
+            Some(num) => self.api.get_block_hash(num).await?,
+            None => None,
+        };
+
+        if let Some(block_hash) = block_hash {
+            let height = self
+                .api
+                .query_at(block_hash)
+                .confidential_assets()
+                .account_curve_tree_height()
+                .await?;
+            Ok(height)
+        } else {
+            let height = self
+                .api
+                .query()
+                .confidential_assets()
+                .account_curve_tree_height()
+                .await?;
+            Ok(height)
+        }
     }
 
     async fn allocate_leaf_index(&mut self) -> LeafIndex {
@@ -541,13 +582,13 @@ impl AsyncCurveTreeBackend<FEE_ACCOUNT_TREE_L, FEE_ACCOUNT_TREE_M, FeeAccountTre
     }
 
     async fn get_block_number(&self) -> Result<BlockNumber, Self::Error> {
-        let last_block_number = self
+        let last_update = self
             .api
             .query()
             .confidential_assets()
             .fee_account_curve_tree_last_update()
             .await?;
-        Ok(last_block_number)
+        Ok(last_update.block_number)
     }
 
     async fn fetch_root(&self, block_number: Option<BlockNumber>) -> Result<FeeAccountTreeRoot> {
@@ -574,8 +615,29 @@ impl AsyncCurveTreeBackend<FEE_ACCOUNT_TREE_L, FEE_ACCOUNT_TREE_M, FeeAccountTre
         }
     }
 
-    async fn height(&self) -> NodeLevel {
-        FEE_ACCOUNT_TREE_HEIGHT
+    async fn height(&self, block_number: Option<BlockNumber>) -> Result<NodeLevel, Error> {
+        let block_hash = match block_number {
+            Some(num) => self.api.get_block_hash(num).await?,
+            None => None,
+        };
+
+        if let Some(block_hash) = block_hash {
+            let height = self
+                .api
+                .query_at(block_hash)
+                .confidential_assets()
+                .fee_account_curve_tree_height()
+                .await?;
+            Ok(height)
+        } else {
+            let height = self
+                .api
+                .query()
+                .confidential_assets()
+                .fee_account_curve_tree_height()
+                .await?;
+            Ok(height)
+        }
     }
 
     async fn allocate_leaf_index(&mut self) -> LeafIndex {

@@ -5,7 +5,7 @@ use polymesh_dart::{
     ReceiverClaimProof as NativeReceiverClaimProof,
     SenderAffirmationProof as NativeSenderAffirmationProof,
     SenderCounterUpdateProof as NativeSenderCounterUpdateProof,
-    SenderReversalProof as NativeSenderReversalProof,
+    SenderRevertAffirmationProof as NativeSenderRevertAffirmationProof,
 };
 use wasm_bindgen::prelude::*;
 
@@ -460,12 +460,12 @@ impl SenderCounterUpdateProof {
 /// const result = await issuer.senderRevert(proof);
 /// ```
 #[wasm_bindgen]
-pub struct SenderReversalProof {
-    pub(crate) inner: NativeSenderReversalProof,
+pub struct SenderRevertAffirmationProof {
+    pub(crate) inner: NativeSenderRevertAffirmationProof,
 }
 
 #[wasm_bindgen]
-impl SenderReversalProof {
+impl SenderRevertAffirmationProof {
     /// Exports the proof as a SCALE-encoded byte array.
     ///
     /// # Returns
@@ -496,11 +496,14 @@ impl SenderReversalProof {
     /// const proof = SenderReversalProof.fromBytes(bytes);
     /// ```
     #[wasm_bindgen(js_name = fromBytes)]
-    pub fn from_bytes(bytes: &[u8]) -> Result<SenderReversalProof, JsValue> {
-        let inner = NativeSenderReversalProof::decode(&mut &bytes[..]).map_err(|e| {
-            JsValue::from_str(&format!("Failed to decode sender reversal proof: {}", e))
+    pub fn from_bytes(bytes: &[u8]) -> Result<SenderRevertAffirmationProof, JsValue> {
+        let inner = NativeSenderRevertAffirmationProof::decode(&mut &bytes[..]).map_err(|e| {
+            JsValue::from_str(&format!(
+                "Failed to decode sender revert affirmation proof: {}",
+                e
+            ))
         })?;
-        Ok(SenderReversalProof { inner })
+        Ok(SenderRevertAffirmationProof { inner })
     }
 
     /// Exports the proof as a hex-encoded string.
@@ -523,18 +526,18 @@ impl SenderReversalProof {
     /// * `hex_str` - A hex string representing the SCALE-encoded proof (with or without "0x" prefix).
     ///
     /// # Returns
-    /// A `SenderReversalProof` instance.
+    /// A `SenderRevertAffirmationProof` instance.
     ///
     /// # Errors
     /// * Throws an error if the string is not valid hex.
-    /// * Throws an error if the decoded bytes are not a valid sender reversal proof.
+    /// * Throws an error if the decoded bytes are not a valid sender revert affirmation proof.
     ///
     /// # Example
     /// ```javascript
-    /// const proof = SenderReversalProof.fromHex("a1b2c3...");
+    /// const proof = SenderRevertAffirmationProof.fromHex("a1b2c3...");
     /// ```
     #[wasm_bindgen(js_name = fromHex)]
-    pub fn from_hex(hex_str: &str) -> Result<SenderReversalProof, JsValue> {
+    pub fn from_hex(hex_str: &str) -> Result<SenderRevertAffirmationProof, JsValue> {
         let bytes = hex::decode(hex_str)
             .map_err(|e| JsValue::from_str(&format!("Invalid hex string: {}", e)))?;
         Self::from_bytes(&bytes)

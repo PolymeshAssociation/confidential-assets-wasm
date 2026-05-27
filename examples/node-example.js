@@ -214,6 +214,7 @@ async function main() {
         const mintingProof = issuerAccountState.assetMintingProof(
             issuerKeys,
             issuerAccountLeafPath,
+            issuer_did,
             mintAmount
         );
         console.log('   Proof generation took', Date.now() - timed_proof, 'ms');
