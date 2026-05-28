@@ -666,8 +666,8 @@ impl SettlementLegEncrypted {
 /// The fields are accessible as properties in JavaScript.
 ///
 /// # Properties
-/// * `sender` - The sender's account public keys (`AccountPublicKeys`)
-/// * `receiver` - The receiver's account public keys (`AccountPublicKeys`)
+/// * `sender` - The sender's encryption public keys (`EncryptionPublicKey`)
+/// * `receiver` - The receiver's encryption public keys (`EncryptionPublicKey`)
 /// * `assetId` - The asset identifier (number)
 /// * `amount` - The transfer amount (number)
 ///
