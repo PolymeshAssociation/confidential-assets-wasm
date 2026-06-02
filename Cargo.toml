@@ -65,7 +65,6 @@ ark-ed25519 = { git = "https://github.com/PolymeshAssociation/arkworks-algebra.g
 #ark-bn254 = { git = "https://github.com/PolymeshAssociation/arkworks-algebra.git", branch = "polymesh-master" }
 ark-bls12-381 = { git = "https://github.com/PolymeshAssociation/arkworks-algebra.git", branch = "polymesh-master" }
 
-
 [dependencies]
 # DART Assets
 polymesh-dart = { version = "0.1.0", default-features = false, features = [

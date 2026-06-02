@@ -1,41 +1,27 @@
 use codec::{Decode, Encode};
-use polymesh_dart::AssetId;
-use polymesh_dart::AssetState as NativeAssetState;
+use polymesh_dart::{AssetId, AssetKeys as NativeAssetKeys, AssetState as NativeAssetState};
 use wasm_bindgen::prelude::*;
 
-use crate::keys::EncryptionPublicKey;
-use crate::AccountPublicKeys;
-
-/// Helper function to convert chain key data (Uint8Array or hex strings) to EncryptionPublicKey objects
-fn convert_chain_keys_to_encryption_keys(
-    keys_value: JsValue,
-) -> Result<Vec<EncryptionPublicKey>, JsValue> {
-    let keys = js_sys::Array::from(&keys_value);
-    let mut result = Vec::new();
-
-    for i in 0..keys.length() {
-        let key_data = keys.get(i);
-        let key = EncryptionPublicKey::new(key_data)?;
-        result.push(key);
+// Helper function to convert chain `AssetKeys` data to native `AssetKeys` format
+fn convert_chain_asset_keys(keys: JsValue) -> Result<NativeAssetKeys, JsValue> {
+    // Try Uint8Array (check if it's a valid Uint8Array)
+    let bytes_array = js_sys::Uint8Array::new(&keys);
+    if bytes_array.length() > 0 {
+        let bytes_vec = bytes_array.to_vec();
+        if !bytes_vec.is_empty() {
+            let native = NativeAssetKeys::decode(&mut &bytes_vec[..]).map_err(|e| {
+                JsValue::from_str(&format!(
+                    "Failed to decode asset keys from Uint8Array: {}",
+                    e
+                ))
+            })?;
+            return Ok(native);
+        }
     }
 
-    Ok(result)
-}
-
-/// Helper function to convert chain public keys (Uint8Array or hex strings) to AccountPublicKeys objects
-fn convert_chain_keys_to_account_public_keys(
-    keys_value: JsValue,
-) -> Result<Vec<AccountPublicKeys>, JsValue> {
-    let keys = js_sys::Array::from(&keys_value);
-    let mut result = Vec::new();
-
-    for i in 0..keys.length() {
-        let key_data = keys.get(i);
-        let account_keys = AccountPublicKeys::new(key_data)?;
-        result.push(account_keys);
-    }
-
-    Ok(result)
+    // Try JS map/object by using `serde_wasm_bindgen`
+    serde_wasm_bindgen::from_value(keys)
+        .map_err(|e| JsValue::from_str(&format!("Failed to decode asset keys from object: {}", e)))
 }
 
 /// Represents the confidential asset state stored in the asset curve tree.
@@ -93,46 +79,19 @@ impl AssetState {
     /// ```javascript
     /// // From Polkadot.js chain data (recommended)
     /// const assetKeys = await api.query.confidentialAssets.keys(assetId);
-    /// // TODO: FIXUP.
     /// const assetState = new AssetState(assetId, assetKeys);
-    ///
-    /// // From pre-converted EncryptionPublicKey objects
-    /// const mediatorKeys = new AccountPublicKeys({
-    ///   accountPublicKey: "0x1234...",
-    ///   encryptionPublicKey: "0x5678..."
-    /// });
-    /// const auditorKey = new EncryptionPublicKey("0x5678...");
-    /// const assetState = new AssetState(assetId, [mediatorKeys], [auditorKey]);
-    ///
-    /// // From hex strings or Uint8Arrays
-    /// const assetState = new AssetState(assetId, ["0xabc..."], [new Uint8Array(32)]);
     ///
     /// // Use in settlement legs
     /// const leg = new LegBuilder(senderKeys, receiverKeys, assetState, amount);
     /// ```
     #[wasm_bindgen(constructor)]
-    pub fn new(
-        asset_id: AssetId,
-        mediators: JsValue,
-        auditors: JsValue,
-    ) -> Result<AssetState, JsValue> {
-        let mediator_keys = convert_chain_keys_to_account_public_keys(mediators)?;
-        let auditor_keys = convert_chain_keys_to_encryption_keys(auditors)?;
-
-        let mediator_inner: Vec<_> = mediator_keys
-            .into_iter()
-            .map(|key| (key.account.inner, key.encryption.inner))
-            .collect();
-        let auditor_inner: Vec<_> = auditor_keys.into_iter().map(|key| key.inner).collect();
-
-        let inner = NativeAssetState::new::<()>(asset_id, &mediator_inner, &auditor_inner).map_err(|e| {
-            JsValue::from_str(&format!(
-                "Failed to create AssetState: {}. Ensure assetId is a valid number and keys are properly formatted.",
-                e
-            ))
-        })?;
-
-        Ok(AssetState { inner })
+    pub fn new(asset_id: AssetId, asset_keys: JsValue) -> Result<AssetState, JsValue> {
+        Ok(AssetState {
+            inner: NativeAssetState {
+                asset_id,
+                keys: convert_chain_asset_keys(asset_keys)?,
+            },
+        })
     }
 
     /// Serializes the asset state to a SCALE-encoded byte array.
