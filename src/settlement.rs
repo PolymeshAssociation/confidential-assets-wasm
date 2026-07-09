@@ -635,15 +635,7 @@ impl SettlementLegEncrypted {
     pub fn from_bare_hex(hex_str: &str) -> Result<SettlementLegEncrypted, JsValue> {
         let bytes = crate::hex_to_bytes(hex_str)?;
         // Bare payload bytes — wrap with the SCALE Vec<u8> compact-length prefix
-        let leg = Self::from_bytes(&bytes.encode())?;
-        leg.inner.decode().map_err(|e| {
-            JsValue::from_str(&format!(
-                "Invalid encrypted leg: {}. If this hex came from toHex() (SCALE-encoded, \
-                 with a length prefix), use fromHex() instead.",
-                e
-            ))
-        })?;
-        Ok(leg)
+        Self::from_bytes(&bytes.encode())
     }
 
     /// Attempts to decrypt the leg using account keys.
