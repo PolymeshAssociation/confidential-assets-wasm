@@ -437,7 +437,7 @@ impl PolymeshSigner {
                 ))
             })?;
 
-        // Conver `data` from a JS string or byte array.
+        // Convert `data` from a JS string or byte array.
         let data = jsvalue_to_bytes(&data)?;
 
         let mut res = self

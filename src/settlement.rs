@@ -1,4 +1,4 @@
-use codec::{Decode, Encode};
+use codec::{Compact, Decode, Encode};
 use polymesh_dart::{
     AssetId, Balance, Leg as NativeLeg, LegBuilder as NativeLegBuilder,
     LegConfig as NativeLegConfig, LegEncrypted as NativeLegEncrypted, LegRole as NativeLegRole,
@@ -564,26 +564,92 @@ impl SettlementLegEncrypted {
         hex::encode(self.to_bytes())
     }
 
-    /// Deserializes an encrypted leg from a hexadecimal string.
+    /// Deserializes an encrypted leg from its SCALE-encoded hexadecimal form.
+    ///
+    /// Expects the SCALE encoding (compact length prefix + payload bytes) — the
+    /// format produced by `toHex()`/`toBytes()` and by SCALE-encoding the chain
+    /// storage value. If your hex is the bare payload without the length prefix
+    /// (e.g. from polkadot-js `Bytes.toHex()` or an indexer such as SubQuery),
+    /// use `fromBareHex()` instead.
+    ///
+    /// The payload is validated, so an invalid leg fails here rather than
+    /// silently returning `null` from a later `tryDecrypt()`.
     ///
     /// # Arguments
-    /// * `hex_str` - A hex-encoded string (with or without "0x" prefix).
+    /// * `hex_str` - A SCALE-encoded hex string (with or without "0x" prefix).
     ///
     /// # Returns
     /// The deserialized `SettlementLegEncrypted`.
     ///
     /// # Errors
-    /// * Throws an error if the hex string is invalid.
+    /// * Throws an error if the hex string is invalid, lacks a valid SCALE
+    ///   length prefix, or the payload is not a valid encrypted leg.
     ///
     /// # Example
     /// ```javascript
-    /// const encryptedLeg = SettlementLegEncrypted.fromHex("0x1234...");
+    /// const encryptedLeg = SettlementLegEncrypted.fromHex(otherLeg.toHex());
     /// ```
     #[wasm_bindgen(js_name = fromHex)]
     pub fn from_hex(hex_str: &str) -> Result<SettlementLegEncrypted, JsValue> {
-        let bytes = hex::decode(hex_str)
-            .map_err(|e| JsValue::from_str(&format!("Invalid hex string: {}", e)))?;
-        Self::from_bytes(&bytes)
+        let bytes = crate::hex_to_bytes(hex_str)?;
+        // Require the compact length prefix to *exactly* account for the remaining bytes
+        // (stricter than `from_bytes`, which ignores trailing bytes).
+        let mut rest = &bytes[..];
+        let has_scale_prefix = Compact::<u64>::decode(&mut rest)
+            .map(|Compact(len)| len == rest.len() as u64)
+            .unwrap_or(false);
+        if !has_scale_prefix {
+            return Err(JsValue::from_str(
+                "Expected SCALE-encoded hex (compact length prefix + payload), as produced by \
+                 toHex(). If this hex is the bare payload (e.g. from polkadot-js Bytes.toHex() \
+                 or an indexer), use fromBareHex() instead.",
+            ));
+        }
+        let leg = Self::from_bytes(&bytes)?;
+        leg.inner
+            .decode()
+            .map_err(|e| JsValue::from_str(&format!("Invalid encrypted leg: {}", e)))?;
+        Ok(leg)
+    }
+
+    /// Deserializes an encrypted leg from its bare (unprefixed) hexadecimal form.
+    ///
+    /// Expects the bare payload bytes without a SCALE length prefix — the format
+    /// produced by polkadot-js `Bytes.toHex()` and stored by indexers (e.g.
+    /// SubQuery). If your hex came from this class's `toHex()` (or is the full
+    /// SCALE encoding with its length prefix), use `fromHex()` instead.
+    ///
+    /// The payload is validated, so an invalid leg fails here rather than
+    /// silently returning `null` from a later `tryDecrypt()`.
+    ///
+    /// # Arguments
+    /// * `hex_str` - A bare payload hex string (with or without "0x" prefix).
+    ///
+    /// # Returns
+    /// The deserialized `SettlementLegEncrypted`.
+    ///
+    /// # Errors
+    /// * Throws an error if the hex string is invalid or the payload is not a
+    ///   valid encrypted leg.
+    ///
+    /// # Example
+    /// ```javascript
+    /// // Hex as stored by an indexer (no SCALE length prefix)
+    /// const encryptedLeg = SettlementLegEncrypted.fromBareHex(indexerRow.encryptedData);
+    /// ```
+    #[wasm_bindgen(js_name = fromBareHex)]
+    pub fn from_bare_hex(hex_str: &str) -> Result<SettlementLegEncrypted, JsValue> {
+        let bytes = crate::hex_to_bytes(hex_str)?;
+        // Bare payload bytes — wrap with the SCALE Vec<u8> compact-length prefix
+        let leg = Self::from_bytes(&bytes.encode())?;
+        leg.inner.decode().map_err(|e| {
+            JsValue::from_str(&format!(
+                "Invalid encrypted leg: {}. If this hex came from toHex() (SCALE-encoded, \
+                 with a length prefix), use fromHex() instead.",
+                e
+            ))
+        })?;
+        Ok(leg)
     }
 
     /// Attempts to decrypt the leg using account keys.

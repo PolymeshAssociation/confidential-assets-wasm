@@ -98,6 +98,15 @@ pub fn block_hash_to_jsvalue(hash: Option<BlockHash>) -> JsValue {
     }
 }
 
+/// Decode a hex string (with optional "0x"/"0X" prefix) into bytes
+pub fn hex_to_bytes(hex_str: &str) -> Result<Vec<u8>, JsValue> {
+    let hex_str = hex_str
+        .strip_prefix("0x")
+        .or_else(|| hex_str.strip_prefix("0X"))
+        .unwrap_or(hex_str);
+    hex::decode(hex_str).map_err(|e| JsValue::from_str(&format!("Invalid hex string: {}", e)))
+}
+
 /// Convert JS string or byte array to `Vec<u8>`
 pub fn jsvalue_to_bytes(value: &JsValue) -> Result<Vec<u8>, JsValue> {
     if let Some(js_str) = value.as_string() {

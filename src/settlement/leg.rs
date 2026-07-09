@@ -113,8 +113,7 @@ impl SenderAffirmationProof {
     /// ```
     #[wasm_bindgen(js_name = fromHex)]
     pub fn from_hex(hex_str: &str) -> Result<SenderAffirmationProof, JsValue> {
-        let bytes = hex::decode(hex_str)
-            .map_err(|e| JsValue::from_str(&format!("Invalid hex string: {}", e)))?;
+        let bytes = crate::hex_to_bytes(hex_str)?;
         Self::from_bytes(&bytes)
     }
 }
@@ -220,8 +219,7 @@ impl ReceiverAffirmationProof {
     /// ```
     #[wasm_bindgen(js_name = fromHex)]
     pub fn from_hex(hex_str: &str) -> Result<ReceiverAffirmationProof, JsValue> {
-        let bytes = hex::decode(hex_str)
-            .map_err(|e| JsValue::from_str(&format!("Invalid hex string: {}", e)))?;
+        let bytes = crate::hex_to_bytes(hex_str)?;
         Self::from_bytes(&bytes)
     }
 }
@@ -324,8 +322,7 @@ impl ReceiverClaimProof {
     /// ```
     #[wasm_bindgen(js_name = fromHex)]
     pub fn from_hex(hex_str: &str) -> Result<ReceiverClaimProof, JsValue> {
-        let bytes = hex::decode(hex_str)
-            .map_err(|e| JsValue::from_str(&format!("Invalid hex string: {}", e)))?;
+        let bytes = crate::hex_to_bytes(hex_str)?;
         Self::from_bytes(&bytes)
     }
 }
@@ -431,8 +428,7 @@ impl SenderCounterUpdateProof {
     /// ```
     #[wasm_bindgen(js_name = fromHex)]
     pub fn from_hex(hex_str: &str) -> Result<SenderCounterUpdateProof, JsValue> {
-        let bytes = hex::decode(hex_str)
-            .map_err(|e| JsValue::from_str(&format!("Invalid hex string: {}", e)))?;
+        let bytes = crate::hex_to_bytes(hex_str)?;
         Self::from_bytes(&bytes)
     }
 }
@@ -538,8 +534,7 @@ impl SenderRevertAffirmationProof {
     /// ```
     #[wasm_bindgen(js_name = fromHex)]
     pub fn from_hex(hex_str: &str) -> Result<SenderRevertAffirmationProof, JsValue> {
-        let bytes = hex::decode(hex_str)
-            .map_err(|e| JsValue::from_str(&format!("Invalid hex string: {}", e)))?;
+        let bytes = crate::hex_to_bytes(hex_str)?;
         Self::from_bytes(&bytes)
     }
 }
@@ -640,8 +635,7 @@ impl MediatorAffirmationProof {
     /// ```
     #[wasm_bindgen(js_name = fromHex)]
     pub fn from_hex(hex_str: &str) -> Result<MediatorAffirmationProof, JsValue> {
-        let bytes = hex::decode(hex_str)
-            .map_err(|e| JsValue::from_str(&format!("Invalid hex string: {}", e)))?;
+        let bytes = crate::hex_to_bytes(hex_str)?;
         Self::from_bytes(&bytes)
     }
 }

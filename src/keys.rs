@@ -115,6 +115,7 @@ impl AccountKeys {
     /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(seed_hex: &str) -> Result<AccountKeys, JsValue> {
+        let seed_hex = seed_hex.strip_prefix("0x").unwrap_or(seed_hex);
         let seed_bytes = hex::decode(seed_hex)
             .map_err(|e| JsValue::from_str(&format!("Invalid hex seed: {}", e)))?;
 
