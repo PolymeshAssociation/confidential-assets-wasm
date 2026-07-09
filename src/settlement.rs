@@ -1,4 +1,4 @@
-use codec::{Compact, Decode, Encode};
+use codec::{DecodeAll, Encode};
 use polymesh_dart::{
     AssetId, Balance, Leg as NativeLeg, LegBuilder as NativeLegBuilder,
     LegConfig as NativeLegConfig, LegEncrypted as NativeLegEncrypted, LegRole as NativeLegRole,
@@ -345,7 +345,7 @@ impl SettlementLegsEncrypted {
     /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<SettlementLegsEncrypted, JsValue> {
-        let inner = Decode::decode(&mut &bytes[..])
+        let inner = DecodeAll::decode_all(&mut &bytes[..])
             .map_err(|e| JsValue::from_str(&format!("Failed to decode encrypted legs: {}", e)))?;
         Ok(SettlementLegsEncrypted { inner })
     }
@@ -545,8 +545,19 @@ impl SettlementLegEncrypted {
     /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<SettlementLegEncrypted, JsValue> {
-        let inner = Decode::decode(&mut &bytes[..])
-            .map_err(|e| JsValue::from_str(&format!("Failed to decode encrypted leg: {}", e)))?;
+        let inner = NativeLegEncrypted::decode_all(&mut &bytes[..]).map_err(|_e| {
+            JsValue::from_str(
+                "Expected SCALE-encoded hex (compact length prefix + payload), as produced by \
+                 toHex(). If this hex is the bare payload (e.g. from polkadot-js Bytes.toHex() \
+                 or an indexer), use fromBareHex() instead.",
+            )
+        })?;
+        #[cfg(feature = "decode_checks")]
+        {
+            inner
+                .decode()
+                .map_err(|e| JsValue::from_str(&format!("Invalid encrypted leg: {}", e)))?;
+        }
         Ok(SettlementLegEncrypted { inner })
     }
 
@@ -592,24 +603,7 @@ impl SettlementLegEncrypted {
     #[wasm_bindgen(js_name = fromHex)]
     pub fn from_hex(hex_str: &str) -> Result<SettlementLegEncrypted, JsValue> {
         let bytes = crate::hex_to_bytes(hex_str)?;
-        // Require the compact length prefix to *exactly* account for the remaining bytes
-        // (stricter than `from_bytes`, which ignores trailing bytes).
-        let mut rest = &bytes[..];
-        let has_scale_prefix = Compact::<u64>::decode(&mut rest)
-            .map(|Compact(len)| len == rest.len() as u64)
-            .unwrap_or(false);
-        if !has_scale_prefix {
-            return Err(JsValue::from_str(
-                "Expected SCALE-encoded hex (compact length prefix + payload), as produced by \
-                 toHex(). If this hex is the bare payload (e.g. from polkadot-js Bytes.toHex() \
-                 or an indexer), use fromBareHex() instead.",
-            ));
-        }
-        let leg = Self::from_bytes(&bytes)?;
-        leg.inner
-            .decode()
-            .map_err(|e| JsValue::from_str(&format!("Invalid encrypted leg: {}", e)))?;
-        Ok(leg)
+        Self::from_bytes(&bytes)
     }
 
     /// Deserializes an encrypted leg from its bare (unprefixed) hexadecimal form.
@@ -828,7 +822,7 @@ impl SettlementProof {
     /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<SettlementProof, JsValue> {
-        let inner = Decode::decode(&mut &bytes[..])
+        let inner = NativeSettlementProof::decode_all(&mut &bytes[..])
             .map_err(|e| JsValue::from_str(&format!("Failed to decode settlement proof: {}", e)))?;
         Ok(SettlementProof { inner })
     }

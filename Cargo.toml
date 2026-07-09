@@ -129,8 +129,11 @@ polymesh-api-client = { version = "3.11.1", default-features = false, features =
 ], optional = true }
 
 [features]
-default = []
+default = ["decode_checks"]
 #default = ["polymesh-client"]
+
+# Enables extra verification of decoded structures.
+decode_checks = []
 
 # Enable this feature to compile against a dev-chain.
 download_metadata = ["polymesh-api/download_metadata"]
