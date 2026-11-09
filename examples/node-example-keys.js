@@ -42,17 +42,14 @@ console.log('   Encryption public key:', encryptionPubKey.toJson());
 console.log('');
 
 // 5. Export and import keys
-console.log('5. Testing key export/import...');
-const keyBytes = accountKeys.toBytes();
-console.log('   Exported key bytes length:', keyBytes.length);
-
-const reimportedKeys = AccountKeys.fromBytes(keyBytes);
-const reimportedPublicKeys = reimportedKeys.publicKeys();
-console.log('   Re-imported public keys:', reimportedPublicKeys.toJson());
+console.log('5. Recreating keys from the seed...');
+const recreatedKeys = new AccountKeys(seed);
+const recreatedPublicKeys = recreatedKeys.publicKeys();
+console.log('   Recreated public keys:', recreatedPublicKeys.toJson());
 
 // Verify they match
-if (publicKeys.toJson() === reimportedPublicKeys.toJson()) {
-    console.log('   ✓ Keys match after re-import!');
+if (publicKeys.toJson() === recreatedPublicKeys.toJson()) {
+    console.log('   ✓ Keys match after recreating from the seed!');
 } else {
     console.log('   ✗ Error: Keys do not match!');
 }
@@ -68,20 +65,29 @@ console.log('');
 // 7. Create an asset state
 console.log('7. Creating an asset state...');
 const assetId = 0;
-const mediators = []; // Array of EncryptionPublicKey bytes
-const auditors = [];  // Array of EncryptionPublicKey bytes
+const auditorPublicKeys = AccountKeys.fromSeed('auditor-seed').publicKeys();
+const mediatorPublicKeys = AccountKeys.fromSeed('mediator-seed').publicKeys();
+// Same shape as the chain's `confidentialAssets.keys(assetId)` value.
+const assetKeys = {
+    encKeys: [
+        auditorPublicKeys.encryptionPublicKey().toJs(),
+        mediatorPublicKeys.encryptionPublicKey().toJs(),
+    ],
+    mediators: [mediatorPublicKeys.accountPublicKey().toJs()],
+};
 
 try {
-    const assetState = new AssetState(assetId, mediators, auditors);
+    const assetState = new AssetState(assetId, assetKeys);
     console.log('   ✓ Asset state created');
     console.log('   Asset ID:', assetState.assetId());
     console.log('   Mediators:', assetState.mediatorCount());
-    console.log('   Auditors:', assetState.auditorCount());
+    console.log('   Encryption keys:', assetState.auditorCount());
+    console.log('   Frozen:', assetState.isFrozen());
 
     const assetBytes = assetState.toBytes();
     console.log('   Asset state bytes length:', assetBytes.length);
 } catch (error) {
-    console.log('   Note: Asset state creation requires encryption keys for mediators/auditors');
+    console.log('   ✗ Error creating asset state:', error);
 }
 console.log('');
 

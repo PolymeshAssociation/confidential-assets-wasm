@@ -2,7 +2,7 @@
 
 Get up and running with Polymesh DART WASM bindings in minutes!
 
-## ⚠️ Important: Chain Integration is Optional
+## Important: Chain Integration is Optional
 
 This library generates zero-knowledge proofs for confidential transactions. You have flexibility in how you submit these proofs to the blockchain:
 
@@ -11,6 +11,8 @@ This library generates zero-knowledge proofs for confidential transactions. You 
 - **Your own chain client**: Use any solution that works for you
 
 The core WASM APIs (proof generation, key management) work independently and don't require PolymeshClient.
+
+This release targets DART v1 and a chain running the DART v1 confidential-assets pallet. If you are upgrading from the DART v0.1 release, read [MIGRATION.md](MIGRATION.md).
 
 ## Installation
 
@@ -157,14 +159,11 @@ import { AccountKeys, generateRandomSeed } from '@polymesh/dart-wasm';
 const seed = generateRandomSeed();
 const keys = new AccountKeys(seed);
 
-// Export for storage (encrypt before storing!)
-const keyBytes = keys.toBytes();
-localStorage.setItem('dartKeys', JSON.stringify(Array.from(keyBytes)));
+// Store the seed (encrypt before storing!). AccountKeys has no byte export.
 localStorage.setItem('dartSeed', seed);
 
-// Later: Restore from storage
-const storedBytes = JSON.parse(localStorage.getItem('dartKeys'));
-const restoredKeys = AccountKeys.fromBytes(new Uint8Array(storedBytes));
+// Later: Recreate the same keys from the seed
+const restoredKeys = new AccountKeys(localStorage.getItem('dartSeed'));
 ```
 
 ### 2. Share Public Keys
@@ -204,22 +203,29 @@ console.log('Generated proof - ready to submit to chain');
 
 ### 4. Work with Asset States
 
+An `AssetState` holds the asset's encryption keys (`encKeys`, one per auditor and mediator) and its mediators' account public keys (`mediators`). It matches the chain's `confidentialAssets.keys(assetId)` storage value.
+
 ```javascript
-import { AssetState, EncryptionPublicKey } from '@polymesh/dart-wasm';
+import { AssetState } from '@polymesh/dart-wasm';
 
-// Option A: From Polkadot.js chain query
+// Option A: From a Polkadot.js chain query (SCALE bytes)
 const assetId = 42;
-const assetDetail = await api.query.confidentialAssets.dartAssetDetails(assetId);
-const assetState = new AssetState(assetId, assetDetail.mediators, assetDetail.auditors);
+const assetKeys = await api.query.confidentialAssets.keys(assetId);
+const assetState = new AssetState(assetId, assetKeys.unwrap().toU8a());
 
-// Option B: From raw hex strings
-const mediatorKey = new EncryptionPublicKey('0xabcd...');
-const auditorKey = new EncryptionPublicKey('0x5678...');
-const assetState = new AssetState(assetId, [mediatorKey], [auditorKey]);
+// Option B: From hex strings
+const assetState = new AssetState(assetId, {
+  encKeys: ['0x5678...', '0xabcd...'], // auditor and mediator encryption public keys
+  mediators: ['0x1234...'],            // mediator account public keys
+});
 
 console.log('Asset ID:', assetState.assetId());
 console.log('Mediators:', assetState.mediatorCount());
-console.log('Auditors:', assetState.auditorCount());
+console.log('Encryption keys:', assetState.auditorCount());
+
+// The constructor sets frozen = false. Read the frozen status from the chain
+// (`confidentialAssets.assetFrozen`), or use PolymeshClient.getAssetState.
+console.log('Frozen:', assetState.isFrozen());
 
 // Export asset state
 const assetBytes = assetState.toBytes();
@@ -228,6 +234,8 @@ const assetBytes = assetState.toBytes();
 ### 5. Deterministic Key Generation
 
 ```javascript
+import { AccountKeys, MasterSeed, generateRandomSeed } from '@polymesh/dart-wasm';
+
 // Same seed always produces same keys
 const keys1 = AccountKeys.fromSeed('my-password');
 const keys2 = AccountKeys.fromSeed('my-password');
@@ -237,6 +245,28 @@ console.assert(
   keys1.publicKeys().accountPublicKey().toJson() === 
   keys2.publicKeys().accountPublicKey().toJson()
 );
+
+// Several accounts from one master seed. The seed must be at least 32 bytes.
+const masterSeed = new MasterSeed('0x' + generateRandomSeed());
+const account0 = masterSeed.deriveAccountKeys("m/44'/595'/0'/0/0");
+const account1 = masterSeed.deriveAccountKeys("m/44'/595'/0'/0/1");
+```
+
+### 6. Decrypt a Settlement Leg as an Auditor or Mediator
+
+```javascript
+import { SettlementLegsEncrypted } from '@polymesh/dart-wasm';
+
+const legs = SettlementLegsEncrypted.fromBytes(encryptedLegBytes);
+
+// Auditor: the encryption key pair is enough. The role is always `Auditor`.
+const auditorView = legs.tryDecryptAsMediatorOrAuditor(auditorKeys.encryptionKeyPair());
+
+// Mediator: also pass the account public key, or the role comes back as `Auditor`.
+const mediatorView = legs.tryDecryptAsMediatorOrAuditor(
+  mediatorKeys.encryptionKeyPair(),
+  mediatorKeys.publicKeys().accountPublicKey(),
+);
 ```
 
 ## Next Steps
@@ -244,8 +274,9 @@ console.assert(
 1. **Read the Full Documentation**: See [README.md](README.md) for complete API reference
 2. **Explore Examples**: Check the `examples/` directory for more complex scenarios
 3. **Development Guide**: Read [DEVELOPMENT.md](DEVELOPMENT.md) for integration patterns
-4. **Learn DART**: Review the [P-DART paper](https://assets.polymesh.network/P-DART-v1.pdf) for protocol details
-5. **Chain Integration**: 
+4. **Upgrading from DART v0.1**: Read [MIGRATION.md](MIGRATION.md)
+5. **Learn DART**: Review the [P-DART paper](https://assets.polymesh.network/P-DART-v1.pdf) for protocol details
+6. **Chain Integration**: 
    - See [README.md - Using with Polkadot.js](README.md#using-with-polkadotjs-without-polymeshclient) for examples
    - See [DEVELOPMENT.md](DEVELOPMENT.md) for PolymeshClient integration (optional)
 
@@ -277,7 +308,16 @@ Ensure your input data is valid:
 - DIDs should be 32 bytes (64 hex characters)
 - Asset IDs should be valid numbers
 - Keys should come from the same seed generation
-- AssetState mediators/auditors should match chain data
+- `AssetState` keys should come from the chain's `confidentialAssets.keys(assetId)`
+- Proofs and encrypted legs from the DART v0.1 release do not verify on a DART v1 chain. Regenerate them
+
+### Issue: "Invalid master seed"
+
+`new MasterSeed(seed)` requires at least 32 bytes of seed, and a `0x`-prefixed seed must be valid hex. Use `new MasterSeed('0x' + generateRandomSeed())`.
+
+### Issue: `MissingRequiredClaim` when creating an asset
+
+The chain requires the asset creator, auditors and mediators to hold DART role claims from a trusted claim issuer. See [Role Claims](README.md#role-claims). On a development chain, call `client.onboardConfidentialRoles(signer, ["AssetCreator"])` for the issuer and `client.onboardConfidentialRoles(signer, ["Auditor", "Mediator"])` for auditors and mediators. On other chains the trusted issuer calls `trustedIssuer.addConfidentialRoleClaims(did, roles)` for each identity.
 
 ## Getting Help
 

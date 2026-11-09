@@ -73,6 +73,13 @@ async function main() {
     }
     console.log('');
 
+    // Confidential-asset roles need a KYC claim from a trusted issuer (Alice on a dev chain).
+    console.log('Granting confidential asset role claims...');
+    await client.onboardConfidentialRoles(issuer, ["AssetCreator"]);
+    await client.onboardConfidentialRoles(mediator, ["Auditor", "Mediator"]);
+    console.log('   ✓ Role claims granted');
+    console.log('');
+
     // Create account keys from seed
     console.log('Creating account keys for test issuer...');
     const issuerKeys = AccountKeys.fromSeed("Test-Issuer-seed");
@@ -278,9 +285,9 @@ async function main() {
     const timed_asset_state = Date.now();
     const assetState = await client.getAssetState(assetId); // Using the Rust client here to create the `AssetState` object from on-chain data.
     console.log('   Asset state retrieval took', Date.now() - timed_asset_state, 'ms');
-    // The `AssetState` object can be recreated from the AssetDetails on-chain.
-    // const assetDetails = api.query().confidentialAssets.dartAssetDetails(assetId);
-    // const assetState = new AssetState(assetId, assetDetails.mediators, assetDetails.auditors); // The mediator/auditors encryption keys would need to be converted from the on-chain type.
+    // The `AssetState` object can be recreated from the asset keys on-chain.
+    // const assetKeys = await api.query.confidentialAssets.keys(assetId);
+    // const assetState = new AssetState(assetId, assetKeys.unwrap().toU8a());
     const assetLeafIndex = assetState.leafIndex();
     const timed_asset_path = Date.now();
     const assetPath = await assetCurveTree.getLeafPath(assetLeafIndex);

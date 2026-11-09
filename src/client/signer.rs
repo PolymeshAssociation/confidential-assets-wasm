@@ -2,7 +2,10 @@ use bounded_collections::{BoundedBTreeMap, BoundedBTreeSet, TryCollect};
 
 use polymesh_api::{
     types::{
-        polymesh_primitives::secondary_key::KeyRecord,
+        polymesh_primitives::{
+            identity_claim::{Claim, Scope},
+            secondary_key::KeyRecord,
+        },
         runtime::{events::*, RuntimeEvent},
     },
     Api, WrappedCall,
@@ -17,8 +20,8 @@ use polymesh_dart::{
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    asset::AssetState, identity_id_to_jsvalue, jsvalue_to_bytes, settlement_ref_to_jsvalue,
-    AccountPublicKeys, MediatorAffirmationProof,
+    asset::AssetState, identity_id_to_jsvalue, jsvalue_to_bytes, jsvalue_to_identity_id,
+    settlement_ref_to_jsvalue, AccountPublicKeys, MediatorAffirmationProof,
 };
 use crate::{block_hash_to_jsvalue, error::Error};
 use crate::{
@@ -201,6 +204,37 @@ impl PolymeshSigner {
         Ok(())
     }
 
+    /// Add a `KnowYourCustomer(Custom(scope))` claim to `did` for each scope, issued by this
+    /// signer's identity.
+    pub(crate) async fn add_custom_kyc_claims(
+        &mut self,
+        did: IdentityId,
+        scopes: Vec<Vec<u8>>,
+    ) -> Result<(), Error> {
+        let mut calls = Vec::with_capacity(scopes.len());
+        for scope in scopes {
+            calls.push(
+                self.api
+                    .call()
+                    .identity()
+                    .add_claim(did, Claim::KnowYourCustomer(Scope::Custom(scope)), None)
+                    .map_err(Error::from)?
+                    .into(),
+            );
+        }
+        let mut res = self
+            .submit_and_watch(
+                self.api
+                    .call()
+                    .utility()
+                    .batch_all(calls)
+                    .map_err(Error::from)?,
+            )
+            .await?;
+        res.ok().await.map_err(Error::from)?;
+        Ok(())
+    }
+
     /// Query the Polymesh identity (DID) associated with this signer's account.
     ///
     /// Internal utility method that checks the blockchain to see if this account
@@ -297,6 +331,39 @@ impl PolymeshSigner {
             Some(did) => Ok(identity_id_to_jsvalue(&did)),
             _ => Ok(JsValue::NULL),
         }
+    }
+
+    /// Add the default DART role claims to an identity, issued by this signer's identity.
+    ///
+    /// Adds `KnowYourCustomer(Custom("DART:<Role>"))` for each role. The pallet only counts claims
+    /// from the role's trusted issuers, so this signer's identity must be one of them. Each role's
+    /// required claim and trusted issuers are stored in `confidentialAssets.requiredClaims(role)`.
+    /// If `requiredClaims(Mediator)` is unset, mediators are checked against
+    /// `requiredClaims(Auditor)`, so they need the `"Auditor"` claim.
+    ///
+    /// # Arguments
+    /// * `did` - The identity receiving the claims, as a hex string or 32-byte array.
+    /// * `roles` - Any of `"AssetCreator"`, `"Auditor"` and `"Mediator"`.
+    ///
+    /// # Errors
+    /// * Throws if `did` is malformed, a role is unknown, or the transaction fails.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const trustedIssuer = client.newSigner(issuerMnemonic);
+    /// await trustedIssuer.addConfidentialRoleClaims(assetIssuerDid, ["AssetCreator"]);
+    /// ```
+    #[wasm_bindgen(js_name = addConfidentialRoleClaims)]
+    pub async fn add_confidential_role_claims(
+        &mut self,
+        did: JsValue,
+        roles: Vec<String>,
+    ) -> Result<(), JsValue> {
+        let did = jsvalue_to_identity_id(&did)?;
+        let scopes = role_claim_scopes(&roles)?;
+        self.add_custom_kyc_claims(did, scopes)
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Failed to add role claims: {}", e)))
     }
 
     /// Register DART account keys and link them to this signer's Polymesh identity.
@@ -465,7 +532,7 @@ impl PolymeshSigner {
         // Check if the transaction was successful
         res.ok()
             .await
-            .map_err(|e| JsValue::from_str(&format!("Register account call failed: {}", e)))?;
+            .map_err(|e| JsValue::from_str(&format!("Create asset call failed: {}", e)))?;
 
         // Get the block hash.
         let block_hash = res
@@ -493,6 +560,7 @@ impl PolymeshSigner {
                     // Return the Create Asset result.
                     let asset_state = NativeAssetState {
                         asset_id,
+                        frozen: false,
                         keys: asset_keys,
                     };
                     return Ok(CreateAssetResult {
@@ -1434,4 +1502,17 @@ impl AccountStateResult {
     pub fn leaf_index(&self) -> u64 {
         self.leaf_index
     }
+}
+
+/// Map role names to the custom scopes of their default DART claims.
+pub(crate) fn role_claim_scopes(roles: &[String]) -> Result<Vec<Vec<u8>>, JsValue> {
+    roles
+        .iter()
+        .map(|role| match role.as_str() {
+            "AssetCreator" | "Auditor" | "Mediator" => Ok(format!("DART:{role}").into_bytes()),
+            _ => Err(JsValue::from_str(&format!(
+                "Unknown confidential role: {role}"
+            ))),
+        })
+        .collect()
 }
