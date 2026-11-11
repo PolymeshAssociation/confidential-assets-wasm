@@ -33,19 +33,24 @@ impl MasterSeed {
     /// Creates a new MasterSeed from a hexadecimal seed string.
     ///
     /// # Arguments
-    /// * `seed` - A seed phrase or "0x"-prefixed hexadecimal string used to derive the master seed.
+    /// * `seed` - A "0x"-prefixed hexadecimal string, or else a string whose raw bytes are used.
+    ///   Must decode to at least 32 bytes.
     ///
     /// # Returns
     /// A new `MasterSeed` object containing the generated seed.
     ///
+    /// # Errors
+    /// * Throws an error if the hex is invalid or the seed is shorter than 32 bytes.
+    ///
     /// # Example
     /// ```javascript
-    /// const masterSeed = new MasterSeed("my-secure-seed-phrase");
+    /// const masterSeed = new MasterSeed("0x" + generateRandomSeed());
     /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(seed: &str) -> Result<MasterSeed, JsValue> {
         Ok(MasterSeed {
-            inner: NativeMasterSeed::from_seed(seed),
+            inner: NativeMasterSeed::from_seed(seed)
+                .map_err(|e| JsValue::from_str(&format!("Invalid master seed: {}", e)))?,
         })
     }
 
@@ -289,6 +294,7 @@ impl AccountKeys {
             0,
             &did.0[..],
             &params,
+            None,
         )
         .map_err(|e| {
             JsValue::from_str(&format!(
@@ -336,7 +342,13 @@ impl AccountKeys {
 
         // Decrypt leg.
         let (leg, leg_role) = leg_enc
-            .try_decrypt_with_key(&self.inner.enc, None, None)
+            .try_decrypt_with_key(
+                &self.inner.enc,
+                None,
+                Some(&self.inner.acct.public),
+                None,
+                None,
+            )
             .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
 
         // Verify asset id matches.
@@ -742,9 +754,9 @@ impl AccountPublicKey {
     /// const key2 = new AccountPublicKey(new Uint8Array(32));
     ///
     /// // From Polkadot.js Codec
-    /// const assetDetail = await api.query.confidentialAssets.dartAssetDetails(assetId);
-    /// const auditor = assetDetail.auditors[0]; // Auditor key from chain storage
-    /// const key4 = new AccountPublicKey(auditor); // Automatically calls toU8a()
+    /// const assetKeys = (await api.query.confidentialAssets.keys(assetId)).unwrap();
+    /// const mediator = [...assetKeys.mediators][0]; // Mediator key from chain storage
+    /// const key4 = new AccountPublicKey(mediator); // Automatically calls toU8a()
     /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(js_value: JsValue) -> Result<AccountPublicKey, JsValue> {
@@ -898,7 +910,10 @@ impl AccountPublicKey {
 /// const encKey = new EncryptionPublicKey(uint8Array);
 ///
 /// // Use in AssetState
-/// const assetState = new AssetState(assetId, [mediatorEncKey], [auditorEncKey]);
+/// const assetState = new AssetState(assetId, {
+///     encKeys: [auditorEncKey.toJs(), mediatorEncKey.toJs()],
+///     mediators: [mediatorAccountKey.toJs()],
+/// });
 /// ```
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -940,9 +955,9 @@ impl EncryptionPublicKey {
     /// const key2 = new EncryptionPublicKey(new Uint8Array(32));
     ///
     /// // From Polkadot.js Codec
-    /// const assetDetail = await api.query.confidentialAssets.dartAssetDetails(assetId);
-    /// const mediator = assetDetail.mediators[0]; // Mediator key from chain storage
-    /// const key4 = new EncryptionPublicKey(mediator); // Automatically calls toU8a()
+    /// const assetKeys = (await api.query.confidentialAssets.keys(assetId)).unwrap();
+    /// const encKey = [...assetKeys.encKeys][0]; // Auditor or mediator key from chain storage
+    /// const key4 = new EncryptionPublicKey(encKey); // Automatically calls toU8a()
     /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(js_value: JsValue) -> Result<EncryptionPublicKey, JsValue> {

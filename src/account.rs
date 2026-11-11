@@ -468,6 +468,7 @@ impl AccountAssetState {
             &keys,
             &leg_ref,
             &leg_enc,
+            leg.amount,
             &mut self.inner,
             &path.path,
         )
@@ -658,6 +659,7 @@ impl AccountAssetState {
             &keys,
             &leg_ref,
             &leg_enc,
+            leg.amount,
             &mut self.inner,
             &path.path,
         )

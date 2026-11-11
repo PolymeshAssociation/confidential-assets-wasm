@@ -8,8 +8,9 @@ use polymesh_dart::{
 use wasm_bindgen::prelude::*;
 
 use crate::{
-    bytes_to_jsvalue, jsvalue_to_balance, jsvalue_to_bytes, AccountKeys, AccountPublicKeys,
-    AssetLeafPath, AssetState, AssetTreeRoot, EncryptionKeyPair, EncryptionPublicKey,
+    bytes_to_jsvalue, jsvalue_to_balance, jsvalue_to_bytes, AccountKeys, AccountPublicKey,
+    AccountPublicKeys, AssetLeafPath, AssetState, AssetTreeRoot, EncryptionKeyPair,
+    EncryptionPublicKey,
 };
 
 mod leg;
@@ -221,7 +222,7 @@ impl LegBuilder {
     /// # On-chain Data
     /// All the required information can be queried from on-chain:
     /// - `confidentialAssets.accountEncryptionKey(accountPublicKey)` - Get encryption keys
-    /// - `confidentialAssets.dartAssetDetails(assetId)` - Get asset mediators/auditors
+    /// - `confidentialAssets.keys(assetId)` - Get asset auditor/mediator keys
     ///
     /// # Example
     /// ```javascript
@@ -390,31 +391,50 @@ impl SettlementLegsEncrypted {
     ///
     /// # Arguments
     /// * `encryption_key` - The encryption key pair for the mediator or auditor.
+    /// * `affirmation_key` - Optional mediator account (affirmation) public key, as an
+    ///   `AccountPublicKey`, hex string or `Uint8Array`. Without it every decrypted leg reports the
+    ///   `Auditor` role.
+    /// * `max_amount` - Optional upper bound on the leg amount (`bigint` or number). Bounds decryption time.
     ///
     /// # Returns
     /// A `SettlementLegs` object where each leg is either decrypted (`Some`) or not (`None`).
     ///
+    /// # Errors
+    /// * Throws an error if `max_amount` is not a valid balance.
+    ///
     /// # Example
     /// ```javascript
     /// const mediatorKeys = accountKeys.encryptionKeyPair();
-    /// const decryptedLegs = encryptedLegs.tryDecryptAsMediatorOrAuditor(mediatorKeys);
+    /// const mediatorAccountKey = accountKeys.publicKeys().accountPublicKey();
+    /// const decryptedLegs = encryptedLegs.tryDecryptAsMediatorOrAuditor(mediatorKeys, mediatorAccountKey);
     /// console.log('As mediator, can see', decryptedLegs.legCount(), 'legs');
     /// ```
     #[wasm_bindgen(js_name = tryDecryptAsMediatorOrAuditor)]
     pub fn try_decrypt_as_mediator_or_auditor(
         &self,
         encryption_key: &EncryptionKeyPair,
-    ) -> SettlementLegs {
+        affirmation_key: Option<JsValue>,
+        max_amount: Option<JsValue>,
+    ) -> Result<SettlementLegs, JsValue> {
+        let max_amount = optional_balance(max_amount)?;
+        let affirmation_key = optional_account_public_key(affirmation_key)?;
+        let affirmation_key = affirmation_key.as_ref().map(|k| &k.inner);
         let mut legs = Vec::with_capacity(self.inner.len());
         for leg_enc in &self.inner {
             let leg = leg_enc
-                .try_decrypt_with_key(&encryption_key.inner, None, None)
+                .try_decrypt_with_key(
+                    &encryption_key.inner,
+                    None,
+                    affirmation_key,
+                    None,
+                    max_amount,
+                )
                 .ok()
                 .map(|(leg, role)| SettlementLeg::from_native(leg, role));
             legs.push(leg);
         }
 
-        SettlementLegs { legs }
+        Ok(SettlementLegs { legs })
     }
 }
 
@@ -679,16 +699,24 @@ impl SettlementLegEncrypted {
     /// # Arguments
     /// * `encryption_key` - The encryption key pair for the mediator or auditor.
     /// * `max_asset_id` - Optional maximum asset ID to limit decryption scope.
+    /// * `affirmation_key` - Optional mediator account (affirmation) public key, as an
+    ///   `AccountPublicKey`, hex string or `Uint8Array`. Without it a decrypted leg reports the
+    ///   `Auditor` role.
+    /// * `max_amount` - Optional upper bound on the leg amount (`bigint` or number). Bounds decryption time.
     ///
     /// # Returns
     /// * `Some(SettlementLeg)` if decryption succeeded.
     /// * `None` if decryption failed (you are not a mediator/auditor for this asset).
     ///
+    /// # Errors
+    /// * Throws an error if `max_amount` is not a valid balance.
+    ///
     /// # Example
     /// ```javascript
     /// const mediatorKeys = accountKeys.encryptionKeyPair();
+    /// const mediatorAccountKey = accountKeys.publicKeys().accountPublicKey();
     /// const maxAssetId = 500; // Optional limit
-    /// const decrypted = encryptedLeg.tryDecryptAsMediatorOrAuditor(mediatorKeys, maxAssetId);
+    /// const decrypted = encryptedLeg.tryDecryptAsMediatorOrAuditor(mediatorKeys, maxAssetId, mediatorAccountKey);
     /// if (decrypted) {
     ///     console.log('Can see transfer details as mediator/auditor');
     ///     console.log('Amount:', decrypted.amount);
@@ -699,10 +727,20 @@ impl SettlementLegEncrypted {
         &self,
         encryption_key: &EncryptionKeyPair,
         max_asset_id: Option<AssetId>,
+        affirmation_key: Option<JsValue>,
+        max_amount: Option<JsValue>,
     ) -> Result<Option<SettlementLeg>, JsValue> {
+        let max_amount = optional_balance(max_amount)?;
+        let affirmation_key = optional_account_public_key(affirmation_key)?;
         if let Some((leg, role)) = self
             .inner
-            .try_decrypt_with_key(&encryption_key.inner, None, max_asset_id)
+            .try_decrypt_with_key(
+                &encryption_key.inner,
+                None,
+                affirmation_key.as_ref().map(|k| &k.inner),
+                max_asset_id,
+                max_amount,
+            )
             .ok()
         {
             Ok(Some(SettlementLeg::from_native(leg, role)))
@@ -888,5 +926,142 @@ impl SettlementProof {
             .collect();
 
         SettlementLegsEncrypted { inner: legs }
+    }
+}
+
+/// Parses an optional account public key from an `AccountPublicKey` object, a hex string, a
+/// `Uint8Array` or a Polkadot.js `Codec`. `null` and `undefined` give `None`.
+fn optional_account_public_key(
+    value: Option<JsValue>,
+) -> Result<Option<AccountPublicKey>, JsValue> {
+    let Some(value) = value.filter(|v| !v.is_null_or_undefined()) else {
+        return Ok(None);
+    };
+    // NOTE: An object with `toBytes()` is taken as an `AccountPublicKey` and does not fall back to
+    // the hex, `Uint8Array` or `Codec` forms.
+    if value.is_object() {
+        let to_bytes = js_sys::Reflect::get(&value, &JsValue::from_str("toBytes"))?;
+        if to_bytes.is_function() {
+            let bytes = js_sys::Function::from(to_bytes).call0(&value)?;
+            let bytes = js_sys::Uint8Array::new(&bytes).to_vec();
+            return AccountPublicKey::from_bytes(&bytes).map(Some);
+        }
+    }
+    AccountPublicKey::new(value).map(Some)
+}
+
+fn optional_balance(value: Option<JsValue>) -> Result<Option<Balance>, JsValue> {
+    match value.filter(|v| !v.is_null_or_undefined()) {
+        Some(value) => jsvalue_to_balance(&value).map(Some),
+        None => Ok(None),
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{generate_random_seed, MasterSeed};
+    use wasm_bindgen_test::*;
+
+    wasm_bindgen_test_configure!(run_in_browser);
+
+    fn new_keys() -> AccountKeys {
+        AccountKeys::new(&generate_random_seed().unwrap()).unwrap()
+    }
+
+    /// Builds `AssetState` 7 with `mediator` as its only mediator, from the `{ encKeys, mediators }`
+    /// object form.
+    fn asset_with_mediator(mediator: &AccountKeys) -> AssetState {
+        let public = mediator.public_keys();
+        let keys = js_sys::Object::new();
+        let hex = |bytes: Vec<u8>| JsValue::from_str(&format!("0x{}", hex::encode(bytes)));
+        let enc_keys = js_sys::Array::of1(&hex(public.encryption_public_key().to_bytes()));
+        let mediators = js_sys::Array::of1(&hex(public.account_public_key().to_bytes()));
+        js_sys::Reflect::set(&keys, &"encKeys".into(), &enc_keys).unwrap();
+        js_sys::Reflect::set(&keys, &"mediators".into(), &mediators).unwrap();
+        AssetState::new(7, keys.into()).unwrap()
+    }
+
+    fn encrypted_leg(mediator: &AccountKeys, amount: u64) -> SettlementLegEncrypted {
+        let leg = LegBuilder::new(
+            &new_keys().public_keys(),
+            &new_keys().public_keys(),
+            &asset_with_mediator(mediator),
+            JsValue::from_f64(amount as f64),
+        )
+        .unwrap();
+        let inner = leg
+            .to_native()
+            .encrypt::<_, polymesh_dart::PolymeshLimits>(&mut rand::rngs::OsRng)
+            .unwrap()
+            .leg_enc()
+            .unwrap();
+        SettlementLegEncrypted { inner }
+    }
+
+    #[wasm_bindgen_test]
+    fn master_seed_rejects_short_seed() {
+        assert!(MasterSeed::new("0x0102").is_err());
+        assert!(MasterSeed::new("too short").is_err());
+        assert!(MasterSeed::new(&format!("0x{}", generate_random_seed().unwrap())).is_ok());
+    }
+
+    #[wasm_bindgen_test]
+    fn asset_state_from_object_and_hex() {
+        let mediator = new_keys();
+        let asset = asset_with_mediator(&mediator);
+        let hex = format!("0x{}", hex::encode(asset.inner.keys.encode()));
+        assert!(AssetState::new(7, JsValue::from_str(&hex)).is_ok());
+        let empty = AssetState::new(7, js_sys::Uint8Array::new_with_length(0).into());
+        assert_eq!(
+            empty.err().and_then(|e| e.as_string()).as_deref(),
+            Some("Asset keys bytes are empty")
+        );
+    }
+
+    #[wasm_bindgen_test]
+    fn mediator_role_needs_affirmation_key() {
+        let mediator = new_keys();
+        let leg = encrypted_leg(&mediator, 100);
+        let enc = mediator.encryption_key_pair();
+
+        let as_auditor = leg
+            .try_decrypt_as_mediator_or_auditor(&enc, None, None, None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(as_auditor.role, "Auditor");
+        assert_eq!(as_auditor.amount, 100);
+
+        let affirmation_key: JsValue = mediator.public_keys().account_public_key().into();
+        let as_mediator = leg
+            .try_decrypt_as_mediator_or_auditor(&enc, None, Some(affirmation_key), None)
+            .unwrap()
+            .unwrap();
+        assert_eq!(as_mediator.role, "Mediator");
+    }
+
+    #[wasm_bindgen_test]
+    fn invalid_max_amount_throws() {
+        let mediator = new_keys();
+        let leg = encrypted_leg(&mediator, 100);
+        let enc = mediator.encryption_key_pair();
+        for bad in [
+            JsValue::from_f64(-1.0),
+            JsValue::from_f64(1.5),
+            JsValue::from_f64(js_sys::Number::MAX_SAFE_INTEGER + 2.0),
+            JsValue::from_str("abc"),
+        ] {
+            assert!(leg
+                .try_decrypt_as_mediator_or_auditor(&enc, None, None, Some(bad))
+                .is_err());
+        }
+        let ok = leg.try_decrypt_as_mediator_or_auditor(
+            &enc,
+            None,
+            None,
+            Some(js_sys::BigInt::from(1000u64).into()),
+        );
+        assert_eq!(ok.unwrap().unwrap().amount, 100);
     }
 }

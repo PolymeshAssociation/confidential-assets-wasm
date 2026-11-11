@@ -2,26 +2,28 @@ use codec::{Decode, Encode};
 use polymesh_dart::{AssetId, AssetKeys as NativeAssetKeys, AssetState as NativeAssetState};
 use wasm_bindgen::prelude::*;
 
-// Helper function to convert chain `AssetKeys` data to native `AssetKeys` format
-fn convert_chain_asset_keys(keys: JsValue) -> Result<NativeAssetKeys, JsValue> {
-    // Try Uint8Array (check if it's a valid Uint8Array)
-    let bytes_array = js_sys::Uint8Array::new(&keys);
-    if bytes_array.length() > 0 {
-        let bytes_vec = bytes_array.to_vec();
-        if !bytes_vec.is_empty() {
-            let native = NativeAssetKeys::decode(&mut &bytes_vec[..]).map_err(|e| {
-                JsValue::from_str(&format!(
-                    "Failed to decode asset keys from Uint8Array: {}",
-                    e
-                ))
-            })?;
-            return Ok(native);
-        }
-    }
+use crate::hex_to_bytes;
 
-    // Try JS map/object by using `serde_wasm_bindgen`
-    serde_wasm_bindgen::from_value(keys)
-        .map_err(|e| JsValue::from_str(&format!("Failed to decode asset keys from object: {}", e)))
+/// Convert the chain's `AssetKeys` value to native `AssetKeys`. Accepts SCALE bytes as a hex string,
+/// `Uint8Array`, `ArrayBuffer` or number array, or an object `{ encKeys, mediators }`.
+fn convert_chain_asset_keys(keys: JsValue) -> Result<NativeAssetKeys, JsValue> {
+    let bytes = if let Some(hex) = keys.as_string() {
+        hex_to_bytes(&hex)?
+    } else if keys.is_instance_of::<js_sys::Uint8Array>()
+        || keys.is_instance_of::<js_sys::ArrayBuffer>()
+        || js_sys::Array::is_array(&keys)
+    {
+        js_sys::Uint8Array::new(&keys).to_vec()
+    } else {
+        return serde_wasm_bindgen::from_value(keys).map_err(|e| {
+            JsValue::from_str(&format!("Failed to decode asset keys from object: {}", e))
+        });
+    };
+    if bytes.is_empty() {
+        return Err(JsValue::from_str("Asset keys bytes are empty"));
+    }
+    NativeAssetKeys::decode(&mut &bytes[..])
+        .map_err(|e| JsValue::from_str(&format!("Failed to decode asset keys from bytes: {}", e)))
 }
 
 /// Represents the confidential asset state stored in the asset curve tree.
@@ -34,13 +36,14 @@ fn convert_chain_asset_keys(keys: JsValue) -> Result<NativeAssetKeys, JsValue> {
 /// # Examples
 /// ```javascript
 /// // From Polkadot.js chain data (recommended)
-/// const assetDetail = await api.query.confidentialAssets.dartAssetDetails(assetId);
-/// const assetState = new AssetState(assetId, assetDetail.mediators, assetDetail.auditors);
+/// const assetKeys = await api.query.confidentialAssets.keys(assetId);
+/// const assetState = new AssetState(assetId, assetKeys.unwrap().toU8a());
 ///
-/// // From pre-converted keys
-/// const mediatorKey = new EncryptionPublicKey("0x1234...");
-/// const auditorKey = new EncryptionPublicKey("0x5678...");
-/// const assetState = new AssetState(assetId, [mediatorKey], [auditorKey]);
+/// // From hex keys
+/// const assetState = new AssetState(assetId, {
+///     encKeys: ["0x5678...", "0xabcd..."], // auditor and mediator encryption public keys
+///     mediators: ["0x1234..."],            // mediator account public keys
+/// });
 ///
 /// // Use in settlement legs
 /// const leg = new LegBuilder(senderKeys, receiverKeys, assetState, amount);
@@ -53,21 +56,13 @@ pub struct AssetState {
 
 #[wasm_bindgen]
 impl AssetState {
-    /// Creates a new asset state from raw chain data or pre-converted encryption keys.
-    ///
-    /// This constructor automatically converts raw key data from various sources into
-    /// `EncryptionPublicKey` objects. It's especially useful when querying the Polymesh chain
-    /// for mediators and auditors using Polkadot.js, which returns keys as `Codec` objects
-    /// with `.toU8a()` methods.
+    /// Creates a new asset state from the chain's `confidentialAssets.keys(assetId)` value. `frozen` is `false`.
     ///
     /// # Arguments
     /// * `asset_id` - The unique identifier for this confidential asset (as a number).
-    /// * `mediators` - Array of raw key data or `EncryptionPublicKey` objects. Each element can be:
-    ///   - An existing `EncryptionPublicKey` object
-    ///   - A `Uint8Array` (32 bytes)
-    ///   - A hex string with or without "0x" prefix
-    ///   - Any Polkadot.js `Codec` object with a `.toU8a()` method
-    /// * `auditors` - Array of raw key data in the same formats as mediators.
+    /// * `asset_keys` - Either the SCALE-encoded `AssetKeys` as a `Uint8Array` or hex string, or an object
+    ///   `{ encKeys, mediators }` where `encKeys` are the auditor and mediator encryption public keys
+    ///   and `mediators` are the mediator account public keys, each as a hex string.
     ///
     /// # Returns
     /// A new `AssetState` object.
@@ -79,7 +74,7 @@ impl AssetState {
     /// ```javascript
     /// // From Polkadot.js chain data (recommended)
     /// const assetKeys = await api.query.confidentialAssets.keys(assetId);
-    /// const assetState = new AssetState(assetId, assetKeys);
+    /// const assetState = new AssetState(assetId, assetKeys.unwrap().toU8a());
     ///
     /// // Use in settlement legs
     /// const leg = new LegBuilder(senderKeys, receiverKeys, assetState, amount);
@@ -89,6 +84,7 @@ impl AssetState {
         Ok(AssetState {
             inner: NativeAssetState {
                 asset_id,
+                frozen: false,
                 keys: convert_chain_asset_keys(asset_keys)?,
             },
         })
@@ -180,6 +176,20 @@ impl AssetState {
     #[wasm_bindgen(js_name = mediatorCount)]
     pub fn mediator_count(&self) -> usize {
         self.inner.keys.mediators.len()
+    }
+
+    /// Returns `true` if the asset is frozen. The chain rejects new settlements for a frozen asset.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const assetState = await client.getAssetState(assetId);
+    /// if (assetState.isFrozen()) {
+    ///     console.log('Asset is frozen');
+    /// }
+    /// ```
+    #[wasm_bindgen(js_name = isFrozen)]
+    pub fn is_frozen(&self) -> bool {
+        self.inner.frozen
     }
 
     /// Gets the number of auditors associated with this asset.

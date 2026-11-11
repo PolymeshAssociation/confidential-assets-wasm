@@ -245,6 +245,46 @@ impl PolymeshClient {
         Ok(())
     }
 
+    /// Give a signer's identity the default DART role claims (development/test chains only).
+    ///
+    /// The confidential-assets pallet requires asset creators, auditors and mediators to hold
+    /// `KnowYourCustomer(Custom("DART:<Role>"))` from a trusted issuer. `Alice` issues the claims,
+    /// which only works where Alice's identity is a trusted issuer, as on the development chain.
+    /// Elsewhere the transaction fails or the claims are ignored. On other chains the trusted
+    /// issuer calls `PolymeshSigner.addConfidentialRoleClaims`. If `requiredClaims(Mediator)` is
+    /// unset on chain, mediators are checked against `requiredClaims(Auditor)`, so they need the
+    /// `"Auditor"` claim.
+    ///
+    /// # Arguments
+    /// * `signer` - An onboarded signer whose identity receives the claims.
+    /// * `roles` - Any of `"AssetCreator"`, `"Auditor"` and `"Mediator"`.
+    ///
+    /// # Errors
+    /// * Throws if the signer has no identity, a role is unknown, or the transaction fails.
+    ///
+    /// # Example
+    /// ```javascript
+    /// await client.onboardSigner(issuer);
+    /// await client.onboardConfidentialRoles(issuer, ["AssetCreator"]);
+    /// ```
+    #[wasm_bindgen(js_name = onboardConfidentialRoles)]
+    pub async fn onboard_confidential_roles(
+        &self,
+        signer: &PolymeshSigner,
+        roles: Vec<String>,
+    ) -> Result<(), JsValue> {
+        let did = signer.get_did().await?.ok_or_else(|| {
+            JsValue::from_str("Signer has no identity. Call `onboardSigner` first.")
+        })?;
+        let scopes = signer::role_claim_scopes(&roles)?;
+        let mut alice = PolymeshSigner::alice(&self.api, self.finalize);
+        alice
+            .add_custom_kyc_claims(did, scopes)
+            .await
+            .map_err(|e| JsValue::from_str(&format!("Failed to add role claims: {}", e)))?;
+        Ok(())
+    }
+
     /// Get the identity of a given account public key, if any.
     ///
     /// This method queries the blockchain to find the Polymesh identity (DID) associated
@@ -340,9 +380,23 @@ impl PolymeshClient {
             .ok_or_else(|| {
                 JsValue::from_str(&format!("No DART asset found for Asset ID {}", asset_id))
             })?;
+        let frozen = self
+            .api
+            .query()
+            .confidential_assets()
+            .asset_frozen(asset_id)
+            .await
+            .map_err(|e| {
+                JsValue::from_str(&format!(
+                    "Failed to query frozen status for Asset ID {}: {}",
+                    asset_id, e
+                ))
+            })?
+            .is_some();
         Ok(AssetState {
             inner: NativeAssetState {
                 asset_id,
+                frozen,
                 keys: scale_convert(&keys),
             },
         })

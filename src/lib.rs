@@ -137,16 +137,16 @@ pub fn bytes_to_jsvalue(bytes: &[u8]) -> JsValue {
 /// Convert `JsValue` to `Balance`
 ///
 /// Accepts:
-/// - JavaScript number (e.g., `1000`)
+/// - JavaScript number up to `Number.MAX_SAFE_INTEGER` (e.g., `1000`)
 /// - JavaScript BigInt (e.g., `1000n`)
 /// - Decimal string (e.g., `"1000"`)
 /// - Hex string with 0x prefix (e.g., `"0x3e8"`)
 pub fn jsvalue_to_balance(value: &JsValue) -> Result<Balance, JsValue> {
     // Try as number first
     if let Some(num) = value.as_f64() {
-        if num < 0.0 || num > u64::MAX as f64 || num.fract() != 0.0 {
+        if num < 0.0 || num > js_sys::Number::MAX_SAFE_INTEGER || num.fract() != 0.0 {
             return Err(JsValue::from_str(
-                "Balance number must be a non-negative integer within u64 range",
+                "Balance number must be a non-negative integer no greater than Number.MAX_SAFE_INTEGER. Use a BigInt for larger values",
             ));
         }
         return Ok(num as u64);
@@ -155,9 +155,6 @@ pub fn jsvalue_to_balance(value: &JsValue) -> Result<Balance, JsValue> {
     // Try as BigInt
     if let Ok(bigint) = js_sys::BigInt::new(value) {
         let bigint_str = format!("{}", bigint);
-
-        log::info!("Convert JS BigInt to string: '{bigint_str}'");
-
         return bigint_str
             .parse::<u64>()
             .map_err(|e| JsValue::from_str(&format!("BigInt out of range for u64: {}", e)));

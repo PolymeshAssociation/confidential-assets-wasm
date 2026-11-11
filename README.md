@@ -4,6 +4,8 @@ WebAssembly bindings for Polymesh DART (Decentralized, Anonymous and Regulation-
 
 This package provides JavaScript/TypeScript bindings for the Polymesh DART protocol, enabling privacy-preserving asset transfers with zero-knowledge proofs in web browsers and Node.js environments.
 
+This release targets [`polymesh-dart` `dart-v1.0.0`](https://github.com/PolymeshAssociation/polymesh-dart/tree/dart-v1.0.0) and a chain running the DART v1 confidential-assets pallet. See [MIGRATION.md](MIGRATION.md) for the changes from the DART v0.1 release.
+
 ## Features
 
 - **Account Management**: Generate and manage DART account keys
@@ -39,6 +41,14 @@ This library focuses on **zero-knowledge proof generation** for confidential tra
 
 The core proof generation APIs (AccountKeys, AssetState, SettlementBuilder, etc.) work independently and are the primary focus of this library.
 
+### Role Claims
+
+The DART v1 chain only lets an identity create a confidential asset, or be named as its auditor or mediator, if the identity holds the matching claim from a trusted claim issuer. 
+The default claims are `KnowYourCustomer(Custom("DART:AssetCreator"))`, `KnowYourCustomer(Custom("DART:Auditor"))` and `KnowYourCustomer(Custom("DART:Mediator"))`. 
+Without them, asset creation fails with `MissingRequiredClaim`. Each role's required claim and trusted issuers are stored on chain in `confidentialAssets.requiredClaims(role)`, and Root changes them with `setRequiredClaim` and `removeRequiredClaim`. If `requiredClaims(Mediator)` is unset, mediators are checked against `requiredClaims(Auditor)`, so they need the `DART:Auditor` claim.
+
+The trusted issuer adds the claims with `PolymeshSigner.addConfidentialRoleClaims(did, roles)`, signed with its own key. On the development chain, where Alice is the trusted issuer, `PolymeshClient.onboardConfidentialRoles(signer, roles)` has Alice add them to the signer's identity. On other chains `onboardConfidentialRoles` fails or adds claims the chain ignores.
+
 ## Usage
 
 ### Browser (ES Modules)
@@ -59,24 +69,24 @@ const accountKeys = new AccountKeys(seed);
 // Get public keys
 const publicKeys = accountKeys.publicKeys();
 console.log('Public keys:', publicKeys.toJson());
-
-// Export keys as bytes
-const keyBytes = accountKeys.toBytes();
-console.log('Key bytes length:', keyBytes.length);
 ```
 
 ### Node.js
 
 ```javascript
-const { AccountKeys, generateRandomSeed } = require('@polymesh/dart-wasm');
+const { AccountKeys, MasterSeed, generateRandomSeed } = require('@polymesh/dart-wasm');
 
-// Generate account keys
+// Keys from a random 32-byte seed
 const seed = generateRandomSeed();
-const accountKeys = AccountKeys.fromSeed("my-secret-seed");
+const accountKeys = new AccountKeys(seed);
 const publicKeys = accountKeys.publicKeys();
 
 console.log('Account public key:', publicKeys.accountPublicKey().toJson());
 console.log('Encryption public key:', publicKeys.encryptionPublicKey().toJson());
+
+// Several accounts from one master seed (at least 32 bytes)
+const masterSeed = new MasterSeed('0x' + generateRandomSeed());
+const account0 = masterSeed.deriveAccountKeys("m/44'/595'/0'/0/0");
 ```
 
 ### TypeScript
@@ -101,8 +111,10 @@ const pubKeys: AccountPublicKeys = keys.publicKeys();
 
 ### Prerequisites
 
-- Rust (latest stable)
+- Rust (latest stable) with the `wasm32-unknown-unknown` target (`rustup target add wasm32-unknown-unknown`)
 - wasm-pack (`cargo install wasm-pack`)
+
+On Apple Silicon, if `wasm-pack` fails with `bad CPU type in executable`, the installed binary is an x86_64 build. Reinstall it with `cargo install --force wasm-pack`.
 
 ### Build
 
@@ -121,7 +133,69 @@ The built packages will be in:
 - `pkg-web/` - For web browsers (ES modules)
 - `pkg-node/` - For Node.js
 
+`./build_with_rust_client.sh` builds the same targets with `PolymeshClient` and `PolymeshSigner`. That build generates its chain API from the metadata of a running node at `POLYMESH_NODE_URL` (default `ws://localhost:9944`), which must run the DART v1 runtime. See [Integration tests](#integration-tests-against-a-local-chain) for starting one.
+
+## Testing
+
+### Browser tests
+
+`tests/wasm_tests.rs` runs in headless Firefox through `wasm-pack test`. It needs Firefox and `geckodriver`:
+
+```bash
+cargo install geckodriver
+```
+
+```bash
+npm test
+```
+
+`npm test` runs `wasm-pack test --headless --firefox`. To use Chrome instead, install a `chromedriver` that matches the installed Chrome version and run:
+
+```bash
+wasm-pack test --headless --chrome
+```
+
+Without `--headless`, `wasm-pack test` serves the tests at a printed URL to open in any browser.
+
+### Integration tests against a local chain
+
+The Node.js examples in `examples/` run full flows (account and asset registration, minting, settlement, affirmations, claims) against a local development chain.
+
+1. Build and start a Polymesh node from the [`confidential_assets_dart-v1.0.0`](https://github.com/PolymeshAssociation/Polymesh/tree/confidential_assets_dart-v1.0.0) branch:
+
+   ```bash
+   cargo build --release
+   ```
+
+   ```bash
+   ./target/release/polymesh --dev --tmp
+   ```
+
+2. With the node running, build the package with `PolymeshClient`:
+
+   ```bash
+   ./build_with_rust_client.sh
+   ```
+
+3. Install the WebSocket dependency the examples load, and run them:
+
+   ```bash
+   npm install --no-save ws
+   ```
+
+   ```bash
+   node examples/node-example.js
+   ```
+
+   ```bash
+   node examples/node-example-multi-leg.js
+   ```
+
+The examples onboard their own identities and role claims, using Alice as the trusted claim issuer. `examples/node-example-keys.js` needs no chain.
+
 ## API Documentation
+
+The generated `polymesh_dart_wasm.d.ts` in each built package is the complete reference. This section covers the main types.
 
 ### Key Management
 
@@ -133,16 +207,27 @@ Represents an account's private keys.
 
 - `new AccountKeys(seedHex: string)` - Create from 64-character hex seed
 - `fromSeed(seed: string)` - Create from any string (will be hashed)
-- `fromBytes(bytes: Uint8Array)` - Import from SCALE-encoded bytes
-- `toBytes(): Uint8Array` - Export as SCALE-encoded bytes
 - `publicKeys(): AccountPublicKeys` - Get corresponding public keys
+- `encryptionKeyPair(): EncryptionKeyPair` - Get the encryption key pair, used to decrypt legs as an auditor or mediator
+- `registerAccountProof(did)` - Generate an `AccountRegistrationProof`
+- `registerAccountAssetProof(assetId: number, did)` - Generate an `AccountAssetRegistration` (proof and initial `AccountAssetState`)
+- `mediatorAffirmationProof(settlementRef, legId, legEnc, accept, assetId, amount)` - Generate a `MediatorAffirmationProof`
+
+`AccountKeys` has no export. Persist the seed and recreate the keys from it.
+
+#### `MasterSeed`
+Derives several `AccountKeys` from one seed.
+
+- `new MasterSeed(seed: string)` - Create from a seed of at least 32 bytes (`0x`-prefixed hex, or a string of at least 32 bytes)
+- `deriveAccountKeys(path: string): AccountKeys` - Derive keys for a path (e.g. `"m/44'/595'/0'/0/0"`)
 
 #### `AccountPublicKeys`
 Represents an account's public keys.
 
+- `new AccountPublicKeys(keys)` - Create from bytes, hex or a JS object
 - `fromBytes(bytes: Uint8Array)` - Import from bytes
 - `toBytes(): Uint8Array` - Export as bytes
-- `accountPublicKey(): AccountPublicKey` - Get account public key
+- `accountPublicKey(): AccountPublicKey` - Get account's affirmation public key
 - `encryptionPublicKey(): EncryptionPublicKey` - Get encryption public key
 
 ### Account State
@@ -153,10 +238,11 @@ Represents the confidential state of an account for a specific asset.
 - `fromBytes(bytes: Uint8Array)` - Import from SCALE-encoded bytes
 - `toBytes(): Uint8Array` - Export as SCALE-encoded bytes
 - `assetId(): number` - Get the asset ID
-- `balance(): number` - Get current balance
-- `leafIndex(): number` - Get the leaf index in the account tree (after committing)
-- `commitPendingState(leafIndex: number)` - Commit pending state after on-chain transaction
-- `getProof(): Uint8Array` - Get current proof state
+- `balance()` - Get current balance
+- `leafIndex(): bigint` - Get the leaf index in the account tree (after committing)
+- `hasPendingState(): boolean` - Whether a generated proof's state change is not yet committed
+- `commitPendingState(leafIndex: bigint)` - Commit pending state after on-chain transaction
+- `assetMintingProof`, `senderAffirmProof`, `receiverAffirmProof`, `receiverClaimProof`, `senderCounterUpdateProof`, `senderRevertProof` - Generate the proofs that update this state
 
 #### `AccountState`
 Represents account commitment stored in the account tree.
@@ -164,22 +250,23 @@ Represents account commitment stored in the account tree.
 - `fromBytes(bytes: Uint8Array)` - Import from SCALE-encoded bytes
 - `toBytes(): Uint8Array` - Export as SCALE-encoded bytes
 - `assetId(): number` - Get asset ID
-- `balance(): number` - Get balance
-- `counter(): number` - Get transaction counter
+- `balance()` - Get balance
+- `counter(): bigint` - Get transaction counter
 
 ### Asset Management
 
 #### `AssetState`
 Represents a confidential asset's state, including mediators and auditors.
 
-- `new AssetState(assetId: number, mediators: Array, auditors: Array)` - Create new asset state
-  - Automatically converts chain data (Uint8Array, hex strings, or EncryptionPublicKey objects)
-  - Perfect for data from Polkadot.js queries
+- `new AssetState(assetId: number, keys)` - Create from the chain's `confidentialAssets.keys(assetId)` value
+  - `keys` is the SCALE bytes of that value (`Uint8Array` or hex string), or an object `{ encKeys: [...], mediators: [...] }` of hex strings or bytes, where `encKeys` are the auditor and mediator encryption public keys and `mediators` are the mediators' account public keys
+  - `isFrozen()` is `false`. Use `PolymeshClient.getAssetState(assetId)` to also read the frozen status
 - `fromBytes(bytes: Uint8Array)` - Import from SCALE-encoded bytes
 - `toBytes(): Uint8Array` - Export as SCALE-encoded bytes
 - `assetId(): number` - Get asset ID
+- `isFrozen(): boolean` - Whether the asset is frozen. The chain rejects new settlements for a frozen asset
 - `mediatorCount(): number` - Get number of mediators
-- `auditorCount(): number` - Get number of auditors
+- `auditorCount(): number` - Get number of encryption keys (auditors and mediators)
 
 ### Settlement Operations
 
@@ -194,7 +281,7 @@ Builds a confidential settlement with multiple transfer legs.
 #### `LegBuilder`
 Represents a single transfer leg in a settlement.
 
-- `new LegBuilder(senderKeys: AccountKeys, receiverKeys: AccountPublicKeys, assetState: AssetState, amount: BigInt)` - Create leg
+- `new LegBuilder(sender: AccountPublicKeys, receiver: AccountPublicKeys, assetState: AssetState, amount: bigint)` - Create leg
 - Handles encryption of transfer details for mediators and auditors
 
 #### `SettlementProof`
@@ -202,16 +289,32 @@ The zero-knowledge proof for a settlement.
 
 - `fromBytes(bytes: Uint8Array)` - Import from bytes
 - `toBytes(): Uint8Array` - Export as bytes
-- `fromHex(hex: string)` - Import from hex string
-- `toHex(): string` - Export as hex string
+- `getEncryptedLegs(): SettlementLegsEncrypted` - Get the encrypted legs
+- `getLegCount(): number`, `getMemo()`, `getBlockNumber(): number`
+
+#### `SettlementLegEncrypted` / `SettlementLegsEncrypted`
+An encrypted settlement leg, and all encrypted legs of a settlement.
+
+- `tryDecrypt(keys: AccountKeys)` - Decrypt as the sender or receiver
+- `SettlementLegEncrypted.tryDecryptAsMediatorOrAuditor(encryptionKey: EncryptionKeyPair, maxAssetId?, affirmationKey?, maxAmount?)` - Decrypt as an auditor or mediator
+- `SettlementLegsEncrypted.tryDecryptAsMediatorOrAuditor(encryptionKey: EncryptionKeyPair, affirmationKey?, maxAmount?)` - Same, for all legs
+
+Without `affirmationKey`, the decrypted role is `Auditor`. A mediator passes its account public key (`AccountPublicKey`, hex string or `Uint8Array`) to be identified as `Mediator`:
+
+```javascript
+const legs = settlementLegs.tryDecryptAsMediatorOrAuditor(
+  mediatorKeys.encryptionKeyPair(),
+  mediatorKeys.publicKeys().accountPublicKey(),
+);
+```
 
 #### Proof Types
-
-All proof types support serialization:
 
 All proof types support:
 - `fromBytes(bytes: Uint8Array)` - Import from bytes
 - `toBytes(): Uint8Array` - Export as bytes
+
+All except `AccountRegistrationProof` also support:
 - `fromHex(hex: string)` - Import from hex
 - `toHex(): string` - Export as hex
 
@@ -223,33 +326,35 @@ Available proofs:
 - `ReceiverAffirmationProof` - Receiver affirmation for a settlement leg
 - `ReceiverClaimProof` - Claim received tokens
 - `SenderCounterUpdateProof` - Update sender's counter after transaction
-- `SenderReversalProof` - Reverse a failed settlement
+- `SenderRevertAffirmationProof` - Reverse a failed settlement
 - `MediatorAffirmationProof` - Mediator affirmation for a settlement
 - `SettlementProof` - Complete settlement with multiple legs
 
 ## Examples
 
 See the `examples/` directory for complete working examples:
-- `basic-keys.html` - Key generation and management
-- `node-example.js` - Node.js usage with PolymeshClient
+- `basic-keys.html` - Key generation and management in the browser
+- `node-example-keys.js` - Key generation, asset state and registration proofs, no chain needed
+- `node-example.js` - Single-leg settlement with PolymeshClient
+- `node-example-multi-leg.js` - Multi-leg settlement with PolymeshClient
+- `node-example-account-leaf-path-and-root.js`, `node-example-asset-leaf-path-and-root.js` - Curve tree leaf paths
 
 ## Using with Polkadot.js (Without PolymeshClient)
 
 For most production use cases, you'll want to use Polkadot.js for chain queries and transactions. Here's how to integrate:
 
 ```javascript
-import { ApiPromise, WsProvider } from '@polkadot/api';
+import { ApiPromise, WsProvider, Keyring } from '@polkadot/api';
 import { 
   AccountKeys, 
   AssetState, 
-  SettlementBuilder,
-  LegBuilder,
   generateRandomSeed 
 } from '@polymesh/dart-wasm';
 
 // Connect to chain using Polkadot.js
 const provider = new WsProvider('ws://localhost:9944');
 const api = await ApiPromise.create({ provider });
+const signer = new Keyring({ type: 'sr25519' }).addFromUri('//Alice');
 
 // Generate DART keys for confidential transactions
 const dartKeys = new AccountKeys(generateRandomSeed());
@@ -257,22 +362,18 @@ const publicKeys = dartKeys.publicKeys();
 
 // Query asset state from chain
 const assetId = 1;
-const assetDetails = await api.query.confidentialAssets.dartAssetDetails(assetId);
-const assetState = new AssetState(
-  assetId,
-  assetDetails.mediators,  // Automatically converted from chain format
-  assetDetails.auditors
-);
+const assetKeys = await api.query.confidentialAssets.keys(assetId);
+const assetState = new AssetState(assetId, assetKeys.unwrap().toU8a());
 
 // Generate proof for registration
 const accountDid = '0x1234...'; // Your account DID
-const proof = dartKeys.registerAccountAssetProof(assetId, accountDid);
+const registration = dartKeys.registerAccountAssetProof(assetId, accountDid);
 
 // Submit transaction using Polkadot.js
-const extrinsic = api.tx.confidentialAssets.registerAccountAsset(
-  proof.getProof().toBytes()
+const extrinsic = api.tx.confidentialAssets.registerAccountAssets(
+  registration.getBatchedProofBytes()
 );
-const hash = await extrinsic.signAndSend(keyring.getPair(signer));
+const hash = await extrinsic.signAndSend(signer);
 console.log('Transaction hash:', hash);
 ```
 

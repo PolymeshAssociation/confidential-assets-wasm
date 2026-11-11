@@ -85,8 +85,9 @@
         <div>
             <button id="generateSeed">Generate Random Seed</button>
             <button id="createKeys" disabled>Create Account Keys</button>
-            <button id="exportKeys" disabled>Export Keys</button>
-            <button id="importKeys" disabled>Re-import Keys</button>
+            <button id="recreateKeys" disabled>Recreate Keys from Seed</button>
+            <button id="exportKeys" disabled>Export Public Keys</button>
+            <button id="importKeys" disabled>Re-import Public Keys</button>
         </div>
 
         <div class="label">Status:</div>
@@ -104,13 +105,14 @@
         <div class="label">Encryption Public Key JSON:</div>
         <div id="encryptionPubKey" class="output"></div>
 
-        <div class="label">Exported Key Bytes (hex):</div>
+        <div class="label">Exported Public Key Bytes (hex):</div>
         <div id="keyBytes" class="output"></div>
     </div>
 
     <script type="module">
         import init, {
             AccountKeys,
+            AccountPublicKeys,
             generateRandomSeed
         } from '../pkg-web/polymesh_dart_wasm.js';
 
@@ -171,16 +173,34 @@
                 updateOutput('encryptionPubKey', encryptionPubKey.toJson());
 
                 updateStatus('✓ Account keys created!', 'success');
+                document.getElementById('recreateKeys').disabled = false;
                 document.getElementById('exportKeys').disabled = false;
             } catch (error) {
                 updateStatus('✗ Error creating keys: ' + error.message, 'error');
             }
         });
 
-        // Export keys
+        // Recreate keys from the seed. AccountKeys has no export, so the seed is what gets persisted.
+        document.getElementById('recreateKeys').addEventListener('click', () => {
+            try {
+                const recreatedKeys = new AccountKeys(currentSeed);
+                const originalJson = currentKeys.publicKeys().toJson();
+                const recreatedJson = recreatedKeys.publicKeys().toJson();
+
+                if (originalJson === recreatedJson) {
+                    updateStatus('✓ Keys recreated from the seed! They match the original keys.', 'success');
+                } else {
+                    updateStatus('✗ Warning: Recreated keys do not match original keys!', 'error');
+                }
+            } catch (error) {
+                updateStatus('✗ Error recreating keys: ' + error.message, 'error');
+            }
+        });
+
+        // Export public keys
         document.getElementById('exportKeys').addEventListener('click', () => {
             try {
-                exportedBytes = currentKeys.toBytes();
+                exportedBytes = currentKeys.publicKeys().toBytes();
 
                 // Convert to hex for display
                 const hexString = Array.from(exportedBytes)
@@ -188,30 +208,29 @@
                     .join('');
 
                 updateOutput('keyBytes', hexString + '\n\nLength: ' + exportedBytes.length + ' bytes');
-                updateStatus('✓ Keys exported as bytes!', 'success');
+                updateStatus('✓ Public keys exported as bytes!', 'success');
                 document.getElementById('importKeys').disabled = false;
             } catch (error) {
                 updateStatus('✗ Error exporting keys: ' + error.message, 'error');
             }
         });
 
-        // Re-import keys
+        // Re-import public keys
         document.getElementById('importKeys').addEventListener('click', () => {
             try {
-                const reimportedKeys = AccountKeys.fromBytes(exportedBytes);
-                const reimportedPublicKeys = reimportedKeys.publicKeys();
+                const reimportedPublicKeys = AccountPublicKeys.fromBytes(exportedBytes);
 
                 // Verify they match
                 const originalJson = currentKeys.publicKeys().toJson();
                 const reimportedJson = reimportedPublicKeys.toJson();
 
                 if (originalJson === reimportedJson) {
-                    updateStatus('✓ Keys successfully re-imported and verified! They match the original keys.', 'success');
+                    updateStatus('✓ Public keys successfully re-imported and verified! They match the original keys.', 'success');
                 } else {
-                    updateStatus('✗ Warning: Re-imported keys do not match original keys!', 'error');
+                    updateStatus('✗ Warning: Re-imported public keys do not match original keys!', 'error');
                 }
             } catch (error) {
-                updateStatus('✗ Error importing keys: ' + error.message, 'error');
+                updateStatus('✗ Error importing public keys: ' + error.message, 'error');
             }
         });
 
