@@ -186,12 +186,21 @@ pub fn balance_to_jsvalue(balance: Balance) -> JsValue {
     JsValue::from_f64(balance as f64)
 }
 
-/// Initialize the WASM module. This should be called once when loading the module.
-/// It sets up panic hooks for better error messages in the browser console.
+/// Initialize the WASM module: sets up the console logger and the panic hook for better
+/// error messages in the browser console.
+///
+/// It runs automatically when the module loads (`#[wasm_bindgen(start)]`) and is also
+/// exported, so callers may call it again. It is idempotent: later calls do nothing.
+/// Without this guard a second call re-registered the global logger, and `wasm_logger`
+/// reported "attempted to set a logger after the logging system was already initialized"
+/// with `console.error`.
 #[wasm_bindgen(start)]
 pub fn init() {
-    wasm_logger::init(wasm_logger::Config::default());
-    utils::set_panic_hook();
+    static INIT: std::sync::Once = std::sync::Once::new();
+    INIT.call_once(|| {
+        wasm_logger::init(wasm_logger::Config::default());
+        utils::set_panic_hook();
+    });
 }
 
 /// Get the version of the polymesh-dart-wasm library
