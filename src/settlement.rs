@@ -748,6 +748,56 @@ impl SettlementLegEncrypted {
             Ok(None)
         }
     }
+
+    /// Returns the mediator index of `affirmation_key` in this leg, without decrypting the leg.
+    ///
+    /// Each mediator entry of the leg is checked with `encryption_key` for an encryption of
+    /// `affirmation_key`. This works for any account, including a sender or receiver that also
+    /// mediates the leg, for which `tryDecrypt` reports only the participant role.
+    ///
+    /// # Arguments
+    /// * `encryption_key` - The encryption key pair of the account.
+    /// * `affirmation_key` - The account public key of the account.
+    ///
+    /// # Returns
+    /// The index the chain records the mediator's affirmation under
+    /// (`legAffirmationStatus(settlementRef, legId, Mediator(index))`), or `undefined` when the
+    /// account is not a mediator of the leg.
+    ///
+    /// # Errors
+    /// * Throws an error if the leg or `affirmation_key` cannot be decoded.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const index = encryptedLeg.mediatorIndex(
+    ///     accountKeys.encryptionKeyPair(), accountKeys.publicKeys().accountPublicKey());
+    /// if (index !== undefined) {
+    ///     const status = await api.query.confidentialAssets.legAffirmationStatus(
+    ///         settlementRef, legId, { Mediator: index });
+    /// }
+    /// ```
+    #[wasm_bindgen(js_name = mediatorIndex)]
+    pub fn mediator_index(
+        &self,
+        encryption_key: &EncryptionKeyPair,
+        affirmation_key: &AccountPublicKey,
+    ) -> Result<Option<u8>, JsValue> {
+        let leg_enc = self
+            .inner
+            .decode()
+            .map_err(|e| JsValue::from_str(&format!("Failed to decode encrypted leg: {}", e)))?;
+        let affirmation_key = affirmation_key
+            .inner
+            .get_affine()
+            .map_err(|e| JsValue::from_str(&format!("Failed to decode affirmation key: {}", e)))?;
+        let sk_enc = &encryption_key.inner.secret.inner().0;
+        let index = leg_enc.mediators.as_ref().and_then(|mediators| {
+            mediators
+                .iter()
+                .position(|m| m.find_key_index(sk_enc, &affirmation_key).is_ok())
+        });
+        Ok(index.map(|i| i as u8))
+    }
 }
 
 /// Represents a decrypted settlement leg with visible transfer details.
@@ -979,7 +1029,6 @@ fn optional_balance(value: Option<JsValue>) -> Result<Option<Balance>, JsValue> 
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1136,6 +1185,53 @@ mod tests {
         let as_receiver = leg.try_decrypt(&receiver).unwrap().unwrap();
         assert_eq!(as_receiver.role, "Receiver");
         assert_eq!(as_receiver.role_index, None);
+    }
+
+    #[wasm_bindgen_test]
+    fn mediator_index_matches_decrypted_role_index() {
+        let first = new_keys();
+        let second = new_keys();
+        let other = new_keys();
+        let leg = encrypt_leg(
+            &new_keys(),
+            &new_keys(),
+            &asset_with_mediators(&[&first, &second]),
+            100,
+        );
+
+        for mediator in [&first, &second] {
+            let index = leg
+                .mediator_index(
+                    &mediator.encryption_key_pair(),
+                    &mediator.public_keys().account_public_key(),
+                )
+                .unwrap();
+            assert!(index.is_some());
+            assert_eq!(index, decrypt_as_mediator(&leg, mediator).role_index);
+        }
+
+        let index = leg
+            .mediator_index(
+                &other.encryption_key_pair(),
+                &other.public_keys().account_public_key(),
+            )
+            .unwrap();
+        assert_eq!(index, None);
+    }
+
+    #[wasm_bindgen_test]
+    fn mediator_index_of_sender_that_mediates() {
+        let sender = new_keys();
+        let leg = encrypt_leg(&sender, &new_keys(), &asset_with_mediator(&sender), 100);
+
+        assert_eq!(leg.try_decrypt(&sender).unwrap().unwrap().role, "Sender");
+        let index = leg
+            .mediator_index(
+                &sender.encryption_key_pair(),
+                &sender.public_keys().account_public_key(),
+            )
+            .unwrap();
+        assert_eq!(index, Some(0));
     }
 
     #[wasm_bindgen_test]
