@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/PolymeshAssociation/polymesh-dart-wasm/schemas/dart-key-file-v1.schema.json",
+  "$id": "https://github.com/PolymeshAssociation/confidential-assets-wasm/blob/main/schemas/dart-key-file-v1.schema.json",
   "title": "DART key file, version 1",
   "description": "One DART confidential account's secret keys, encrypted with a password (scrypt + XSalsa20-Poly1305, the polkadot.js keyring JSON encoding version 3). Normative text: docs/KEY_FILE_FORMAT.md. This schema checks the JSON structure only; a reader MUST also perform every check in the specification's reader procedure.",
   "type": "object",

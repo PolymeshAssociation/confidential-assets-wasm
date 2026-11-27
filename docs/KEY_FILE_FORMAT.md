@@ -32,28 +32,155 @@ RFC 2119 and RFC 8174 when, and only when, they appear in capitals.
   behaviour of polkadot.js `base64Encode`/`base64Decode` (appendix A).
 - The SCALE codec is the Parity SCALE codec. Every SCALE type used here is fixed-size, so its
   encoding is the concatenation of its fields in declaration order, with no length prefixes.
+- **Text to bytes.** A string (a mnemonic, a passphrase, a password) is turned into bytes with the
+  [WHATWG UTF-8 encoder](https://encoding.spec.whatwg.org/#utf-8-encoder): a JavaScript string's
+  lone surrogate (an unpaired U+D800 to U+DFFF code unit) is encoded as U+FFFD (`EF BF BD`), and
+  every other code point as UTF-8. This is what `TextEncoder`, wasm-bindgen's string arguments
+  and polkadot.js `stringToU8a` do. So the passphrase or password `"\uD800"` is the same as
+  `"�"`. A host whose strings can't hold lone surrogates (such as Rust's `String`) is
+  unaffected.
+- `NFKD(s)` is Unicode Normalization Form KD of `s` (Unicode Standard Annex #15).
 
 ## 2. Mnemonic and derivation
 
-These constants are the ones implemented by `src/keys.rs` (`generateMnemonic`,
-`MasterSeed.fromMnemonic`, `DART_KEY_PATH_TEMPLATE`, `MasterSeed.deriveAccountKeys`). They are
-frozen forever: changing any of them would make existing users' keys impossible to re-derive.
-`tests/vectors/derivation-v1.json` holds the reference vectors.
+This section is frozen forever, for every version: changing anything in it would make existing
+users' keys impossible to re-derive. It is implemented by `src/keys.rs` (`generateMnemonic`,
+`MasterSeed.fromMnemonic`, `DART_KEY_PATH_TEMPLATE`, `MasterSeed.deriveAccountKeys`), which
+delegates to the `bip39` crate 2.2.2 and to DART `polymesh-dart` 1.0.1 (tag `dart-v1.0.1`). The
+text below is normative on its own; the crates are the cross-check (appendix A).
+`tests/vectors/derivation-v1.json` holds the reference vectors: for each mnemonic, passphrase and
+account, the 64-byte `seed` of section 2.1, the public keys, and the complete raw secret key
+`secretKeyHex` (section 3), so an implementation can check every intermediate value.
 
-1. **Mnemonic:** BIP-39 with the English wordlist, 12, 15, 18, 21 or 24 words. Writers SHOULD
-   generate 24 words. Implementations MUST verify the BIP-39 checksum and MUST reject words outside
-   the English wordlist.
-2. **Seed:** the BIP-39 seed: both the mnemonic and the optional passphrase are NFKD-normalised, then
-   `seed = PBKDF2-HMAC-SHA512(password = mnemonic, salt = "mnemonic" ‖ passphrase, iterations = 2048,
-   dkLen = 64)`. The passphrase defaults to the empty string.
-3. **Master seed:** the DART `MasterSeed` is created with the 64-byte BIP-39 seed as its input key
-   material (IKM). (`src/keys.rs` passes it to DART `MasterSeed::from_seed` as `0x` + its hex, which
-   DART hex-decodes back to the same 64 bytes.)
-4. **Account path:** account `account` is derived with DART `MasterSeed::derive_account_keys` at the
-   path string `m/44'/595'/{account}'/0/0`, where `{account}` is the decimal integer `account`
-   without leading zeros and `0 ≤ account ≤ 2^31 − 1`. The path string's ASCII bytes are DART's
-   derivation input; it is not BIP-32 derivation. The DART crate version this was frozen against is
-   `polymesh-dart` 1.0.1 (tag `dart-v1.0.1`).
+Strings passed in from a host are first encoded as UTF-8 with the WHATWG UTF-8 encoder (section
+1), so a lone surrogate becomes U+FFFD.
+
+### 2.1 Mnemonic and seed
+
+1. **Wordlist and length.** A mnemonic is BIP-39 with the English wordlist (2048 lowercase ASCII
+   words), of 12, 15, 18, 21 or 24 words. Writers SHOULD generate 24 words, and MUST output the
+   words in lowercase, separated by single U+0020 spaces.
+2. **Parsing.** A reader parses a mnemonic `phrase` as follows, and MUST reject it if any step
+   fails:
+   1. Normalise `phrase` to Unicode NFKD.
+   2. Split the result on runs of characters with the Unicode `White_Space` property; leading and
+      trailing white space is ignored. The pieces are the words.
+   3. The number of words MUST be 12, 15, 18, 21 or 24.
+   4. Every word MUST exactly equal (byte for byte) a word of the English wordlist. A reader MAY
+      lowercase its input before this lookup; that doesn't change the seed, because the seed is
+      computed from the wordlist's spelling (item 3 below). This implementation doesn't
+      lowercase: it rejects `ABANDON`.
+   5. The BIP-39 checksum MUST be valid: with each word's 11-bit wordlist index concatenated
+      most significant bit first, the first `32 · n / 3` bits (for `n` words) are the entropy
+      `ENT`, and the last `n / 3` bits MUST equal the first `n / 3` bits of `SHA-256(ENT)`.
+3. **Seed.** With the canonical words of step 2 (their wordlist spelling) and the passphrase
+   (the empty string if none is given):
+
+   ```text
+   password = UTF-8(word_1 ‖ " " ‖ word_2 ‖ " " ‖ … ‖ " " ‖ word_n)    (exactly one U+0020 between words)
+   salt     = UTF-8("mnemonic" ‖ NFKD(passphrase))
+   seed     = PBKDF2-HMAC-SHA512(password, salt, iterations = 2048, dkLen = 64)    (RFC 8018)
+   ```
+
+   The passphrase is NFKD-normalised and otherwise used as it is: it is not trimmed, and its case
+   is kept.
+
+### 2.2 Secret keys
+
+Account `account`, an integer with `0 ≤ account ≤ 2^31 − 1`, has the path string
+
+```text
+path = "m/44'/595'/" ‖ decimal(account) ‖ "'/0/0"
+```
+
+where `decimal(account)` is the decimal integer without leading zeros (`0` for zero), and the path
+string is ASCII. It is a label: this is not BIP-32 derivation, and nothing else is derived along
+the path.
+
+Its two secret keys, `acct.secret` (the account, or signing, key) and `enc.secret` (the
+encryption key), are scalars of the Pallas scalar field, the integers modulo the Pallas group
+order
+
+```text
+r = 0x40000000000000000000000000000000224698fc0994a8dd8c46eb2100000001
+  = 28948022309329048855892746252171976963363056481941647379679742748393362948097    (255 bits)
+```
+
+They are computed with KeyGen of
+[draft-irtf-cfrg-bls-signature-05](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-bls-signature-05#section-2.3)
+section 2.3, with hash `H = SHA-256` (so HKDF is HKDF-SHA-256, RFC 5869), the group order `r`
+above, and:
+
+| Input                    | Value                                                        |
+|--------------------------|--------------------------------------------------------------|
+| `IKM`                    | the 64-byte `seed` of section 2.1                            |
+| `salt` for `acct.secret` | the 24 ASCII bytes `POLYMESH-DART-V1-SIG-KEY`                |
+| `salt` for `enc.secret`  | the 24 ASCII bytes `POLYMESH-DART-V1-ENC-KEY`                |
+| `key_info`               | `u32le(len(path)) ‖ path ‖ u16le(0) ‖ 0x00`                  |
+| `L`                      | `ceil((3 · ceil(log2(r))) / 16) = ceil(765 / 16) = 48`       |
+
+In `key_info`, `len(path)` is the path's length in bytes, `u16le(0)` is the two bytes `00 00` (DART's
+key-generation counter, a `u16`, always 0 here), and the final `0x00` is the one-byte index of the
+first field element DART's `hkdf_to_field` produces (`I2OSP(0, 1)`). For example, account 0 has
+`len(path) = 17` and
+
+```text
+key_info = 11 00 00 00 ‖ "m/44'/595'/0'/0/0" ‖ 00 00 ‖ 00      (24 bytes)
+```
+
+KeyGen is, for each of the two salts:
+
+```text
+loop:
+    PRK = HKDF-Extract(salt, IKM ‖ 0x00)
+    OKM = HKDF-Expand(PRK, key_info ‖ I2OSP(L, 2), L)        (I2OSP(48, 2) = 00 30)
+    SK  = OS2IP(OKM) mod r                                   (OKM read as a big-endian integer)
+    if SK ≠ 0: return SK
+    salt = SHA-256(salt)
+```
+
+The first iteration uses the salt as given; it is hashed only if `SK` is 0, which happens with
+negligible probability. Both keys use the same `IKM` and `key_info`; only the salt differs.
+
+### 2.3 Public keys
+
+```text
+acct.public = acct.secret · sig_key_gen
+enc.public  = enc.secret · enc_key_gen
+```
+
+is scalar multiplication on the Pallas curve `y² = x³ + 5` over the field of prime
+`p = 0x40000000000000000000000000000000224698fc094cf91b992d30ed00000001`. The generators are DART's
+`dart_gens().sig_key_gen()` and `dart_gens().enc_key_gen()`. Their compressed encodings (section
+3.1) are:
+
+```text
+sig_key_gen = 0x74535e5be4948ecb1dd353a96d6bd21421f97f037fcde676fa71f1a472fae3a3
+enc_key_gen = 0x387134452cc97b763175d92d570f042b6fab62398f25cdcf515119c8e68320a0
+```
+
+These two constants are normative, and an implementation MAY hard-code them. They are defined
+as:
+
+```text
+sig_key_gen = hash_to_pallas(DST = "polymesh-dart-generators", msg = " : sig_key_gen")
+enc_key_gen = hash_to_pallas(DST = "polymesh-dart-generators", msg = " : enc_key_gen")
+```
+
+(both strings ASCII; each message starts with a space), where `hash_to_pallas` is the RFC 9380
+`hash_to_curve` construction (random-oracle encoding: two field elements, each mapped to the
+curve, added; Pallas has cofactor 1) with:
+
+- `hash_to_field` using `expand_message_xmd` with SHA-256, `k = 128`, so each field element takes
+  `ceil((255 + 128) / 8) = 48` bytes, read big-endian and reduced modulo `p`; **except** that
+  `Z_pad` is 48 zero bytes (the per-element length) instead of RFC 9380's 64 (SHA-256's block
+  size). This is arkworks `LegacyFieldHasher<Sha256, 128>`, the ark-ff 0.4/0.5 behaviour, so the
+  points are not RFC 9380 test-vector compatible;
+- `map_to_curve`: the simplified SWU map to the 3-isogenous curve `y² = x³ + A'x + 1265` with
+  `Z = −13`, followed by the 3-isogeny to Pallas, with the constants of Zcash `pasta_curves`
+  (arkworks `WBMap<PallasConfig>`).
+
+Appendix A gives the source of each constant.
 
 ## 3. Raw secret-key hex
 
@@ -77,19 +204,30 @@ The total is exactly **128 bytes**, so the hex form is exactly 258 characters. T
 key encodings are the same bytes that `AccountPublicKey.toBytes()` and
 `EncryptionPublicKey.toBytes()` return.
 
-Decoders MUST reject input that isn't exactly 128 bytes, and MUST reject a point or scalar that
-DART's decoder rejects (for example, a scalar not below the Pallas group order). Readers MAY accept
-an upper-case `0X` prefix, upper-case digits or a missing prefix in the raw hex form, as
-`AccountKeys.fromSecretKeyHex` does; writers MUST NOT produce them.
+A scalar is its integer value below `r`, as 32 bytes little-endian. A point `(x, y)` is `x` (below
+`p`) as 32 bytes little-endian, with bit 7 of the last byte set if `y > p − y` (as integers) and
+bit 6 set only for the point at infinity, whose only accepted encoding is 31 zero bytes followed
+by `0x40`.
+
+Decoders MUST reject input that isn't exactly 128 bytes, and MUST reject a scalar that isn't
+below `r`. Readers MAY accept an upper-case `0X` prefix, upper-case digits or a missing prefix in
+the raw hex form, as `AccountKeys.fromSecretKeyHex` does; writers MUST NOT produce them.
 
 ### 3.2 Consistency of imported secret keys
 
-A decoder can't yet check that `enc.secret` and `acct.secret` correspond to `enc.public` and
-`acct.public`: DART doesn't expose a public helper to recompute a public key from a secret key.
-Until it does, an imported raw secret key, or the plaintext of a key file, is trusted to be
-internally consistent. Implementations SHOULD add this check once DART provides the helper. The key
-file's public-key check (section 7, step 10) compares the file's `public` member with the public
-halves of the plaintext; it does not prove the secrets match.
+An `AccountKeys` is **valid** only if all of the following hold. A decoder MUST check them, and
+MUST reject the input otherwise:
+
+1. `enc.public` and `acct.public` are valid compressed Pallas points: `x` is below `p`, `x³ + 5`
+   is a square modulo `p`, and the flag bits are as described in section 3.1. (Pallas has
+   cofactor 1, so every curve point is in the prime-order group.)
+2. `enc.secret` and `acct.secret` are non-zero. (Section 2.2 never produces 0.)
+3. `acct.public = acct.secret · sig_key_gen` and `enc.public = enc.secret · enc_key_gen`, with the
+   generators of section 2.3.
+
+This applies to every import: `AccountKeys.fromSecretKeyHex` rejects such input with
+`Invalid secret key: …`, and the key file reader rejects it at step 9 (section 7) as a corrupted
+file. Every key derived by section 2 is valid.
 
 ## 4. Key file overview
 
@@ -100,7 +238,9 @@ bytes, polkadot.js `jsonDecrypt({ encoded, encoding }, password)` returns the pl
 
 Files SHOULD use the extension `.json` and the media type `application/json`.
 
-Example (values abbreviated; `encoded` is always 284 characters):
+Example. `encoded` is elided here (it is always 284 characters); the public keys are the real
+ones of account 0 of the `abandon … about` mnemonic with an empty passphrase, the first entry of
+`tests/vectors/derivation-v1.json`:
 
 ```json
 {
@@ -127,10 +267,24 @@ The top-level value MUST be a JSON object with exactly the members below. A read
 file with a missing member, a member of the wrong JSON type, or a top-level member not listed here.
 Member order is not significant.
 
+The document MUST be valid JSON (RFC 8259) encoded as UTF-8, and in addition:
+
+- **Valid Unicode.** Writers MUST NOT emit a string that isn't valid Unicode, such as one holding
+  the escape of a lone surrogate (`"\ud800"`). Readers MAY reject such a string; this
+  implementation does (its JSON parser, serde_json, refuses it), reporting an invalid file.
+- **Unique member names.** Writers MUST NOT emit an object with two members of the same name.
+  Readers SHOULD reject such an object; a reader that doesn't MUST use the last occurrence of
+  the name, as JavaScript's `JSON.parse` does. This implementation uses the last occurrence (its
+  JSON parser keeps it), so that it reads such a file exactly as a `JSON.parse`-based reader such
+  as polkadot.js does.
+- **Numbers.** A member whose value is specified as a number equal to an integer accepts any JSON
+  number with that value: `1`, `1.0` and `1e0` are the same number, as in JSON Schema. Writers
+  SHOULD write integers without a fraction or exponent.
+
 | Member       | Type    | Required | Value                                                                    |
 |--------------|---------|----------|--------------------------------------------------------------------------|
 | `type`       | string  | yes      | exactly `"dart-key-file"`                                                |
-| `version`    | number  | yes      | exactly the integer `1`                                                  |
+| `version`    | number  | yes      | a JSON number equal to `1` (`1.0` is the same number, as in JSON Schema) |
 | `name`       | string  | yes      | a label for the account; MAY be empty                                    |
 | `public`     | object  | yes      | section 5.1                                                              |
 | `encoded`    | string  | yes      | base64 of the encrypted payload, section 6                               |
@@ -146,7 +300,9 @@ An object with exactly two members, both REQUIRED, each a hex string of exactly 
 - `encryption`: the encryption public key, equal to plaintext bytes `[0..32]`.
 
 They let a program show and index the account without the password. A reader MUST reject the file if
-they don't match the decrypted plaintext (section 7, step 10).
+they don't match the decrypted plaintext (section 7, step 10). The plaintext's public keys must in
+turn match its secret keys (section 3.2, checked at step 9), so a file that opens has `public`
+equal to the keys derived from its secrets.
 
 ### 5.2 `encoding`
 
@@ -173,7 +329,7 @@ NOT base security decisions on them.
 
 | Member           | Type    | Required | Value                                                                  |
 |------------------|---------|----------|------------------------------------------------------------------------|
-| `created`        | integer | yes      | when the file was written, in Unix milliseconds, `0 ≤ created ≤ 2^53 − 1` |
+| `created`        | number  | yes      | when the file was written, in Unix milliseconds: a JSON number equal to an integer with `0 ≤ created ≤ 2^53 − 1` (`1.0` is the same number as `1`, as in JSON Schema) |
 | `derivationPath` | string  | no       | the path the keys were derived at, section 5.3.1                       |
 
 `meta` is **open**: a reader MUST ignore members it doesn't know, and a writer MAY add members
@@ -197,8 +353,9 @@ alone determines the keys.
 
 ### 6.1 Password
 
-The password is a non-empty Unicode string. Its bytes are its UTF-8 encoding, with **no** Unicode
-normalisation. Writers MUST refuse an empty password.
+The password is a non-empty string. Its bytes are its UTF-8 encoding by the WHATWG UTF-8 encoder
+(section 1: a lone surrogate becomes U+FFFD), with **no** Unicode normalisation. Writers MUST
+refuse an empty password.
 
 > **polkadot.js interop:** `jsonEncrypt`, `jsonDecrypt` and `scryptEncode` convert a *string*
 > password with `u8aToU8a`, which hex-decodes any string matching `/^0x[0-9a-fA-F]*$/` of even
@@ -270,13 +427,17 @@ one `=`. With the default parameters, bytes 32 to 43 are `00 00 02 00 01 00 00 0
 
 A reader MUST perform these steps in order, and MUST reject the file, returning no key material,
 when any step fails. It SHOULD report steps 1 to 6 as an invalid or unsupported file, step 8 as a
-wrong password or corrupted file, and steps 9 and 10 as a corrupted file.
+wrong password or corrupted file, step 9 as a corrupted file, and step 10 as a mismatch between
+`public` and the encrypted keys. This implementation reports them as `Invalid key file: …`
+(steps 1, 5 and 6), `Unsupported key file` (steps 2, 3, 4 and 7), `Invalid password or corrupted
+key file` (step 8), `Corrupted key file: the decrypted keys are invalid` (step 9) and `Key file
+public keys don't match its encrypted keys` (step 10).
 
 1. Parse the document as JSON. The top-level value MUST be an object.
 2. `type` MUST be `"dart-key-file"`. (A reader SHOULD check this first, to tell a DART key file from
    other JSON, such as a polkadot.js account file.)
-3. `version` MUST be the integer `1`. A reader MUST reject any other value, and MUST NOT try to
-   interpret a file of an unknown version.
+3. `version` MUST be a JSON number equal to `1` (`1.0` is the same number, section 5). A reader
+   MUST reject any other value, and MUST NOT try to interpret a file of an unknown version.
 4. `encoding.version`, `encoding.content` and `encoding.type` MUST have exactly the values in
    section 5.2. A reader MUST reject any other value, and MUST NOT guess.
 5. Every other member MUST satisfy section 5: required members present, no unknown top-level,
@@ -287,10 +448,13 @@ wrong password or corrupted file, and steps 9 and 10 as a corrupted file.
    `nonce` (section 6.3). Opening MUST fail, and the reader MUST reject the file, if the tag doesn't
    verify.
 9. Decode the 128-byte plaintext as a SCALE `AccountKeys` (section 3.1). Decoding MUST consume
-   every byte and MUST succeed.
+   every byte and MUST succeed, and the keys MUST be valid (section 3.2): both public keys valid
+   points, both secret keys non-zero, and each public key equal to its secret key times its
+   generator. An authenticated plaintext that fails this check is a corrupted file, not a
+   mismatch of `public`.
 10. Compare plaintext bytes `[64..96]` with `public.account` and bytes `[0..32]` with
-    `public.encryption`. Both MUST be equal. (This doesn't prove that the secrets match the public
-    keys; see section 3.2.)
+    `public.encryption`. Both MUST be equal. With step 9, this proves `public` holds the public
+    keys of the file's secret keys.
 
 Readers SHOULD zero the password, `DK`, `key` and the plaintext once they're no longer needed.
 
@@ -368,3 +532,38 @@ Every polkadot.js statement above was checked against `@polkadot/util-crypto` **
 | `AccountKeys` field order                         | `src/bp/keys.rs` lines 383–386, 112–116, 210–214                 |
 | Public keys are 32-byte `CompressedAffine`        | `src/bp/encode.rs` lines 242, 263–265                            |
 | Secret keys are 32-byte compressed scalars        | `src/bp/encode.rs` lines 58–100, 401, 405                        |
+
+The derivation of section 2 and the consistency rule of section 3.2 were checked against the crates
+this implementation builds with: `bip39` 2.2.2; `polymesh-dart` and `polymesh-dart-bp` 1.0.1
+(commit `022cee3`); `polymesh-dart-common` (same commit); the Polymesh `curve-trees` fork at tag
+`dart-v1.0.1` (commit `778bb7b`); and the Polymesh `arkworks-algebra` fork at tag `dart-v1.0.1`
+(commit `2380877`). The test `vector_secrets_follow_the_spec_keygen_construction` in
+`tests/wasm_keys_derivation.rs` recomputes every vector from the text of section 2 with generic
+HKDF, PBKDF2 and NFKD implementations, and checks the result against DART.
+
+| Statement                                                  | Source                                                     |
+|------------------------------------------------------------|------------------------------------------------------------|
+| NFKD of phrase and passphrase                              | `src/keys.rs` `nfkd`, `MasterSeed::from_mnemonic`; `bip39` `src/lib.rs` lines 198–203 |
+| Words split on Unicode white space, exact wordlist match   | `bip39` `src/lib.rs` lines 437–451 (`split_whitespace`, `find_word`); `src/language/mod.rs` lines 171–176 (binary search, no case folding) |
+| 12, 15, 18, 21 or 24 words                                 | `bip39` `src/lib.rs` lines 682–684                         |
+| Checksum: first `n / 3` bits of SHA-256 of the entropy     | `bip39` `src/lib.rs` lines 460–476                         |
+| PBKDF2 password = words joined by one space                | `bip39` `src/pbkdf2.rs` lines 20–29                        |
+| Salt = `"mnemonic"` ‖ passphrase, 2048 rounds, 64 bytes     | `bip39` `src/pbkdf2.rs` lines 3, 111–112; `src/lib.rs` lines 551–557 |
+| The seed is the IKM, as `0x` + hex, decoded back           | `src/keys.rs` `from_seed_bytes`; DART `src/bp/keys.rs` lines 345–357 |
+| Path bytes, counter 0, `sig_key_gen`/`enc_key_gen`         | DART `src/bp/keys.rs` lines 360–376                        |
+| `key_info` = `u32le(len(path))` ‖ path ‖ counter           | `dart-bp/src/auth_proofs/keys.rs` lines 419–423 (`extend_with_len`), 452–465 (`derive_secret_keys`) |
+| The counter is a `u16`, little-endian                      | `dart-common/src/lib.rs` line 11 (`SkGenCounter = u16`); `dart-bp/src/auth_proofs/keys.rs` line 460 |
+| Salts `POLYMESH-DART-V1-SIG-KEY`, `POLYMESH-DART-V1-ENC-KEY` | `dart-bp/src/auth_proofs/keys.rs` lines 351, 354         |
+| `key_info` ‖ `I2OSP(i, 1)`, `i = 0`; KeyGen with SHA-256   | `dart-bp/src/auth_proofs/keys.rs` lines 362–377 (`hkdf_to_field`) |
+| KeyGen loop, `L`, `I2OSP(L, 2)`, `OS2IP mod r`, IKM ≥ 32 bytes | `dart-bp/src/auth_proofs/keys.rs` lines 379–417 (`ietf_keygen`) |
+| Pallas group order `r`                                     | `arkworks-algebra` `curves/pallas/src/fields/fr.rs` line 4 |
+| Pallas field prime `p`, curve `y² = x³ + 5`, cofactor 1    | `curves/pallas/src/fields/fq.rs` line 4; `curves/pallas/src/curves/mod.rs` lines 34–38 |
+| Public key = secret · generator                            | `dart-bp/src/auth_proofs/keys.rs` lines 93–96, 107–110     |
+| Generators: `hash_to_pallas("polymesh-dart-generators", " : sig_key_gen")`, `" : enc_key_gen"` | DART `src/bp/mod.rs` lines 263, 288–290, 488–490, 513–519 |
+| `hash_to_pallas` = `PallasConfig::hash_to_curve`           | `curve-trees` `bulletproofs/src/hash_to_curve_pasta.rs` lines 8–10 |
+| Pallas hashing: `LegacyFieldHasher<Sha256, 128>`, `WBMap`   | `arkworks-algebra` `host-hash-to-curve/src/lib.rs` lines 52–57, 81–84 |
+| Legacy `Z_pad` = per-element length (48 bytes)             | `ff/src/fields/field_hashers/mod.rs` lines 103–124, 147–156; `ff/src/fields/field_hashers/expander/mod.rs` lines 102–149 |
+| Two field elements, mapped, added, cofactor cleared        | `ec/src/hashing/map_to_curve_hasher.rs` lines 59–76        |
+| Isogenous curve `B' = 1265`, `Z = −13`, Zcash isogeny constants | `curves/pallas/src/curves/swu_iso.rs` lines 33–37, 63–64, 83–85 |
+| Point compression flags                                    | `ec/src/models/short_weierstrass/serialization_flags.rs` lines 7–14, 22–29, 70–81 |
+| A public key decodes only as a valid point; one encoding of infinity | DART `src/bp/encode.rs` lines 336–352                |
