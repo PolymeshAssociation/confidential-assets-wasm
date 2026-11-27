@@ -183,8 +183,12 @@ re-saving a file (for example after a password change) SHOULD preserve members i
 #### 5.3.1 `derivationPath`
 
 If present, it MUST have the form `m/44'/595'/{account}'/0/0` from section 2, with `{account}` a
-decimal integer from 0 to 2147483647 without leading zeros. A writer SHOULD include it when the keys
-were derived from a mnemonic and it knows the account index, and MUST omit it otherwise.
+decimal integer from 0 to 2147483647 without leading zeros. A reader MUST reject a file whose
+`derivationPath` is present but doesn't have this form, including an out-of-range account such as
+`2147483648`. The schema's `derivationPath` pattern encodes exactly this rule, range included, so a
+reader that validates against the schema and a reader that follows this text accept the same
+files. A writer SHOULD include it when the keys were derived from a mnemonic and it knows the
+account index, and MUST omit it otherwise.
 
 It is informational only. A reader MUST NOT use it to derive, check or modify keys; the plaintext
 alone determines the keys.
