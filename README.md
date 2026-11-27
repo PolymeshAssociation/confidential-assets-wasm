@@ -54,17 +54,16 @@ The trusted issuer adds the claims with `PolymeshSigner.addConfidentialRoleClaim
 ### Browser (ES Modules)
 
 ```javascript
-import init, { AccountKeys, generateRandomSeed } from '@polymesh/dart-wasm';
+import init, { MasterSeed, generateMnemonic } from '@polymesh/dart-wasm';
 
 // Initialize the WASM module
 await init();
 
-// Generate a random seed for account keys
-const seed = generateRandomSeed();
-console.log('Seed:', seed);
+// Generate a BIP-39 mnemonic; the user backs it up
+const mnemonic = generateMnemonic();
 
-// Create account keys from the seed
-const accountKeys = new AccountKeys(seed);
+// Derive account 0's keys from the mnemonic
+const accountKeys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
 
 // Get public keys
 const publicKeys = accountKeys.publicKeys();
@@ -74,19 +73,16 @@ console.log('Public keys:', publicKeys.toJson());
 ### Node.js
 
 ```javascript
-const { AccountKeys, MasterSeed, generateRandomSeed } = require('@polymesh/dart-wasm');
+const { MasterSeed, generateMnemonic } = require('@polymesh/dart-wasm');
 
-// Keys from a random 32-byte seed
-const seed = generateRandomSeed();
-const accountKeys = new AccountKeys(seed);
+// Several accounts from one BIP-39 mnemonic
+const masterSeed = MasterSeed.fromMnemonic(generateMnemonic());
+const accountKeys = masterSeed.deriveAccountKeys(0);
+const account1 = masterSeed.deriveAccountKeys(1);
 const publicKeys = accountKeys.publicKeys();
 
 console.log('Account public key:', publicKeys.accountPublicKey().toJson());
 console.log('Encryption public key:', publicKeys.encryptionPublicKey().toJson());
-
-// Several accounts from one master seed (at least 32 bytes)
-const masterSeed = new MasterSeed('0x' + generateRandomSeed());
-const account0 = masterSeed.deriveAccountKeys("m/44'/595'/0'/0/0");
 ```
 
 ### TypeScript
@@ -96,14 +92,15 @@ import init, {
   AccountKeys, 
   AccountPublicKeys,
   AssetState,
-  generateRandomSeed 
+  MasterSeed,
+  generateMnemonic
 } from '@polymesh/dart-wasm';
 
 await init();
 
 // Generate keys with full type safety
-const seed: string = generateRandomSeed();
-const keys: AccountKeys = new AccountKeys(seed);
+const mnemonic: string = generateMnemonic();
+const keys: AccountKeys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
 const pubKeys: AccountPublicKeys = keys.publicKeys();
 ```
 
@@ -199,27 +196,28 @@ The generated `polymesh_dart_wasm.d.ts` in each built package is the complete re
 
 ### Key Management
 
-#### `generateRandomSeed(): string`
-Generates a cryptographically secure random seed (32 bytes, hex-encoded).
+#### `generateMnemonic(words?: number): string`
+Generates a random BIP-39 mnemonic (English wordlist) of 12, 15, 18, 21 or 24 words (default 24).
 
 #### `AccountKeys`
-Represents an account's private keys.
+Represents an account's private keys. Get them from `MasterSeed.deriveAccountKeys`; there is no constructor.
 
-- `new AccountKeys(seedHex: string)` - Create from 64-character hex seed
-- `fromSeed(seed: string)` - Create from any string (will be hashed)
+- `toSecretKeyHex(): string` - The private key (`0x` + SCALE `AccountKeys`). Treat it like a seed.
+- `AccountKeys.fromSecretKeyHex(hex: string)` - Restore keys from `toSecretKeyHex()` output. Rejects keys whose public keys don't match their secret keys
 - `publicKeys(): AccountPublicKeys` - Get corresponding public keys
 - `encryptionKeyPair(): EncryptionKeyPair` - Get the encryption key pair, used to decrypt legs as an auditor or mediator
 - `registerAccountProof(did)` - Generate an `AccountRegistrationProof`
 - `registerAccountAssetProof(assetId: number, did)` - Generate an `AccountAssetRegistration` (proof and initial `AccountAssetState`)
 - `mediatorAffirmationProof(settlementRef, legId, legEnc, accept, assetId, amount)` - Generate a `MediatorAffirmationProof`
 
-`AccountKeys` has no export. Persist the seed and recreate the keys from it.
-
 #### `MasterSeed`
-Derives several `AccountKeys` from one seed.
+Derives an account's `AccountKeys` from a BIP-39 mnemonic. This is the only way to create keys.
 
-- `new MasterSeed(seed: string)` - Create from a seed of at least 32 bytes (`0x`-prefixed hex, or a string of at least 32 bytes)
-- `deriveAccountKeys(path: string): AccountKeys` - Derive keys for a path (e.g. `"m/44'/595'/0'/0/0"`)
+- `MasterSeed.fromMnemonic(phrase: string, passphrase?: string)` - Create from a BIP-39 mnemonic (checksum validated, NFKD-normalised)
+- `MasterSeed.fromBytes(seed: Uint8Array)` - Create from raw seed bytes (at least 32), for tests and advanced hosts
+- `deriveAccountKeys(account: number): AccountKeys` - Derive account `account`'s keys (an integer from 0 to 2^31 - 1), at path `m/44'/595'/{account}'/0/0`
+- `MasterSeed.DART_KEY_PATH_TEMPLATE` - The path template, `m/44'/595'/{account}'/0/0`
+- `clear()` - Zero the seed
 
 #### `AccountPublicKeys`
 Represents an account's public keys.
@@ -347,9 +345,8 @@ For most production use cases, you'll want to use Polkadot.js for chain queries 
 ```javascript
 import { ApiPromise, WsProvider, Keyring } from '@polkadot/api';
 import { 
-  AccountKeys, 
-  AssetState, 
-  generateRandomSeed 
+  AssetState,
+  MasterSeed
 } from '@polymesh/dart-wasm';
 
 // Connect to chain using Polkadot.js
@@ -357,8 +354,8 @@ const provider = new WsProvider('ws://localhost:9944');
 const api = await ApiPromise.create({ provider });
 const signer = new Keyring({ type: 'sr25519' }).addFromUri('//Alice');
 
-// Generate DART keys for confidential transactions
-const dartKeys = new AccountKeys(generateRandomSeed());
+// Derive DART keys for confidential transactions from the user's BIP-39 mnemonic
+const dartKeys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
 const publicKeys = dartKeys.publicKeys();
 
 // Query asset state from chain

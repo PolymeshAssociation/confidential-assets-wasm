@@ -1048,13 +1048,17 @@ fn optional_balance(value: Option<JsValue>) -> Result<Option<Balance>, JsValue> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{generate_random_seed, MasterSeed};
+    use crate::MasterSeed;
+    use rand::RngCore as _;
     use wasm_bindgen_test::*;
 
-    wasm_bindgen_test_configure!(run_in_browser);
-
     fn new_keys() -> AccountKeys {
-        AccountKeys::new(&generate_random_seed().unwrap()).unwrap()
+        let mut seed = [0u8; 32];
+        rand::rngs::OsRng.fill_bytes(&mut seed);
+        MasterSeed::from_bytes(seed.to_vec())
+            .unwrap()
+            .derive_account_keys(0.0)
+            .unwrap()
     }
 
     /// Builds `AssetState` 7 with `mediators` as its mediators, from the `{ encKeys, mediators }`
@@ -1125,9 +1129,9 @@ mod tests {
 
     #[wasm_bindgen_test]
     fn master_seed_rejects_short_seed() {
-        assert!(MasterSeed::new("0x0102").is_err());
-        assert!(MasterSeed::new("too short").is_err());
-        assert!(MasterSeed::new(&format!("0x{}", generate_random_seed().unwrap())).is_ok());
+        assert!(MasterSeed::from_bytes(vec![1, 2]).is_err());
+        assert!(MasterSeed::from_bytes(vec![7u8; 31]).is_err());
+        assert!(MasterSeed::from_bytes(vec![7u8; 32]).is_ok());
     }
 
     #[wasm_bindgen_test]

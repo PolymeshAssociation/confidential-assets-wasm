@@ -5,14 +5,20 @@
 Object.assign(global, { WebSocket: require('ws') });
 
 const {
-    AccountKeys,
-    generateRandomSeed,
+    MasterSeed,
     AssetState,
     PolymeshClient,
     PolymeshSigner,
     SettlementBuilder,
     LegBuilder,
 } = require('../pkg-node/polymesh_dart_wasm.js');
+
+// Deterministic test keys, so re-runs reuse the accounts already registered on the dev chain.
+// This is the well-known BIP-39 test mnemonic: never use it for real funds.
+const TEST_MNEMONIC = 'abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
+const testSeed = MasterSeed.fromMnemonic(TEST_MNEMONIC);
+// Account index of each test role.
+const ISSUER = 0, MEDIATOR = 1, INVESTOR = 2;
 
 console.log('=== Polymesh DART WASM Node.js Example ===\n');
 
@@ -80,9 +86,9 @@ async function main() {
     console.log('   ✓ Role claims granted');
     console.log('');
 
-    // Create account keys from seed
+    // Derive account keys from the test mnemonic
     console.log('Creating account keys for test issuer...');
-    const issuerKeys = AccountKeys.fromSeed("Test-Issuer-seed");
+    const issuerKeys = testSeed.deriveAccountKeys(ISSUER);
     const issuerPublicKeys = issuerKeys.publicKeys();
     console.log('   Public keys JSON:');
     console.log('  ', issuerPublicKeys.toJson());
@@ -104,7 +110,7 @@ async function main() {
 
     // Create account keys for test investor
     console.log('Creating account keys for test investor...');
-    const investorKeys = AccountKeys.fromSeed("Test-Investor-seed");
+    const investorKeys = testSeed.deriveAccountKeys(INVESTOR);
     const investorPublicKeys = investorKeys.publicKeys();
     console.log('   Public keys JSON:');
     console.log('  ', investorPublicKeys.toJson());
@@ -127,7 +133,7 @@ async function main() {
 
     // Create account keys for test mediator
     console.log('Creating account keys for test mediator...');
-    const mediatorKeys = AccountKeys.fromSeed("Test-Mediator-seed");
+    const mediatorKeys = testSeed.deriveAccountKeys(MEDIATOR);
     const mediatorEncryptionKey = mediatorKeys.encryptionKeyPair();
     const mediatorPublicKeys = mediatorKeys.publicKeys();
     const mediatorEncryptionPublicKey = mediatorPublicKeys.encryptionPublicKey();

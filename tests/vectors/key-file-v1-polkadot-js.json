@@ -1,0 +1,30 @@
+{
+  "description": "A DART key file whose `encoded`/`encoding` were made by @polkadot/util-crypto 13.5.9 `jsonEncrypt(secretKeyHex bytes, [\"dart-account-keys\", \"scale-v1\"], stringToU8a(password))` (scripts/key-file-interop/interop.mjs --emit-fixture). Keys: the abandon...about mnemonic, passphrase \"TREZOR\", account 0.",
+  "password": "polkadot.js fixture 🔐",
+  "secretKeyHex": "0xfa5952aa85a449a946b51ae88794438a14bceca1a2ec5ac35ebafa2d7c35fc8a64763cb83b900c17c8acee3289aa910a1b27df0d3119a8a33040454ca4146a22aee05c233ec6c37f2a3844de64e79e50979f7abdda04304ce188eefb43f57b2f0e014cb27d64bd6a10d4d316966de6d70963d622cc24bac453842d15c73fdc3f",
+  "file": {
+    "type": "dart-key-file",
+    "version": 1,
+    "name": "polkadot.js jsonEncrypt",
+    "public": {
+      "account": "0xaee05c233ec6c37f2a3844de64e79e50979f7abdda04304ce188eefb43f57b2f",
+      "encryption": "0xfa5952aa85a449a946b51ae88794438a14bceca1a2ec5ac35ebafa2d7c35fc8a"
+    },
+    "encoded": "StCrTvwTPWxLf8lVWmFvzuUPznA3o9z8E992jAqKY8wAAAIAAQAAAAgAAADWyWU28daR2soHgONO34hARPTJV1BNTh6A8Kzk6x7j8jqeQezLMl6lmZfO+zReBuH/+k2FTUCFNMBAaAmEXDEoJH6lkrEr3w80ITTGvHi/r3vq0l6HkN0iskChjmtRdNkAjSIW1lA+ZZ88Gn34pGld5sgJJJdaYch/ENtCPLf/APBW3FUAEUZaQ5LzZR7HodHOinG/XBKfgv1xP34qQ1BfHbGqjef46F4=",
+    "encoding": {
+      "content": [
+        "dart-account-keys",
+        "scale-v1"
+      ],
+      "type": [
+        "scrypt",
+        "xsalsa20-poly1305"
+      ],
+      "version": "3"
+    },
+    "meta": {
+      "created": 1795813897159,
+      "derivationPath": "m/44'/595'/0'/0/0"
+    }
+  }
+}

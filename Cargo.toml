@@ -111,13 +111,27 @@ thiserror = "1.0"
 codec = { package = "parity-scale-codec", version = "3.2.2", default-features = false }
 bounded-collections = { version = "0.3.2", default-features = false }
 
-rand_core = { version = "0.6", default-features = false }
-rand_chacha = { version = "0.3", default-features = false }
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
 zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
+# BIP-39 mnemonics. `std` brings NFKD normalisation.
+bip39 = { version = "2.2.2", default-features = false, features = ["std", "zeroize"] }
+# DART key file (docs/KEY_FILE_FORMAT.md): scrypt + XSalsa20-Poly1305, base64 payload.
+scrypt = { version = "0.11.0", default-features = false }
+crypto_secretbox = { version = "0.1.1", default-features = false, features = ["salsa20"] }
+base64 = { version = "0.22.1", default-features = false, features = ["alloc"] }
+# Recomputing public keys from secret keys (the AccountKeys consistency check).
+ark-ec = { version = "0.5", default-features = false }
+ark-pallas = { version = "0.5", default-features = false, features = ["curve"] }
+ark-serialize = { version = "0.5", default-features = false }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
+# Recomputing the derivation from the specification's construction (tests/wasm_keys_derivation.rs).
+hkdf = "0.12.4"
+sha2 = "0.10.9"
+pbkdf2 = { version = "0.12.2", default-features = false, features = ["hmac"] }
+unicode-normalization = "0.1.25"
+ark-ff = { version = "0.5", default-features = false }
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

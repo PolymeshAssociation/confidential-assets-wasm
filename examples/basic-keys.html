@@ -83,17 +83,17 @@
         <h1>Polymesh DART WASM - Key Generation Example</h1>
 
         <div>
-            <button id="generateSeed">Generate Random Seed</button>
+            <button id="generateSeed">Generate Mnemonic</button>
             <button id="createKeys" disabled>Create Account Keys</button>
-            <button id="recreateKeys" disabled>Recreate Keys from Seed</button>
+            <button id="recreateKeys" disabled>Recreate Keys from Mnemonic</button>
             <button id="exportKeys" disabled>Export Public Keys</button>
             <button id="importKeys" disabled>Re-import Public Keys</button>
         </div>
 
         <div class="label">Status:</div>
-        <div id="status" class="output">Click "Generate Random Seed" to begin...</div>
+        <div id="status" class="output">Click "Generate Mnemonic" to begin...</div>
 
-        <div class="label">Generated Seed (32 bytes hex):</div>
+        <div class="label">Generated Mnemonic (24 words):</div>
         <div id="seed" class="output"></div>
 
         <div class="label">Public Keys JSON:</div>
@@ -111,13 +111,13 @@
 
     <script type="module">
         import init, {
-            AccountKeys,
             AccountPublicKeys,
-            generateRandomSeed
+            MasterSeed,
+            generateMnemonic
         } from '../pkg-web/polymesh_dart_wasm.js';
 
         let wasmInitialized = false;
-        let currentSeed = null;
+        let currentMnemonic = null;
         let currentKeys = null;
         let exportedBytes = null;
 
@@ -143,10 +143,10 @@
             document.getElementById(id).textContent = content;
         }
 
-        // Generate random seed
+        // Generate a random mnemonic
         document.getElementById('generateSeed').addEventListener('click', () => {
             try {
-                currentSeed = generateRandomSeed();
+                currentMnemonic = generateMnemonic();
                 currentKeys = null;
                 exportedBytes = null;
                 for (const id of ['recreateKeys', 'exportKeys', 'importKeys']) {
@@ -155,18 +155,18 @@
                 for (const id of ['publicKeys', 'accountPubKey', 'encryptionPubKey', 'keyBytes']) {
                     updateOutput(id, '');
                 }
-                updateOutput('seed', currentSeed);
-                updateStatus('✓ Random seed generated!', 'success');
+                updateOutput('seed', currentMnemonic);
+                updateStatus('✓ Random mnemonic generated!', 'success');
                 document.getElementById('createKeys').disabled = false;
             } catch (error) {
-                updateStatus('✗ Error generating seed: ' + error.message, 'error');
+                updateStatus('✗ Error generating mnemonic: ' + error.message, 'error');
             }
         });
 
         // Create account keys
         document.getElementById('createKeys').addEventListener('click', () => {
             try {
-                currentKeys = new AccountKeys(currentSeed);
+                currentKeys = MasterSeed.fromMnemonic(currentMnemonic).deriveAccountKeys(0);
                 const publicKeys = currentKeys.publicKeys();
 
                 // Display public keys
@@ -188,15 +188,15 @@
             }
         });
 
-        // Recreate keys from the seed. AccountKeys has no export, so the seed is what gets persisted.
+        // Recreate keys from the mnemonic, which is what a wallet backs up.
         document.getElementById('recreateKeys').addEventListener('click', () => {
             try {
-                const recreatedKeys = new AccountKeys(currentSeed);
+                const recreatedKeys = MasterSeed.fromMnemonic(currentMnemonic).deriveAccountKeys(0);
                 const originalJson = currentKeys.publicKeys().toJson();
                 const recreatedJson = recreatedKeys.publicKeys().toJson();
 
                 if (originalJson === recreatedJson) {
-                    updateStatus('✓ Keys recreated from the seed! They match the original keys.', 'success');
+                    updateStatus('✓ Keys recreated from the mnemonic! They match the original keys.', 'success');
                 } else {
                     updateStatus('✗ Warning: Recreated keys do not match original keys!', 'error');
                 }

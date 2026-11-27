@@ -178,7 +178,8 @@ import {
   AssetState, 
   SettlementBuilder,
   LegBuilder,
-  generateRandomSeed 
+  MasterSeed,
+  generateMnemonic
 } from '@polymesh/dart-wasm';
 import { Keyring } from '@polkadot/keyring';
 
@@ -188,8 +189,8 @@ async function main() {
   const api = await ApiPromise.create({ provider });
 
   // 2. Generate or load DART keys (independent of chain)
-  const dartSeed = generateRandomSeed();
-  const dartKeys = new AccountKeys(dartSeed);
+  const masterSeed = MasterSeed.fromMnemonic(generateMnemonic());
+  const dartKeys = masterSeed.deriveAccountKeys(0);
   const publicKeys = dartKeys.publicKeys();
 
   // 3. Query asset state from chain
@@ -243,10 +244,11 @@ After building, you can use PolymeshClient and PolymeshSigner:
 
 ```typescript
 import { 
-  PolymeshClient, 
-  AccountKeys, 
+  PolymeshClient,
+  AccountKeys,
   AssetState,
-  generateRandomSeed 
+  MasterSeed,
+  generateMnemonic
 } from '@polymesh/dart-wasm';
 
 async function main() {
@@ -270,10 +272,11 @@ async function main() {
   // await trustedIssuer.addConfidentialRoleClaims(issuerDid, ["AssetCreator"]);
 
   // 3. Generate DART keys
-  const dartKeys = new AccountKeys(generateRandomSeed());
+  const masterSeed = MasterSeed.fromMnemonic(generateMnemonic());
+  const dartKeys = masterSeed.deriveAccountKeys(0);
 
   console.log('Creating account keys for test mediator...');
-  const mediatorKeys = AccountKeys.fromSeed("Test-Mediator-seed");
+  const mediatorKeys = masterSeed.deriveAccountKeys(1);
   const mediatorEncryptionKey = mediatorKeys.encryptionKeyPair();
   const mediatorPublicKeys = mediatorKeys.publicKeys();
   const mediatorEncryptionPublicKey = mediatorPublicKeys.encryptionPublicKey();
@@ -346,14 +349,14 @@ export default {
 
 ```typescript
 import React, { useEffect, useState } from 'react';
-import { AccountKeys, generateRandomSeed } from '@polymesh/dart-wasm';
+import { AccountKeys, MasterSeed, generateMnemonic } from '@polymesh/dart-wasm';
 
 function DartKeyManager() {
   const [accountKeys, setAccountKeys] = useState<AccountKeys | null>(null);
 
   const generateKeys = () => {
-    const seed = generateRandomSeed();
-    const keys = new AccountKeys(seed);
+    const mnemonic = generateMnemonic();
+    const keys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
     setAccountKeys(keys);
   };
 
@@ -386,13 +389,13 @@ export default DartKeyManager;
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { AccountKeys, generateRandomSeed } from '@polymesh/dart-wasm';
+import { MasterSeed, generateMnemonic } from '@polymesh/dart-wasm';
 
 const publicKeys = ref<string | null>(null);
 
 const generateKeys = () => {
-  const seed = generateRandomSeed();
-  const keys = new AccountKeys(seed);
+  const mnemonic = generateMnemonic();
+  const keys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
   publicKeys.value = JSON.stringify({
     account: keys.publicKeys().accountPublicKey().toJson(),
     encryption: keys.publicKeys().encryptionPublicKey().toJson()
@@ -423,14 +426,14 @@ export default function DartKeysPage() {
 
 // components/DartKeyManager.tsx
 import { useEffect, useState } from 'react';
-import { AccountKeys, generateRandomSeed } from '@polymesh/dart-wasm';
+import { AccountKeys, MasterSeed, generateMnemonic } from '@polymesh/dart-wasm';
 
 export default function DartKeyManager() {
   const [keys, setKeys] = useState<AccountKeys | null>(null);
 
   const generateKeys = () => {
-    const seed = generateRandomSeed();
-    const newKeys = new AccountKeys(seed);
+    const mnemonic = generateMnemonic();
+    const newKeys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
     setKeys(newKeys);
   };
 
@@ -459,8 +462,9 @@ All WASM types provide serialization methods for flexibility:
 const bytes: Uint8Array = accountAssetState.toBytes();
 const restoredState = AccountAssetState.fromBytes(bytes);
 
-// AccountKeys has no byte export. Persist the seed and recreate the keys.
-const restoredKeys = new AccountKeys(seed);
+// AccountKeys: recreate them from the mnemonic, or export the private key (treat it like a seed)
+const restoredKeys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
+const sameKeys = AccountKeys.fromSecretKeyHex(restoredKeys.toSecretKeyHex());
 
 // Hex encoding (for display/storage/transmission)
 const hex: string = proof.toHex();
@@ -478,7 +482,7 @@ All WASM functions that can fail return a `Result<T, JsValue>` or throw errors:
 ```typescript
 // Try-catch for synchronous operations
 try {
-  const keys = new AccountKeys(invalidSeed);
+  const masterSeed = MasterSeed.fromMnemonic(invalidMnemonic);
 } catch (error) {
   console.error('Failed to create keys:', error);
 }
@@ -497,7 +501,7 @@ WASM objects are automatically garbage collected by JavaScript. For most use cas
 
 ```typescript
 // Create and use keys
-const keys = new AccountKeys(seed);
+const keys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
 const pubKeys = keys.publicKeys();
 
 // Use pubKeys...
@@ -524,7 +528,7 @@ async function ensureWasmReady() {
 
 // Use in your app
 await ensureWasmReady();
-const keys = new AccountKeys(seed);
+const keys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
 ```
 
 ### Batch Operations
@@ -533,16 +537,17 @@ When performing multiple operations, minimize JavaScript ↔ WASM boundary cross
 
 ```typescript
 // Good: All computation happens in WASM
+const masterSeed = MasterSeed.fromMnemonic(mnemonic);
 const proofs = [];
 for (let i = 0; i < 100; i++) {
-  const keys = AccountKeys.fromSeed(`seed-${i}`);
+  const keys = masterSeed.deriveAccountKeys(i);
   const proof = keys.registerAccountProof(didArray[i]);
   proofs.push(proof.toBytes());
 }
 
 // Less efficient: Multiple boundary crossings per iteration
 for (let i = 0; i < 100; i++) {
-  const keys = AccountKeys.fromSeed(`seed-${i}`);
+  const keys = masterSeed.deriveAccountKeys(i);
   const pubKeys = keys.publicKeys();
   const acctKey = pubKeys.accountPublicKey();
   const encKey = pubKeys.encryptionPublicKey();
@@ -579,7 +584,7 @@ self.onmessage = async (e) => {
   const { type, data } = e.data;
 
   if (type === 'generateProof') {
-    const keys = new AccountKeys(data.seed);
+    const keys = AccountKeys.fromSecretKeyHex(data.secretKeyHex);
     const proof = keys.registerAccountProof(data.did);
     self.postMessage({ proof: proof.toBytes() });
   }
@@ -588,17 +593,17 @@ self.onmessage = async (e) => {
 // main.ts
 const worker = new Worker(new URL('./worker.ts', import.meta.url));
 
-function generateProofInWorker(seed: string, did: string): Promise<Uint8Array> {
+function generateProofInWorker(secretKeyHex: string, did: string): Promise<Uint8Array> {
   return new Promise((resolve) => {
     worker.onmessage = (e) => {
       resolve(e.data.proof);
     };
-    worker.postMessage({ type: 'generateProof', data: { seed, did } });
+    worker.postMessage({ type: 'generateProof', data: { secretKeyHex, did } });
   });
 }
 
 // Usage
-const proof = await generateProofInWorker(mySeed, myDid);
+const proof = await generateProofInWorker(myKeys.toSecretKeyHex(), myDid);
 ```
 
 ### Bundle Size
@@ -650,13 +655,13 @@ For production browser apps, use Polkadot.js with the default build. For Node.js
 
 **Solution**: Always await `init()` before using WASM:
 ```typescript
-import init, { AccountKeys } from '@polymesh/dart-wasm';
+import init, { MasterSeed } from '@polymesh/dart-wasm';
 
 // MUST call init first
 await init();
 
 // Now safe to use
-const keys = new AccountKeys(seed);
+const keys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
 ```
 
 #### 2. "Module parse failed" or "Unexpected token"

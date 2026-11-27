@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/PolymeshAssociation/confidential-assets-wasm/blob/main/schemas/dart-key-file-v1.schema.json",
+  "title": "DART key file, version 1",
+  "description": "One DART confidential account's secret keys, encrypted with a password (scrypt + XSalsa20-Poly1305, the polkadot.js keyring JSON encoding version 3). Normative text: docs/KEY_FILE_FORMAT.md. This schema checks the JSON structure only; a reader MUST also perform every check in the specification's reader procedure.",
+  "type": "object",
+  "required": ["type", "version", "name", "public", "encoded", "encoding", "meta"],
+  "additionalProperties": false,
+  "properties": {
+    "type": {
+      "description": "Identifies the file as a DART key file.",
+      "const": "dart-key-file"
+    },
+    "version": {
+      "description": "The key file format version. Only 1 is defined.",
+      "const": 1
+    },
+    "name": {
+      "description": "A human-readable label for the account. May be empty. Not authenticated by the encryption.",
+      "type": "string"
+    },
+    "public": {
+      "description": "The account's public keys, each `0x` + lowercase hex of its 32-byte SCALE encoding. MUST equal the public keys inside the decrypted plaintext.",
+      "type": "object",
+      "required": ["account", "encryption"],
+      "additionalProperties": false,
+      "properties": {
+        "account": {
+          "description": "The account public key (DART AccountPublicKey).",
+          "$ref": "#/$defs/hex32"
+        },
+        "encryption": {
+          "description": "The encryption public key (DART EncryptionPublicKey).",
+          "$ref": "#/$defs/hex32"
+        }
+      }
+    },
+    "encoded": {
+      "description": "Standard padded base64 (RFC 4648 section 4) of salt[32] || N u32le || p u32le || r u32le || nonce[24] || tag[16] || encrypted plaintext[128]: exactly 212 bytes, so exactly 284 characters ending in a single '='. The final data character carries 2 zero padding bits, so it is one of AEIMQUYcgkosw048.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9+/]{282}[AEIMQUYcgkosw048]=$"
+    },
+    "encoding": {
+      "type": "object",
+      "required": ["content", "type", "version"],
+      "additionalProperties": false,
+      "properties": {
+        "content": {
+          "description": "The plaintext is one SCALE-encoded DART AccountKeys. Other values (including the reserved \"dart-mnemonic\") are invalid in version 1.",
+          "const": ["dart-account-keys", "scale-v1"]
+        },
+        "type": {
+          "description": "scrypt key derivation, then XSalsa20-Poly1305 (NaCl secretbox).",
+          "const": ["scrypt", "xsalsa20-poly1305"]
+        },
+        "version": {
+          "description": "The polkadot.js keyring JSON encoding version.",
+          "const": "3"
+        }
+      }
+    },
+    "meta": {
+      "description": "Unauthenticated, informational metadata. Open: readers MUST ignore members they don't know.",
+      "type": "object",
+      "required": ["created"],
+      "properties": {
+        "created": {
+          "description": "When the file was written, in Unix milliseconds.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "derivationPath": {
+          "description": "Informational only, never used to derive keys: the path the keys were derived at, m/44'/595'/{account}'/0/0 with account a decimal integer from 0 to 2147483647 without leading zeros.",
+          "type": "string",
+          "pattern": "^m/44'/595'/(0|[1-9][0-9]{0,8}|1[0-9]{9}|20[0-9]{8}|21[0-3][0-9]{7}|214[0-6][0-9]{6}|2147[0-3][0-9]{5}|21474[0-7][0-9]{4}|214748[0-2][0-9]{3}|2147483[0-5][0-9]{2}|21474836[0-3][0-9]|214748364[0-7])'/0/0$"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "hex32": {
+      "type": "string",
+      "pattern": "^0x[0-9a-f]{64}$"
+    }
+  }
+}

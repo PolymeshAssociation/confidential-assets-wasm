@@ -16,6 +16,7 @@ mod asset;
 #[cfg(feature = "polymesh-client")]
 mod client;
 mod curve_tree;
+mod key_file;
 mod keys;
 mod settlement;
 mod utils;
@@ -26,6 +27,7 @@ pub use asset::*;
 #[cfg(feature = "polymesh-client")]
 pub use client::*;
 pub use curve_tree::*;
+pub use key_file::{decrypt_key_file, encrypt_key_file, DecryptedKeyFile};
 pub use keys::*;
 pub use settlement::*;
 

@@ -1,0 +1,102 @@
+[
+  {
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "passphrase": "",
+    "account": 0,
+    "path": "m/44'/595'/0'/0/0",
+    "seed": "0x5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+    "accountPublicKey": "0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326",
+    "encryptionPublicKey": "0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327",
+    "secretKeyHex": "0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e3278e9cadcf08332f5245ec3ebdf6dd5c002a4bf6106fae9c654587f92762baa421b97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326d09ef2abfefde27d7b4c8fca90a2fff6088b5be6297fd859a9d31fbc4cb6fc19"
+  },
+  {
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "passphrase": "",
+    "account": 1,
+    "path": "m/44'/595'/1'/0/0",
+    "seed": "0x5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+    "accountPublicKey": "0x991780ddfb3e841f7c8b922657f4f7a4cf6b535fea69a4bc9a6652b2d4880e2c",
+    "encryptionPublicKey": "0xee6738be6a15a3ccc89624183b1dadeab02d6fb4746fe0b676cb876db190a41a",
+    "secretKeyHex": "0xee6738be6a15a3ccc89624183b1dadeab02d6fb4746fe0b676cb876db190a41a1b79d9e192339a9455fb94ed4c3913aabb7759e18809910959c27e8c75ebfc03991780ddfb3e841f7c8b922657f4f7a4cf6b535fea69a4bc9a6652b2d4880e2cb6e142b104be8338c3be3cdf7230d6e53dc2e139636296962b1edab6968edb0e"
+  },
+  {
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "passphrase": "",
+    "account": 2147483647,
+    "path": "m/44'/595'/2147483647'/0/0",
+    "seed": "0x5eb00bbddcf069084889a8ab9155568165f5c453ccb85e70811aaed6f6da5fc19a5ac40b389cd370d086206dec8aa6c43daea6690f20ad3d8d48b2d2ce9e38e4",
+    "accountPublicKey": "0x5fdf2e5e20fdc2dc20358f5134453a85bff12e7d922c48ba3132343931ac28b1",
+    "encryptionPublicKey": "0x4c86ce2a0dbf7079b95ab9f3ca38f35e447bf4f71fe75eb2939ba517d7dbd201",
+    "secretKeyHex": "0x4c86ce2a0dbf7079b95ab9f3ca38f35e447bf4f71fe75eb2939ba517d7dbd2019112f108cfab82b4e38c006cae1302d42e2f73fde15303844996bf86b97d09005fdf2e5e20fdc2dc20358f5134453a85bff12e7d922c48ba3132343931ac28b183338d494eeea3ccb87edeb8fda47dad416679ab820d3354282c12d051390c29"
+  },
+  {
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "passphrase": "TREZOR",
+    "account": 0,
+    "path": "m/44'/595'/0'/0/0",
+    "seed": "0xc55257c360c07c72029aebc1b53c05ed0362ada38ead3e3e9efa3708e53495531f09a6987599d18264c1e1c92f2cf141630c7a3c4ab7c81b2f001698e7463b04",
+    "accountPublicKey": "0xaee05c233ec6c37f2a3844de64e79e50979f7abdda04304ce188eefb43f57b2f",
+    "encryptionPublicKey": "0xfa5952aa85a449a946b51ae88794438a14bceca1a2ec5ac35ebafa2d7c35fc8a",
+    "secretKeyHex": "0xfa5952aa85a449a946b51ae88794438a14bceca1a2ec5ac35ebafa2d7c35fc8a64763cb83b900c17c8acee3289aa910a1b27df0d3119a8a33040454ca4146a22aee05c233ec6c37f2a3844de64e79e50979f7abdda04304ce188eefb43f57b2f0e014cb27d64bd6a10d4d316966de6d70963d622cc24bac453842d15c73fdc3f"
+  },
+  {
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "passphrase": "TREZOR",
+    "account": 1,
+    "path": "m/44'/595'/1'/0/0",
+    "seed": "0xc55257c360c07c72029aebc1b53c05ed0362ada38ead3e3e9efa3708e53495531f09a6987599d18264c1e1c92f2cf141630c7a3c4ab7c81b2f001698e7463b04",
+    "accountPublicKey": "0x456f88c907773f4bf3543e8385bb30485ea2358936dd9a0dc96a1ce622191bb4",
+    "encryptionPublicKey": "0xe96b8fbc11d3bf76a7178967805321d8b09ed012f0fe1a9b9d6cfac4eaca0f9a",
+    "secretKeyHex": "0xe96b8fbc11d3bf76a7178967805321d8b09ed012f0fe1a9b9d6cfac4eaca0f9a685369e1833b0f56e6c7c06ba172a0c85e92348b6ca638a8eef9c130e0492537456f88c907773f4bf3543e8385bb30485ea2358936dd9a0dc96a1ce622191bb423b40ef5f2ba71525d6bfab7c072a76ecef7f5c81cccc37f483c8207ea975a22"
+  },
+  {
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "passphrase": "TREZOR",
+    "account": 2147483647,
+    "path": "m/44'/595'/2147483647'/0/0",
+    "seed": "0xc55257c360c07c72029aebc1b53c05ed0362ada38ead3e3e9efa3708e53495531f09a6987599d18264c1e1c92f2cf141630c7a3c4ab7c81b2f001698e7463b04",
+    "accountPublicKey": "0xab25a113d029f4a4affba3e9057b3e096512758f1a05347160bc3c563fd3df03",
+    "encryptionPublicKey": "0x4a329bd7f50e21f1d0dbaf5f10125ffb544f562bb5f62deaac25967940167415",
+    "secretKeyHex": "0x4a329bd7f50e21f1d0dbaf5f10125ffb544f562bb5f62deaac25967940167415bd3a0c2a3a02d72ad4eb16b29dc006f1e0ed6cf45255857b9d0518a750bbb336ab25a113d029f4a4affba3e9057b3e096512758f1a05347160bc3c563fd3df030aacbfc17402d1459c92b56ad28b6a9f3c07d7a36e7ab687192db17c737dc70d"
+  },
+  {
+    "mnemonic": "legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth title",
+    "passphrase": "TREZOR",
+    "account": 0,
+    "path": "m/44'/595'/0'/0/0",
+    "seed": "0xbc09fca1804f7e69da93c2f2028eb238c227f2e9dda30cd63699232578480a4021b146ad717fbb7e451ce9eb835f43620bf5c514db0f8add49f5d121449d3e87",
+    "accountPublicKey": "0x4087a7a3d8b7505f61950590c5eef6f9e0b5ff2284ec809669593dc77b3a982f",
+    "encryptionPublicKey": "0x51dcc017c4a361292a93e5c094bbaa6366fcf9a9775d9a79a9c075848fd7a895",
+    "secretKeyHex": "0x51dcc017c4a361292a93e5c094bbaa6366fcf9a9775d9a79a9c075848fd7a8952ab7681d20178d6318c6bd87d998370d738677fd1a5e18e1e2c9cb58bab0eb194087a7a3d8b7505f61950590c5eef6f9e0b5ff2284ec809669593dc77b3a982f390470919318665b655ce0366de69bbd3fbbcb87f279104952e428c95431a036"
+  },
+  {
+    "mnemonic": "legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth title",
+    "passphrase": "TREZOR",
+    "account": 1,
+    "path": "m/44'/595'/1'/0/0",
+    "seed": "0xbc09fca1804f7e69da93c2f2028eb238c227f2e9dda30cd63699232578480a4021b146ad717fbb7e451ce9eb835f43620bf5c514db0f8add49f5d121449d3e87",
+    "accountPublicKey": "0x38ed23b45f116d61879343973bb08e7f88f304e0db047d1f8efd270bf9d13405",
+    "encryptionPublicKey": "0x4ec752440acc6851d437ab1d874d2a16794b956d08bfba6451798144edcb0d8b",
+    "secretKeyHex": "0x4ec752440acc6851d437ab1d874d2a16794b956d08bfba6451798144edcb0d8bf5a82b180acf66f9870cffc1acc763df0d177164cc7e7c63be8b3fbba54aa83f38ed23b45f116d61879343973bb08e7f88f304e0db047d1f8efd270bf9d13405efa5eea6d1569d2b161164940503a3584e3201141c8abeb5d6e791a7f16d6417"
+  },
+  {
+    "mnemonic": "legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth title",
+    "passphrase": "TREZOR",
+    "account": 2147483647,
+    "path": "m/44'/595'/2147483647'/0/0",
+    "seed": "0xbc09fca1804f7e69da93c2f2028eb238c227f2e9dda30cd63699232578480a4021b146ad717fbb7e451ce9eb835f43620bf5c514db0f8add49f5d121449d3e87",
+    "accountPublicKey": "0xfff24342761056667cdaffbacdfccb9f81fbc552e86030455c93c6b4dc39359a",
+    "encryptionPublicKey": "0x443b904998c61e4a4307f9a256af72b9133843dceedfbe680c8a41ef05307a11",
+    "secretKeyHex": "0x443b904998c61e4a4307f9a256af72b9133843dceedfbe680c8a41ef05307a11bdb4e671e30815938200869ce56ef3df5d5e28d51dcfc16997390de5ba0f1222fff24342761056667cdaffbacdfccb9f81fbc552e86030455c93c6b4dc39359abf65b773770eb8111b6905b99f696c12c17b5946667146d2bc8f65a0e906e73a"
+  },
+  {
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "passphrase": "café ﬁ",
+    "account": 0,
+    "path": "m/44'/595'/0'/0/0",
+    "seed": "0x19f90ea729062357f00e86cad8a80b435fd4acc9b99c49c7ca1332be16fa035dc87d336b6d28eab2320e75e45cadaf752b47f483b78ad1965eb4f3bee2c8d752",
+    "accountPublicKey": "0x07880126b41d6b4243de42a26a03b741d4b3c45c62ac196d45f7254982e4822c",
+    "encryptionPublicKey": "0x5784063ac32fe157146e94125853ad7d8fed2a09269e035d4bf4e66406147a87",
+    "secretKeyHex": "0x5784063ac32fe157146e94125853ad7d8fed2a09269e035d4bf4e66406147a8736c593e4218ebd1750adfac47373c1152291a2ce26cd6b913e736201d8f4892c07880126b41d6b4243de42a26a03b741d4b3c45c62ac196d45f7254982e4822c564250a0f621fdc00e3b4691eff45fa32bee5398639c16c7b664d504b6f93329"
+  }
+]

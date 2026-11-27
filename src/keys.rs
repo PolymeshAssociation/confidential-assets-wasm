@@ -1,3 +1,4 @@
+use bip39::{Language, Mnemonic};
 use codec::{Decode, DecodeAll, Encode};
 use polymesh_dart::{
     curve_tree::get_account_curve_tree_parameters,
@@ -10,19 +11,158 @@ use polymesh_dart::{
     MediatorAffirmationProof as NativeMediatorAffirmationProof,
 };
 use rand::RngCore as _;
-use rand_chacha::ChaChaRng;
-use rand_core::SeedableRng;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use wasm_bindgen::prelude::*;
 
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::{Zeroize, ZeroizeOnDrop, Zeroizing};
 
 use crate::{
     jsvalue_to_balance, jsvalue_to_identity_id, jsvalue_to_settlement_ref,
     AccountAssetRegistration, AccountAssetState, MediatorAffirmationProof, SettlementLegEncrypted,
 };
 
-/// MasterSeed for deriving account keys.
+/// The DART account key derivation path. `{account}` stands for the account index.
+pub const DART_KEY_PATH_TEMPLATE: &str = "m/44'/595'/{account}'/0/0";
+
+/// The number of words `generateMnemonic` uses when none is given.
+const DEFAULT_MNEMONIC_WORDS: u32 = 24;
+
+/// Accounts are hardened BIP-32 indices, so they must be below 2^31.
+const ACCOUNT_LIMIT: f64 = (1u64 << 31) as f64;
+
+/// Generates a new random BIP-39 mnemonic from the English wordlist.
+///
+/// # Arguments
+/// * `words` - The number of words: 12, 15, 18, 21 or 24. Defaults to 24.
+///
+/// # Returns
+/// The mnemonic, its words separated by single spaces.
+///
+/// # Errors
+/// * Throws an error if `words` isn't 12, 15, 18, 21 or 24.
+/// * Throws an error if the system random number generator is unavailable.
+///
+/// # Example
+/// ```javascript
+/// const mnemonic = generateMnemonic();
+/// const masterSeed = MasterSeed.fromMnemonic(mnemonic);
+/// ```
+#[wasm_bindgen(js_name = generateMnemonic)]
+pub fn generate_mnemonic(words: Option<u32>) -> Result<String, JsValue> {
+    let words = words.unwrap_or(DEFAULT_MNEMONIC_WORDS);
+    if !matches!(words, 12 | 15 | 18 | 21 | 24) {
+        return Err(JsValue::from_str(&format!(
+            "Mnemonic word count must be 12, 15, 18, 21 or 24, not {}",
+            words
+        )));
+    }
+    // Each 3 words carry 4 bytes of entropy (plus checksum bits).
+    let len = words as usize / 3 * 4;
+    let mut entropy = Zeroizing::new([0u8; 32]);
+    rand::rngs::OsRng
+        .try_fill_bytes(&mut entropy[..len])
+        .map_err(|e| JsValue::from_str(&format!("Failed to generate randomness: {}", e)))?;
+    let mnemonic = Mnemonic::from_entropy_in(Language::English, &entropy[..len])
+        .map_err(|e| JsValue::from_str(&format!("Failed to generate mnemonic: {}", e)))?;
+    Ok(mnemonic.to_string())
+}
+
+/// NFKD-normalises `s` into a buffer that is zeroized on drop.
+fn nfkd(s: &str) -> Zeroizing<String> {
+    let mut cow = Cow::Borrowed(s);
+    Mnemonic::normalize_utf8_cow(&mut cow);
+    Zeroizing::new(cow.into_owned())
+}
+
+/// Why an `AccountKeys` isn't internally consistent (`docs/KEY_FILE_FORMAT.md` section 3.2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum KeyConsistencyError {
+    /// A public key isn't a valid compressed Pallas point.
+    InvalidPublicKey,
+    /// A secret key is zero.
+    ZeroSecretKey,
+    /// A public key isn't its secret key times its generator.
+    Mismatch,
+}
+
+impl KeyConsistencyError {
+    pub(crate) fn message(self) -> &'static str {
+        match self {
+            Self::InvalidPublicKey => "a public key is not a valid Pallas point",
+            Self::ZeroSecretKey => "a secret key is zero",
+            Self::Mismatch => "the public keys don't match the secret keys",
+        }
+    }
+}
+
+/// Checks that `keys` is internally consistent (`docs/KEY_FILE_FORMAT.md` section 3.2): both
+/// public keys are valid points, both secret keys are non-zero, `acct.public = acct.secret ·
+/// sig_key_gen` and `enc.public = enc.secret · enc_key_gen`, with DART's generators.
+pub(crate) fn check_key_consistency(keys: &NativeAccountKeys) -> Result<(), KeyConsistencyError> {
+    use ark_ec::CurveGroup as _;
+    use ark_serialize::CanonicalDeserialize as _;
+    use polymesh_dart::{dart_gens, PallasScalar};
+
+    let enc_public = keys
+        .enc
+        .public
+        .get_affine()
+        .map_err(|_| KeyConsistencyError::InvalidPublicKey)?;
+    let acct_public = keys
+        .acct
+        .public
+        .get_affine()
+        .map_err(|_| KeyConsistencyError::InvalidPublicKey)?;
+
+    // The secret scalars, read back from the SCALE encoding (section 3.1): `enc.secret` at
+    // bytes 32..64 and `acct.secret` at 96..128.
+    let encoded = Zeroizing::new(keys.encode());
+    let scalar_at = |at: usize| {
+        encoded
+            .get(at..at + 32)
+            .and_then(|bytes| PallasScalar::deserialize_compressed(bytes).ok())
+            .map(Zeroizing::new)
+            .ok_or(KeyConsistencyError::Mismatch)
+    };
+    let enc_secret = scalar_at(32)?;
+    let acct_secret = scalar_at(96)?;
+    if *enc_secret == PallasScalar::from(0u8) || *acct_secret == PallasScalar::from(0u8) {
+        return Err(KeyConsistencyError::ZeroSecretKey);
+    }
+
+    let gens = dart_gens();
+    // By reference, so no unzeroized copy of a scalar is made.
+    let enc_ok = (gens.enc_key_gen() * &*enc_secret).into_affine() == enc_public;
+    let acct_ok = (gens.sig_key_gen() * &*acct_secret).into_affine() == acct_public;
+    if enc_ok && acct_ok {
+        Ok(())
+    } else {
+        Err(KeyConsistencyError::Mismatch)
+    }
+}
+
+/// `0x` + the lowercase hex of `bytes`, without leaving an unzeroized intermediate copy.
+fn secret_to_hex(bytes: &[u8]) -> String {
+    let encoded = Zeroizing::new(hex::encode(bytes));
+    let mut out = String::with_capacity(2 + encoded.len());
+    out.push_str("0x");
+    out.push_str(&encoded);
+    out
+}
+
+/// The seed that all of a wallet's DART account keys are derived from.
+///
+/// Create it from a BIP-39 mnemonic with `MasterSeed.fromMnemonic`, then derive each account's
+/// keys with `deriveAccountKeys(account)`. Call `clear()` when it's no longer needed.
+///
+/// # Example
+/// ```javascript
+/// const mnemonic = generateMnemonic();
+/// const masterSeed = MasterSeed.fromMnemonic(mnemonic);
+/// const keys = masterSeed.deriveAccountKeys(0);
+/// masterSeed.clear();
+/// ```
 #[wasm_bindgen]
 pub struct MasterSeed {
     pub(crate) inner: NativeMasterSeed,
@@ -30,44 +170,100 @@ pub struct MasterSeed {
 
 #[wasm_bindgen]
 impl MasterSeed {
-    /// Creates a new MasterSeed from a hexadecimal seed string.
+    /// Creates a MasterSeed from a BIP-39 mnemonic (English wordlist).
+    ///
+    /// The phrase and passphrase are NFKD-normalised and the phrase's whitespace is ignored, per
+    /// BIP-39. The 64-byte BIP-39 seed (PBKDF2-HMAC-SHA512, 2048 rounds) is the master seed.
     ///
     /// # Arguments
-    /// * `seed` - A "0x"-prefixed hexadecimal string, or else a string whose raw bytes are used.
-    ///   Must decode to at least 32 bytes.
-    ///
-    /// # Returns
-    /// A new `MasterSeed` object containing the generated seed.
+    /// * `phrase` - A 12, 15, 18, 21 or 24-word mnemonic.
+    /// * `passphrase` - The optional BIP-39 passphrase. Defaults to the empty string.
     ///
     /// # Errors
-    /// * Throws an error if the hex is invalid or the seed is shorter than 32 bytes.
+    /// * Throws an error if a word isn't in the English wordlist, the word count is wrong, or
+    ///   the checksum doesn't match.
     ///
     /// # Example
     /// ```javascript
-    /// const masterSeed = new MasterSeed("0x" + generateRandomSeed());
+    /// const masterSeed = MasterSeed.fromMnemonic(mnemonic, "optional passphrase");
     /// ```
-    #[wasm_bindgen(constructor)]
-    pub fn new(seed: &str) -> Result<MasterSeed, JsValue> {
-        Ok(MasterSeed {
-            inner: NativeMasterSeed::from_seed(seed)
-                .map_err(|e| JsValue::from_str(&format!("Invalid master seed: {}", e)))?,
-        })
+    #[wasm_bindgen(js_name = fromMnemonic)]
+    pub fn from_mnemonic(
+        phrase: String,
+        passphrase: Option<String>,
+    ) -> Result<MasterSeed, JsValue> {
+        let phrase = Zeroizing::new(phrase);
+        let passphrase = Zeroizing::new(passphrase.unwrap_or_default());
+        let mnemonic = Mnemonic::parse_in_normalized(Language::English, &nfkd(&phrase))
+            .map_err(|e| JsValue::from_str(&format!("Invalid mnemonic: {}", e)))?;
+        let seed = Zeroizing::new(mnemonic.to_seed_normalized(&nfkd(&passphrase)));
+        Self::from_seed_bytes(&seed[..])
     }
 
-    /// Derive a new AccountKeys from this MasterSeed.
+    /// Creates a MasterSeed from raw seed bytes. For tests and advanced hosts; wallets should use
+    /// `fromMnemonic`.
     ///
     /// # Arguments
-    /// * `path` - The derivation path string (e.g., "m/44'/595'/0'/0/0").
+    /// * `seed` - At least 32 bytes.
+    ///
+    /// # Errors
+    /// * Throws an error if the seed is shorter than 32 bytes.
+    #[wasm_bindgen(js_name = fromBytes)]
+    pub fn from_bytes(seed: Vec<u8>) -> Result<MasterSeed, JsValue> {
+        // Owned, so the copy of the seed in wasm memory is zeroized.
+        Self::from_seed_bytes(&Zeroizing::new(seed))
+    }
+
+    fn from_seed_bytes(seed: &[u8]) -> Result<MasterSeed, JsValue> {
+        let seed_hex = Zeroizing::new(secret_to_hex(seed));
+        let inner = NativeMasterSeed::from_seed(&seed_hex)
+            .map_err(|e| JsValue::from_str(&format!("Invalid master seed: {}", e)))?;
+        Ok(MasterSeed { inner })
+    }
+
+    /// The derivation path template, `m/44'/595'/{account}'/0/0`.
+    #[wasm_bindgen(getter = DART_KEY_PATH_TEMPLATE)]
+    pub fn dart_key_path_template() -> String {
+        DART_KEY_PATH_TEMPLATE.to_string()
+    }
+
+    /// Derives the keys of an account, at path `m/44'/595'/{account}'/0/0`.
+    ///
+    /// # Arguments
+    /// * `account` - The account index, an integer from 0 to 2^31 - 1.
     ///
     /// # Returns
-    /// A new `AccountKeys` object derived from the master seed.
+    /// The account's `AccountKeys`. The same seed and account always give the same keys.
+    ///
+    /// # Errors
+    /// * Throws an error if `account` isn't an integer from 0 to 2^31 - 1.
+    ///
+    /// # Example
+    /// ```javascript
+    /// const keys = masterSeed.deriveAccountKeys(0);
+    /// ```
     #[wasm_bindgen(js_name = deriveAccountKeys)]
-    pub fn derive_account_keys(&self, path: &str) -> Result<AccountKeys, JsValue> {
+    pub fn derive_account_keys(&self, account: f64) -> Result<AccountKeys, JsValue> {
+        if account.fract() != 0.0 || !(0.0..ACCOUNT_LIMIT).contains(&account) {
+            return Err(JsValue::from_str(&format!(
+                "Account index must be an integer from 0 to 2^31 - 1, not {}",
+                account
+            )));
+        }
+        let path = DART_KEY_PATH_TEMPLATE.replace("{account}", &(account as u32).to_string());
         let inner = self
             .inner
-            .derive_account_keys(path)
+            .derive_account_keys(&path)
             .map_err(|e| JsValue::from_str(&format!("Failed to derive account keys: {}", e)))?;
         Ok(AccountKeys { inner })
+    }
+
+    /// Clears the seed from memory by zeroing it out.
+    ///
+    /// The `MasterSeed` instance can't be used after calling this method.
+    #[wasm_bindgen(js_name = clear)]
+    pub fn clear(mut self) {
+        self.inner.zeroize();
     }
 }
 
@@ -83,12 +279,8 @@ impl MasterSeed {
 ///
 /// # Example
 /// ```javascript
-/// // Generate from a deterministic seed
-/// const keys = AccountKeys.fromSeed("my-secure-seed-phrase");
-///
-/// // Generate from a random hex seed
-/// const randomSeed = generateRandomSeed();
-/// const keys = new AccountKeys(randomSeed);
+/// // Derive from a BIP-39 mnemonic
+/// const keys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
 ///
 /// // Get public keys for sharing
 /// const publicKeys = keys.publicKeys();
@@ -101,70 +293,46 @@ pub struct AccountKeys {
 
 #[wasm_bindgen]
 impl AccountKeys {
-    /// Creates new account keys from a hexadecimal seed string.
+    /// Returns the private key: `0x` + the SCALE encoding of these `AccountKeys`.
     ///
-    /// # Arguments
-    /// * `seed_hex` - A 32-byte hexadecimal string (64 hex characters), with or without "0x" prefix.
-    ///
-    /// # Returns
-    /// A new `AccountKeys` object containing the generated secret keys.
-    ///
-    /// # Errors
-    /// * Throws an error if the seed is not valid hexadecimal.
-    /// * Throws an error if the seed is not exactly 32 bytes (64 hex characters).
+    /// **Treat it like a seed.** Anyone holding it controls the account.
     ///
     /// # Example
     /// ```javascript
-    /// const seed = generateRandomSeed(); // Returns a 64-character hex string
-    /// const keys = new AccountKeys(seed);
+    /// const secret = keys.toSecretKeyHex();
+    /// const sameKeys = AccountKeys.fromSecretKeyHex(secret);
     /// ```
-    #[wasm_bindgen(constructor)]
-    pub fn new(seed_hex: &str) -> Result<AccountKeys, JsValue> {
-        let seed_hex = seed_hex.strip_prefix("0x").unwrap_or(seed_hex);
-        let seed_bytes = hex::decode(seed_hex)
-            .map_err(|e| JsValue::from_str(&format!("Invalid hex seed: {}", e)))?;
-
-        if seed_bytes.len() != 32 {
-            return Err(JsValue::from_str(
-                "Seed must be 32 bytes (64 hex characters)",
-            ));
-        }
-
-        let mut seed = [0u8; 32];
-        seed.copy_from_slice(&seed_bytes);
-
-        let mut rng = ChaChaRng::from_seed(seed);
-        let inner = NativeAccountKeys::rand(&mut rng)
-            .map_err(|e| JsValue::from_str(&format!("Failed to generate keys: {}", e)))?;
-
-        Ok(AccountKeys { inner })
+    #[wasm_bindgen(js_name = toSecretKeyHex)]
+    pub fn to_secret_key_hex(&self) -> String {
+        secret_to_hex(&Zeroizing::new(self.inner.encode()))
     }
 
-    /// Creates account keys from any seed string using deterministic hashing.
-    ///
-    /// This is a convenience method that accepts any string and hashes it to create
-    /// a deterministic 32-byte seed. The same input string will always produce the
-    /// same keys.
+    /// Restores account keys from the private key returned by `toSecretKeyHex()`.
     ///
     /// # Arguments
-    /// * `seed` - Any string to use as the seed (will be hashed internally).
-    ///
-    /// # Returns
-    /// A new `AccountKeys` object.
+    /// * `hex` - The private key hex, with or without a `0x` prefix.
     ///
     /// # Errors
-    /// * Throws an error if key generation fails.
-    ///
-    /// # Example
-    /// ```javascript
-    /// const keys = AccountKeys.fromSeed("my-secure-passphrase");
-    /// // Same seed always produces the same keys
-    /// const keys2 = AccountKeys.fromSeed("my-secure-passphrase");
-    /// ```
-    #[wasm_bindgen(js_name = fromSeed)]
-    pub fn from_seed(seed: &str) -> Result<AccountKeys, JsValue> {
-        let inner = NativeAccountKeys::from_seed(seed)
-            .map_err(|e| JsValue::from_str(&format!("Failed to create keys from seed: {}", e)))?;
+    /// * Throws an error if the hex is invalid, or isn't exactly one SCALE-encoded `AccountKeys`
+    ///   (trailing bytes are rejected).
+    /// * Throws an error if the keys aren't consistent: a public key that isn't a valid point, a
+    ///   zero secret key, or a public key that doesn't match its secret key.
+    #[wasm_bindgen(js_name = fromSecretKeyHex)]
+    pub fn from_secret_key_hex(hex: String) -> Result<AccountKeys, JsValue> {
+        let hex = Zeroizing::new(hex);
+        let digits = hex
+            .strip_prefix("0x")
+            .or_else(|| hex.strip_prefix("0X"))
+            .unwrap_or(&hex);
+        // The error leaves out the decoder's message, which can quote the secret.
+        let bytes = Zeroizing::new(
+            hex::decode(digits).map_err(|_| JsValue::from_str("Invalid secret key hex"))?,
+        );
+        let inner = NativeAccountKeys::decode_all(&mut &bytes[..])
+            .map_err(|e| JsValue::from_str(&format!("Invalid secret key: {}", e)))?;
+        // `inner` is zeroized on drop if this fails.
+        check_key_consistency(&inner)
+            .map_err(|e| JsValue::from_str(&format!("Invalid secret key: {}", e.message())))?;
         Ok(AccountKeys { inner })
     }
 
@@ -1094,31 +1262,4 @@ impl EncryptionPublicKey {
         })?;
         Ok(EncryptionPublicKey { inner })
     }
-}
-
-/// Generates a cryptographically secure random 32-byte seed for key generation.
-///
-/// This function uses the operating system's random number generator to produce
-/// a high-quality random seed suitable for generating account keys.
-///
-/// # Returns
-/// A 64-character hexadecimal string representing the 32-byte seed.
-///
-/// # Errors
-/// * May throw an error if the OS random number generator is unavailable (rare).
-///
-/// # Example
-/// ```javascript
-/// const seed = generateRandomSeed();
-/// console.log('Random seed:', seed); // e.g., "a1b2c3d4..."
-///
-/// // Use the seed to create account keys
-/// const keys = new AccountKeys(seed);
-/// ```
-#[wasm_bindgen(js_name = generateRandomSeed)]
-pub fn generate_random_seed() -> Result<String, JsValue> {
-    let mut rng = rand::rngs::OsRng;
-    let mut seed = [0u8; 32];
-    rng.fill_bytes(&mut seed);
-    Ok(hex::encode(seed))
 }

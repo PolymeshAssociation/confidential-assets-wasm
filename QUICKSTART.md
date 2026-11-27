@@ -58,21 +58,21 @@ Create an HTML file:
     <pre id="output"></pre>
 
     <script type="module">
-        import init, { AccountKeys, generateRandomSeed } 
+        import init, { MasterSeed, generateMnemonic }
             from './pkg-web/polymesh_dart_wasm.js';
 
         // Initialize WASM
         await init();
 
         document.getElementById('createKeys').onclick = () => {
-            // Generate keys
-            const seed = generateRandomSeed();
-            const keys = new AccountKeys(seed);
+            // Generate a mnemonic and derive account 0's keys
+            const mnemonic = generateMnemonic();
+            const keys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
             const pubKeys = keys.publicKeys();
-            
+
             // Display results
-            document.getElementById('output').textContent = 
-                'Seed: ' + seed + '\n\n' +
+            document.getElementById('output').textContent =
+                'Mnemonic: ' + mnemonic + '\n\n' +
                 'Public Keys:\n' + JSON.stringify({
                   accountKey: pubKeys.accountPublicKey().toJson(),
                   encryptionKey: pubKeys.encryptionPublicKey().toJson()
@@ -94,14 +94,14 @@ python3 -m http.server 8000
 Create `app.js`:
 
 ```javascript
-const { AccountKeys, generateRandomSeed } = 
+const { MasterSeed, generateMnemonic } =
     require('./pkg-node/polymesh_dart_wasm.js');
 
-// Generate account keys
-const seed = generateRandomSeed();
-console.log('Seed:', seed);
+// Generate a mnemonic and derive account 0's keys
+const mnemonic = generateMnemonic();
+console.log('Mnemonic:', mnemonic);
 
-const keys = new AccountKeys(seed);
+const keys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
 const pubKeys = keys.publicKeys();
 
 console.log('Account public key:', pubKeys.accountPublicKey().toJson());
@@ -122,19 +122,20 @@ import init, {
     AccountKeys, 
     AccountPublicKeys,
     AssetState,
-    generateRandomSeed 
+    MasterSeed,
+    generateMnemonic
 } from '@polymesh/dart-wasm';
 
 async function main() {
     // Initialize WASM
     await init();
-    
+
     // Generate keys
-    const seed: string = generateRandomSeed();
-    const keys: AccountKeys = new AccountKeys(seed);
+    const mnemonic: string = generateMnemonic();
+    const keys: AccountKeys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
     const pubKeys: AccountPublicKeys = keys.publicKeys();
-    
-    console.log('Seed:', seed);
+
+    console.log('Mnemonic:', mnemonic);
     console.log('Account key:', pubKeys.accountPublicKey().toJson());
     console.log('Encryption key:', pubKeys.encryptionPublicKey().toJson());
 }
@@ -153,17 +154,14 @@ node app.js
 ### 1. Create and Store Account Keys
 
 ```javascript
-import { AccountKeys, generateRandomSeed } from '@polymesh/dart-wasm';
+import { MasterSeed, generateMnemonic } from '@polymesh/dart-wasm';
 
-// Generate new keys
-const seed = generateRandomSeed();
-const keys = new AccountKeys(seed);
+// Generate a mnemonic. The user writes it down: it recovers every account's keys.
+const mnemonic = generateMnemonic();
+const keys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
 
-// Store the seed (encrypt before storing!). AccountKeys has no byte export.
-localStorage.setItem('dartSeed', seed);
-
-// Later: Recreate the same keys from the seed
-const restoredKeys = new AccountKeys(localStorage.getItem('dartSeed'));
+// Later: Recreate the same keys from the mnemonic
+const restoredKeys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
 ```
 
 ### 2. Share Public Keys
@@ -185,10 +183,10 @@ console.log({
 ### 3. Register Account on-Chain (Proof Generation)
 
 ```javascript
-import { AccountKeys } from '@polymesh/dart-wasm';
+import { MasterSeed } from '@polymesh/dart-wasm';
 
 // Your keys and DID
-const keys = new AccountKeys(seed);
+const keys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
 const myDid = '0x1234...'; // Your identity
 
 // Generate registration proof (without submitting to chain)
@@ -234,22 +232,22 @@ const assetBytes = assetState.toBytes();
 ### 5. Deterministic Key Generation
 
 ```javascript
-import { AccountKeys, MasterSeed, generateRandomSeed } from '@polymesh/dart-wasm';
+import { MasterSeed } from '@polymesh/dart-wasm';
 
-// Same seed always produces same keys
-const keys1 = AccountKeys.fromSeed('my-password');
-const keys2 = AccountKeys.fromSeed('my-password');
+// The same mnemonic and account always produce the same keys
+const keys1 = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
+const keys2 = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
 
 // These will be identical
 console.assert(
-  keys1.publicKeys().accountPublicKey().toJson() === 
+  keys1.publicKeys().accountPublicKey().toJson() ===
   keys2.publicKeys().accountPublicKey().toJson()
 );
 
-// Several accounts from one master seed. The seed must be at least 32 bytes.
-const masterSeed = new MasterSeed('0x' + generateRandomSeed());
-const account0 = masterSeed.deriveAccountKeys("m/44'/595'/0'/0/0");
-const account1 = masterSeed.deriveAccountKeys("m/44'/595'/0'/0/1");
+// Several accounts from one mnemonic, at path m/44'/595'/{account}'/0/0
+const masterSeed = MasterSeed.fromMnemonic(mnemonic);
+const account0 = masterSeed.deriveAccountKeys(0);
+const account1 = masterSeed.deriveAccountKeys(1);
 ```
 
 ### 6. Decrypt a Settlement Leg as an Auditor or Mediator
@@ -295,7 +293,7 @@ cd polymesh-dart-wasm
 Always call `init()` before using other functions:
 ```javascript
 await init(); // Important!
-const keys = new AccountKeys(seed); // Now this works
+const keys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0); // Now this works
 ```
 
 ### Issue: Bundler errors with WASM
@@ -307,13 +305,13 @@ Update your bundler config to support WASM modules. See [DEVELOPMENT.md](DEVELOP
 Ensure your input data is valid:
 - DIDs should be 32 bytes (64 hex characters)
 - Asset IDs should be valid numbers
-- Keys should come from the same seed generation
+- Keys should come from the same mnemonic
 - `AssetState` keys should come from the chain's `confidentialAssets.keys(assetId)`
 - Proofs and encrypted legs from the DART v0.1 release do not verify on a DART v1 chain. Regenerate them
 
-### Issue: "Invalid master seed"
+### Issue: "Invalid mnemonic"
 
-`new MasterSeed(seed)` requires at least 32 bytes of seed, and a `0x`-prefixed seed must be valid hex. Use `new MasterSeed('0x' + generateRandomSeed())`.
+`MasterSeed.fromMnemonic(phrase)` requires a valid BIP-39 mnemonic from the English wordlist: 12, 15, 18, 21 or 24 words with a correct checksum. Generate one with `generateMnemonic()`.
 
 ### Issue: `MissingRequiredClaim` when creating an asset
 
