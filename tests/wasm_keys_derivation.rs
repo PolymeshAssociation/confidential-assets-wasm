@@ -5,6 +5,7 @@
 
 use polymesh_dart_wasm::*;
 use serde::{Deserialize, Serialize};
+use wasm_bindgen::JsValue;
 use wasm_bindgen_test::*;
 
 const VECTORS: &str = include_str!("vectors/derivation-v1.json");
@@ -18,7 +19,15 @@ const ABANDON_ABOUT_TREZOR_SEED: &str = "c55257c360c07c72029aebc1b53c05ed0362ada
 /// The official BIP-39 seed for `LEGAL_WINNER_TITLE` with passphrase "TREZOR".
 const LEGAL_WINNER_TITLE_TREZOR_SEED: &str = "bc09fca1804f7e69da93c2f2028eb238c227f2e9dda30cd63699232578480a4021b146ad717fbb7e451ce9eb835f43620bf5c514db0f8add49f5d121449d3e87";
 
+/// A passphrase that NFKD changes, written in NFC: a precomposed "é" (U+00E9, which NFKD
+/// decomposes to "e" U+0301) and the ligature "ﬁ" (U+FB01, which NFKD maps to "fi").
+const NFKD_PASSPHRASE: &str = "caf\u{e9} \u{fb01}";
+
 const MAX_ACCOUNT: u32 = (1 << 31) - 1;
+
+/// `sig_key_gen` and `enc_key_gen`, compressed (`docs/KEY_FILE_FORMAT.md` section 2.3).
+const SIG_KEY_GEN: &str = "0x74535e5be4948ecb1dd353a96d6bd21421f97f037fcde676fa71f1a472fae3a3";
+const ENC_KEY_GEN: &str = "0x387134452cc97b763175d92d570f042b6fab62398f25cdcf515119c8e68320a0";
 
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,8 +36,16 @@ struct Vector {
     passphrase: String,
     account: u32,
     path: String,
+    /// The 64-byte BIP-39 seed.
+    seed: String,
     account_public_key: String,
     encryption_public_key: String,
+    /// `AccountKeys.toSecretKeyHex()`.
+    secret_key_hex: String,
+}
+
+fn vectors() -> Vec<Vector> {
+    serde_json::from_str(VECTORS).unwrap()
 }
 
 fn hex0x(bytes: Vec<u8>) -> String {
@@ -58,27 +75,35 @@ fn path_for(account: u32) -> String {
 #[test]
 #[ignore]
 fn generate_derivation_vectors() {
-    let inputs = [
-        (ABANDON_ABOUT, ""),
-        (ABANDON_ABOUT, "TREZOR"),
-        (LEGAL_WINNER_TITLE, "TREZOR"),
+    let all = [0, 1, MAX_ACCOUNT];
+    let inputs: [(&str, &str, &[u32]); 4] = [
+        (ABANDON_ABOUT, "", &all),
+        (ABANDON_ABOUT, "TREZOR", &all),
+        (LEGAL_WINNER_TITLE, "TREZOR", &all),
+        (ABANDON_ABOUT, NFKD_PASSPHRASE, &[0]),
     ];
     let mut vectors = Vec::new();
-    for (mnemonic, passphrase) in inputs {
-        let seed = from_mnemonic(mnemonic, passphrase);
-        for account in [0, 1, MAX_ACCOUNT] {
-            let keys = seed.derive_account_keys(account as f64).unwrap();
+    for (mnemonic, passphrase, accounts) in inputs {
+        let master = from_mnemonic(mnemonic, passphrase);
+        for &account in accounts {
+            let keys = master.derive_account_keys(account as f64).unwrap();
             let (account_public_key, encryption_public_key) = public_keys_hex(&keys);
             vectors.push(Vector {
                 mnemonic: mnemonic.to_string(),
                 passphrase: passphrase.to_string(),
                 account,
                 path: path_for(account),
+                seed: hex0x(spec::bip39_seed(mnemonic, passphrase).to_vec()),
                 account_public_key,
                 encryption_public_key,
+                secret_key_hex: keys.to_secret_key_hex(),
             });
         }
     }
+    // The generators of section 2.3.
+    let gens = polymesh_dart::dart_gens();
+    eprintln!("sig_key_gen {}", spec::compressed(&gens.sig_key_gen()));
+    eprintln!("enc_key_gen {}", spec::compressed(&gens.enc_key_gen()));
     println!("{}", serde_json::to_string_pretty(&vectors).unwrap());
 }
 
@@ -89,21 +114,223 @@ fn path_template_is_the_dart_bip44_path() {
 
 #[wasm_bindgen_test]
 fn mnemonic_vectors_match() {
-    let vectors: Vec<Vector> = serde_json::from_str(VECTORS).unwrap();
-    assert_eq!(vectors.len(), 9);
+    let vectors = vectors();
+    assert_eq!(vectors.len(), 10);
     for v in vectors {
+        let what = format!(
+            "{:?} / {:?} / account {}",
+            v.mnemonic, v.passphrase, v.account
+        );
         assert_eq!(v.path, path_for(v.account));
-        let keys = from_mnemonic(&v.mnemonic, &v.passphrase)
-            .derive_account_keys(v.account as f64)
-            .unwrap();
+        let master = from_mnemonic(&v.mnemonic, &v.passphrase);
+        let keys = master.derive_account_keys(v.account as f64).unwrap();
         assert_eq!(
             public_keys_hex(&keys),
-            (v.account_public_key, v.encryption_public_key),
-            "vector {:?} / {:?} / account {}",
-            v.mnemonic,
-            v.passphrase,
-            v.account
+            (
+                v.account_public_key.clone(),
+                v.encryption_public_key.clone()
+            ),
+            "{}",
+            what
         );
+        assert_eq!(keys.to_secret_key_hex(), v.secret_key_hex, "{}", what);
+        // The secret key hex holds the same public keys (section 3.1), and imports.
+        assert_eq!(
+            &v.secret_key_hex[2..66],
+            &v.encryption_public_key[2..],
+            "{}",
+            what
+        );
+        assert_eq!(
+            &v.secret_key_hex[130..194],
+            &v.account_public_key[2..],
+            "{}",
+            what
+        );
+        let imported = AccountKeys::from_secret_key_hex(v.secret_key_hex.clone()).unwrap();
+        assert_eq!(imported.to_secret_key_hex(), v.secret_key_hex, "{}", what);
+        // `seed` is the master seed: `fromBytes(seed)` gives the same keys.
+        let seed = hex::decode(&v.seed[2..]).unwrap();
+        assert_eq!(seed.len(), 64);
+        let from_seed = MasterSeed::from_bytes(seed).unwrap();
+        assert_eq!(
+            from_seed
+                .derive_account_keys(v.account as f64)
+                .unwrap()
+                .to_secret_key_hex(),
+            v.secret_key_hex,
+            "{}",
+            what
+        );
+    }
+}
+
+/// The vectors' `seed` is the BIP-39 seed of the specification's section 2.1, computed here from
+/// its text (NFKD, split on whitespace, words joined by one space, PBKDF2-HMAC-SHA512) rather
+/// than with the `bip39` crate.
+#[wasm_bindgen_test]
+fn vector_seeds_follow_the_spec_bip39_construction() {
+    for v in vectors() {
+        assert_eq!(
+            hex0x(spec::bip39_seed(&v.mnemonic, &v.passphrase).to_vec()),
+            v.seed,
+            "{:?} / {:?}",
+            v.mnemonic,
+            v.passphrase
+        );
+    }
+    // The official BIP-39 seeds.
+    assert_eq!(
+        hex::encode(spec::bip39_seed(ABANDON_ABOUT, "TREZOR")),
+        ABANDON_ABOUT_TREZOR_SEED
+    );
+    assert_eq!(
+        hex::encode(spec::bip39_seed(LEGAL_WINNER_TITLE, "TREZOR")),
+        LEGAL_WINNER_TITLE_TREZOR_SEED
+    );
+    // The NFKD vector's salt is "mnemonic" ‖ "cafe" U+0301 " fi", not its NFC bytes.
+    let v = vectors()
+        .into_iter()
+        .find(|v| v.passphrase == NFKD_PASSPHRASE)
+        .expect("the NFKD vector");
+    let nfkd = spec::bip39_seed_raw_passphrase(ABANDON_ABOUT, "cafe\u{301} fi".as_bytes());
+    let nfc = spec::bip39_seed_raw_passphrase(ABANDON_ABOUT, NFKD_PASSPHRASE.as_bytes());
+    assert_eq!(hex0x(nfkd.to_vec()), v.seed);
+    assert_ne!(nfc, nfkd);
+    // And `fromMnemonic` normalises it: the NFKD spelling gives the same keys.
+    assert_eq!(
+        from_mnemonic(ABANDON_ABOUT, "cafe\u{301} fi")
+            .derive_account_keys(0.0)
+            .unwrap()
+            .to_secret_key_hex(),
+        v.secret_key_hex
+    );
+}
+
+/// The vectors' secret scalars and public keys follow the specification's sections 2.2 and 2.3,
+/// computed here from its text: IETF KeyGen with HKDF-SHA-256 over the seed, the exact salts and
+/// `key_info`, reduced modulo the Pallas group order, then `sk · G` with the published generators.
+#[wasm_bindgen_test]
+fn vector_secrets_follow_the_spec_keygen_construction() {
+    use ark_ec::{AffineRepr, CurveGroup};
+
+    let sig_key_gen = spec::point(SIG_KEY_GEN);
+    let enc_key_gen = spec::point(ENC_KEY_GEN);
+    // The published generators are DART's.
+    let gens = polymesh_dart::dart_gens();
+    assert_eq!(sig_key_gen, gens.sig_key_gen());
+    assert_eq!(enc_key_gen, gens.enc_key_gen());
+    assert!(!sig_key_gen.is_zero() && !enc_key_gen.is_zero());
+
+    for v in vectors() {
+        let seed = hex::decode(&v.seed[2..]).unwrap();
+        let sig_sk = spec::keygen(spec::SIG_KEY_SALT, &seed, &v.path);
+        let enc_sk = spec::keygen(spec::ENC_KEY_SALT, &seed, &v.path);
+        // Section 3.1: enc.public ‖ enc.secret ‖ acct.public ‖ acct.secret.
+        assert_eq!(
+            &v.secret_key_hex[66..130],
+            &spec::compressed(&enc_sk)[2..],
+            "{}",
+            v.path
+        );
+        assert_eq!(
+            &v.secret_key_hex[194..258],
+            &spec::compressed(&sig_sk)[2..],
+            "{}",
+            v.path
+        );
+
+        let enc_pk = (enc_key_gen * enc_sk).into_affine();
+        let sig_pk = (sig_key_gen * sig_sk).into_affine();
+        assert_eq!(
+            spec::compressed(&enc_pk),
+            v.encryption_public_key,
+            "{}",
+            v.path
+        );
+        assert_eq!(
+            spec::compressed(&sig_pk),
+            v.account_public_key,
+            "{}",
+            v.path
+        );
+    }
+}
+
+/// The two spec-construction checks above, natively: `cargo test --release --test
+/// wasm_keys_derivation`.
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn native_vectors_follow_the_spec_construction() {
+    vector_seeds_follow_the_spec_bip39_construction();
+    vector_secrets_follow_the_spec_keygen_construction();
+}
+
+/// An independent implementation of the specification's section 2, for the tests above.
+mod spec {
+    use ark_ff::{PrimeField, Zero};
+    use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+    use sha2::{Digest, Sha256, Sha512};
+    use unicode_normalization::UnicodeNormalization;
+
+    pub const SIG_KEY_SALT: &[u8] = b"POLYMESH-DART-V1-SIG-KEY";
+    pub const ENC_KEY_SALT: &[u8] = b"POLYMESH-DART-V1-ENC-KEY";
+    /// `ceil((3 * ceil(log2(r))) / 16)` for the 255-bit Pallas group order `r`.
+    const L: usize = 48;
+
+    /// `0x` + the hex of the arkworks compressed encoding.
+    pub fn compressed<T: CanonicalSerialize>(value: &T) -> String {
+        let mut out = Vec::new();
+        value.serialize_compressed(&mut out).unwrap();
+        format!("0x{}", hex::encode(out))
+    }
+
+    pub fn point(hex: &str) -> ark_pallas::Affine {
+        ark_pallas::Affine::deserialize_compressed(&hex::decode(&hex[2..]).unwrap()[..]).unwrap()
+    }
+
+    /// Section 2.1, with the passphrase's salt bytes given directly.
+    pub fn bip39_seed_raw_passphrase(mnemonic: &str, passphrase: &[u8]) -> [u8; 64] {
+        let normalized: String = mnemonic.nfkd().collect();
+        let password = normalized.split_whitespace().collect::<Vec<_>>().join(" ");
+        let mut salt = b"mnemonic".to_vec();
+        salt.extend_from_slice(passphrase);
+        let mut seed = [0u8; 64];
+        pbkdf2::pbkdf2_hmac::<Sha512>(password.as_bytes(), &salt, 2048, &mut seed);
+        seed
+    }
+
+    /// Section 2.1.
+    pub fn bip39_seed(mnemonic: &str, passphrase: &str) -> [u8; 64] {
+        let passphrase: String = passphrase.nfkd().collect();
+        bip39_seed_raw_passphrase(mnemonic, passphrase.as_bytes())
+    }
+
+    /// Section 2.2: KeyGen of draft-irtf-cfrg-bls-signature-05 section 2.3.
+    pub fn keygen(salt: &[u8], ikm: &[u8], path: &str) -> ark_pallas::Fr {
+        // key_info = u32le(len(path)) ‖ path ‖ u16le(0) ‖ 0x00
+        let mut key_info = (path.len() as u32).to_le_bytes().to_vec();
+        key_info.extend_from_slice(path.as_bytes());
+        key_info.extend_from_slice(&0u16.to_le_bytes());
+        key_info.push(0);
+        // HKDF-Expand info = key_info ‖ I2OSP(L, 2)
+        let mut info = key_info;
+        info.extend_from_slice(&(L as u16).to_be_bytes());
+        // HKDF-Extract input = IKM ‖ I2OSP(0, 1)
+        let mut ikm0 = ikm.to_vec();
+        ikm0.push(0);
+
+        let mut salt = salt.to_vec();
+        loop {
+            let hkdf = hkdf::Hkdf::<Sha256>::new(Some(&salt), &ikm0);
+            let mut okm = [0u8; L];
+            hkdf.expand(&info, &mut okm).unwrap();
+            let sk = ark_pallas::Fr::from_be_bytes_mod_order(&okm);
+            if !sk.is_zero() {
+                return sk;
+            }
+            salt = Sha256::digest(&salt).to_vec();
+        }
     }
 }
 
@@ -266,4 +493,90 @@ fn secret_key_hex_round_trip() {
     assert!(AccountKeys::from_secret_key_hex(format!("{}00", hex)).is_err());
     assert!(AccountKeys::from_secret_key_hex(hex[..hex.len() - 2].to_string()).is_err());
     assert!(AccountKeys::from_secret_key_hex("0xzz".to_string()).is_err());
+}
+
+/// `bytes` with `edit` applied, as secret key hex.
+fn edited_secret_hex(hex: &str, edit: impl FnOnce(&mut Vec<u8>)) -> String {
+    let mut bytes = ::hex::decode(&hex[2..]).unwrap();
+    edit(&mut bytes);
+    format!("0x{}", ::hex::encode(bytes))
+}
+
+fn import_err(hex: String) -> String {
+    AccountKeys::from_secret_key_hex(hex)
+        .err()
+        .expect("must be rejected")
+        .as_string()
+        .unwrap()
+}
+
+/// Section 3.2: an imported secret key must be consistent, whatever its source.
+#[wasm_bindgen_test]
+fn inconsistent_secret_key_hex_rejected() {
+    let hex = from_mnemonic(ABANDON_ABOUT, "")
+        .derive_account_keys(0.0)
+        .unwrap()
+        .to_secret_key_hex();
+    const MISMATCH: &str = "Invalid secret key: the public keys don't match the secret keys";
+    const BAD_POINT: &str = "Invalid secret key: a public key is not a valid Pallas point";
+    const ZERO: &str = "Invalid secret key: a secret key is zero";
+
+    // A flipped bit in the low byte of a secret: still a valid scalar, but another key.
+    for at in [32, 96] {
+        let flipped = edited_secret_hex(&hex, |b| b[at] ^= 0x01);
+        assert_eq!(import_err(flipped), MISMATCH, "secret at {}", at);
+    }
+    // The secrets swapped between the two pairs.
+    let swapped = edited_secret_hex(&hex, |b| {
+        let enc: Vec<u8> = b[32..64].to_vec();
+        let acct: Vec<u8> = b[96..128].to_vec();
+        b[32..64].copy_from_slice(&acct);
+        b[96..128].copy_from_slice(&enc);
+    });
+    assert_eq!(import_err(swapped), MISMATCH);
+    // Another account's public key.
+    let other = from_mnemonic(ABANDON_ABOUT, "")
+        .derive_account_keys(1.0)
+        .unwrap()
+        .to_secret_key_hex();
+    let other = ::hex::decode(&other[2..]).unwrap();
+    let foreign = edited_secret_hex(&hex, |b| b[64..96].copy_from_slice(&other[64..96]));
+    assert_eq!(import_err(foreign), MISMATCH);
+    // A public key of all 0xff bytes isn't a point.
+    for at in [0, 64] {
+        let bad = edited_secret_hex(&hex, |b| b[at..at + 32].fill(0xff));
+        assert_eq!(import_err(bad), BAD_POINT, "public at {}", at);
+    }
+    // A zero secret with the identity as its public key is consistent, but not a key.
+    let mut identity = Vec::new();
+    ark_serialize::CanonicalSerialize::serialize_compressed(
+        &<ark_pallas::Affine as ark_ec::AffineRepr>::zero(),
+        &mut identity,
+    )
+    .unwrap();
+    let zero = edited_secret_hex(&hex, |b| {
+        b[64..96].copy_from_slice(&identity);
+        b[96..128].fill(0);
+    });
+    assert_eq!(import_err(zero), ZERO);
+    // The original still imports.
+    assert!(AccountKeys::from_secret_key_hex(hex).is_ok());
+}
+
+/// Section 2.1 and 6.1: strings are encoded with the WHATWG UTF-8 encoder, as wasm-bindgen does,
+/// so a lone surrogate becomes U+FFFD before anything else sees it.
+#[wasm_bindgen_test]
+fn lone_surrogate_passphrase_is_replacement_character() {
+    let lone = js_sys::JsString::from_char_code1(0xd800);
+    assert!(!lone.is_valid_utf16());
+    let converted: String = JsValue::from(lone).as_string().unwrap();
+    assert_eq!(converted, "\u{fffd}");
+    let keys = |passphrase: String| {
+        MasterSeed::from_mnemonic(ABANDON_ABOUT.to_string(), Some(passphrase))
+            .unwrap()
+            .derive_account_keys(0.0)
+            .unwrap()
+            .to_secret_key_hex()
+    };
+    assert_eq!(keys(converted), keys("\u{fffd}".to_string()));
 }
