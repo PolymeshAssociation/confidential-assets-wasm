@@ -65,7 +65,7 @@ use crate::{scale_convert, AssetMintingProof};
 /// console.log('DID:', did);
 ///
 /// // Register confidential account keys
-/// const keys = AccountKeys.fromSeed("my-seed");
+/// const keys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
 /// const proof = keys.registerAccountProof(did);
 /// await signer.registerAccount(proof);
 /// ```
@@ -385,7 +385,7 @@ impl PolymeshSigner {
     ///
     /// # Example
     /// ```javascript
-    /// const keys = AccountKeys.fromSeed("my-seed-phrase");
+    /// const keys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
     /// const proof = keys.registerAccountProof(myDid);
     /// const blockHash = await signer.registerAccount(proof);
     /// console.log('Account registered at block:', blockHash);
@@ -599,7 +599,7 @@ impl PolymeshSigner {
     ///
     /// # Example
     /// ```javascript
-    /// const accountKeys = AccountKeys.fromSeed("my-seed");
+    /// const accountKeys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
     /// const registration = accountKeys.registerAccountAssetProof(assetId, myDid);
     /// const proof = registration.getProof();
     ///

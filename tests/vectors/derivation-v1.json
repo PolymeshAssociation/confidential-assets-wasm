@@ -1,0 +1,74 @@
+[
+  {
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "passphrase": "",
+    "account": 0,
+    "path": "m/44'/595'/0'/0/0",
+    "accountPublicKey": "0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326",
+    "encryptionPublicKey": "0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327"
+  },
+  {
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "passphrase": "",
+    "account": 1,
+    "path": "m/44'/595'/1'/0/0",
+    "accountPublicKey": "0x991780ddfb3e841f7c8b922657f4f7a4cf6b535fea69a4bc9a6652b2d4880e2c",
+    "encryptionPublicKey": "0xee6738be6a15a3ccc89624183b1dadeab02d6fb4746fe0b676cb876db190a41a"
+  },
+  {
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "passphrase": "",
+    "account": 2147483647,
+    "path": "m/44'/595'/2147483647'/0/0",
+    "accountPublicKey": "0x5fdf2e5e20fdc2dc20358f5134453a85bff12e7d922c48ba3132343931ac28b1",
+    "encryptionPublicKey": "0x4c86ce2a0dbf7079b95ab9f3ca38f35e447bf4f71fe75eb2939ba517d7dbd201"
+  },
+  {
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "passphrase": "TREZOR",
+    "account": 0,
+    "path": "m/44'/595'/0'/0/0",
+    "accountPublicKey": "0xaee05c233ec6c37f2a3844de64e79e50979f7abdda04304ce188eefb43f57b2f",
+    "encryptionPublicKey": "0xfa5952aa85a449a946b51ae88794438a14bceca1a2ec5ac35ebafa2d7c35fc8a"
+  },
+  {
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "passphrase": "TREZOR",
+    "account": 1,
+    "path": "m/44'/595'/1'/0/0",
+    "accountPublicKey": "0x456f88c907773f4bf3543e8385bb30485ea2358936dd9a0dc96a1ce622191bb4",
+    "encryptionPublicKey": "0xe96b8fbc11d3bf76a7178967805321d8b09ed012f0fe1a9b9d6cfac4eaca0f9a"
+  },
+  {
+    "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+    "passphrase": "TREZOR",
+    "account": 2147483647,
+    "path": "m/44'/595'/2147483647'/0/0",
+    "accountPublicKey": "0xab25a113d029f4a4affba3e9057b3e096512758f1a05347160bc3c563fd3df03",
+    "encryptionPublicKey": "0x4a329bd7f50e21f1d0dbaf5f10125ffb544f562bb5f62deaac25967940167415"
+  },
+  {
+    "mnemonic": "legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth title",
+    "passphrase": "TREZOR",
+    "account": 0,
+    "path": "m/44'/595'/0'/0/0",
+    "accountPublicKey": "0x4087a7a3d8b7505f61950590c5eef6f9e0b5ff2284ec809669593dc77b3a982f",
+    "encryptionPublicKey": "0x51dcc017c4a361292a93e5c094bbaa6366fcf9a9775d9a79a9c075848fd7a895"
+  },
+  {
+    "mnemonic": "legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth title",
+    "passphrase": "TREZOR",
+    "account": 1,
+    "path": "m/44'/595'/1'/0/0",
+    "accountPublicKey": "0x38ed23b45f116d61879343973bb08e7f88f304e0db047d1f8efd270bf9d13405",
+    "encryptionPublicKey": "0x4ec752440acc6851d437ab1d874d2a16794b956d08bfba6451798144edcb0d8b"
+  },
+  {
+    "mnemonic": "legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth title",
+    "passphrase": "TREZOR",
+    "account": 2147483647,
+    "path": "m/44'/595'/2147483647'/0/0",
+    "accountPublicKey": "0xfff24342761056667cdaffbacdfccb9f81fbc552e86030455c93c6b4dc39359a",
+    "encryptionPublicKey": "0x443b904998c61e4a4307f9a256af72b9133843dceedfbe680c8a41ef05307a11"
+  }
+]

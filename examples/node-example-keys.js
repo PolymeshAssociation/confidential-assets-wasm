@@ -6,7 +6,8 @@ Object.assign(global, { WebSocket: require('ws') });
 
 const {
     AccountKeys,
-    generateRandomSeed,
+    MasterSeed,
+    generateMnemonic,
     AssetState,
     PolymeshClient,
     PolymeshSigner,
@@ -14,15 +15,16 @@ const {
 
 console.log('=== Polymesh DART WASM Node.js Example ===\n');
 
-// 1. Generate a random seed
-console.log('1. Generating random seed...');
-const seed = generateRandomSeed();
-console.log('   Seed:', seed);
+// 1. Generate a random mnemonic
+console.log('1. Generating random mnemonic...');
+const mnemonic = generateMnemonic();
+console.log('   Mnemonic:', mnemonic);
 console.log('');
 
-// 2. Create account keys from seed
-console.log('2. Creating account keys from seed...');
-const accountKeys = new AccountKeys(seed);
+// 2. Derive account keys from the mnemonic
+console.log('2. Deriving account 0 keys from the mnemonic...');
+const masterSeed = MasterSeed.fromMnemonic(mnemonic);
+const accountKeys = masterSeed.deriveAccountKeys(0);
 console.log('   ✓ Account keys created');
 console.log('');
 
@@ -42,31 +44,30 @@ console.log('   Encryption public key:', encryptionPubKey.toJson());
 console.log('');
 
 // 5. Export and import keys
-console.log('5. Recreating keys from the seed...');
-const recreatedKeys = new AccountKeys(seed);
+console.log('5. Recreating keys from the mnemonic...');
+const recreatedKeys = MasterSeed.fromMnemonic(mnemonic).deriveAccountKeys(0);
 const recreatedPublicKeys = recreatedKeys.publicKeys();
 console.log('   Recreated public keys:', recreatedPublicKeys.toJson());
 
 // Verify they match
 if (publicKeys.toJson() === recreatedPublicKeys.toJson()) {
-    console.log('   ✓ Keys match after recreating from the seed!');
+    console.log('   ✓ Keys match after recreating from the mnemonic!');
 } else {
     console.log('   ✗ Error: Keys do not match!');
 }
 console.log('');
 
-// 6. Create keys from a string seed
-console.log('6. Creating keys from a string seed...');
-const stringKeys = AccountKeys.fromSeed('my-secret-password-seed');
-const stringPublicKeys = stringKeys.publicKeys();
-console.log('   Public keys from string seed:', stringPublicKeys.toJson());
+// 6. Export the secret keys and restore them
+console.log('6. Restoring keys from toSecretKeyHex() (the private key; treat it like a seed)...');
+const restoredKeys = AccountKeys.fromSecretKeyHex(accountKeys.toSecretKeyHex());
+console.log('   Restored public keys:', restoredKeys.publicKeys().toJson());
 console.log('');
 
 // 7. Create an asset state
 console.log('7. Creating an asset state...');
 const assetId = 0;
-const auditorPublicKeys = AccountKeys.fromSeed('auditor-seed').publicKeys();
-const mediatorPublicKeys = AccountKeys.fromSeed('mediator-seed').publicKeys();
+const auditorPublicKeys = masterSeed.deriveAccountKeys(1).publicKeys();
+const mediatorPublicKeys = masterSeed.deriveAccountKeys(2).publicKeys();
 // Same shape as the chain's `confidentialAssets.keys(assetId)` value.
 const assetKeys = {
     encKeys: [

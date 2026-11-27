@@ -812,6 +812,7 @@ dependencies = [
  "rand_core",
  "serde",
  "unicode-normalization",
+ "zeroize",
 ]
 
 [[package]]
@@ -3551,6 +3552,7 @@ name = "polymesh-dart-wasm"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bip39",
  "bounded-collections",
  "console_error_panic_hook",
  "futures-util",
@@ -3563,8 +3565,6 @@ dependencies = [
  "polymesh-api-client",
  "polymesh-dart",
  "rand",
- "rand_chacha",
- "rand_core",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
