@@ -745,6 +745,27 @@
       "error": "corrupted"
     },
     {
+      "description": "`acct.secret` has a flipped bit: a valid scalar that doesn't match `acct.public`",
+      "step": 9,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"type\": \"dart-key-file\",\n  \"version\": 1,\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf5eKOdmVX8iUq72LY7GlnoC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytLr5Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000\n  }\n}",
+      "error": "corrupted"
+    },
+    {
+      "description": "`enc.secret` has a flipped bit: a valid scalar that doesn't match `enc.public`",
+      "step": 9,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"type\": \"dart-key-file\",\n  \"version\": 1,\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf77xiGwN+JcJKNidgc39uJC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEuspgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000\n  }\n}",
+      "error": "corrupted"
+    },
+    {
+      "description": "`enc.public` (and `public.encryption`) is 32 0xff bytes, not a Pallas point",
+      "step": 9,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"type\": \"dart-key-file\",\n  \"version\": 1,\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff\"\n  },\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trcC4ixtZ83+Gq9kIs2IGbKaKYGt/sdtbKz2ZFEpIKy4S+beM9zdUKeCZg4soIIuLJOtpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000\n  }\n}",
+      "error": "corrupted"
+    },
+    {
       "description": "`public.account` is another account's",
       "step": 10,
       "password": "correct horse battery staple",

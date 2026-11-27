@@ -119,9 +119,19 @@ bip39 = { version = "2.2.2", default-features = false, features = ["std", "zeroi
 scrypt = { version = "0.11.0", default-features = false }
 crypto_secretbox = { version = "0.1.1", default-features = false, features = ["salsa20"] }
 base64 = { version = "0.22.1", default-features = false, features = ["alloc"] }
+# Recomputing public keys from secret keys (the AccountKeys consistency check).
+ark-ec = { version = "0.5", default-features = false }
+ark-pallas = { version = "0.5", default-features = false, features = ["curve"] }
+ark-serialize = { version = "0.5", default-features = false }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
+# Recomputing the derivation from the specification's construction (tests/wasm_keys_derivation.rs).
+hkdf = "0.12.4"
+sha2 = "0.10.9"
+pbkdf2 = { version = "0.12.2", default-features = false, features = ["hmac"] }
+unicode-normalization = "0.1.25"
+ark-ff = { version = "0.5", default-features = false }
 
 # native:
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]

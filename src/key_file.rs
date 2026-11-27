@@ -19,6 +19,7 @@ use serde_json::{Map, Value};
 use wasm_bindgen::prelude::*;
 use zeroize::{Zeroize, Zeroizing};
 
+use crate::keys::check_key_consistency;
 use crate::AccountKeys;
 
 const FILE_TYPE: &str = "dart-key-file";
@@ -104,7 +105,7 @@ pub(crate) enum KeyFileError {
     /// The tag didn't verify: a wrong password or a modified payload (step 8). Deliberately
     /// doesn't say which.
     InvalidPasswordOrCorrupted,
-    /// The plaintext isn't a valid `AccountKeys` (step 9).
+    /// The plaintext isn't a valid, internally consistent `AccountKeys` (step 9).
     Corrupted,
     /// `public` doesn't match the decrypted keys (step 10).
     PublicKeyMismatch,
@@ -446,7 +447,7 @@ pub(crate) fn parse(json: &str) -> Result<KeyFileFields, KeyFileError> {
         return Err(KeyFileError::Unsupported);
     }
 
-    // 3. The version: exactly the integer 1.
+    // 3. The version: a JSON number equal to 1 (`1.0` is the same number).
     if file.get("version").and_then(|v| as_integer(v, u64::MAX)) != Some(FILE_VERSION) {
         return Err(KeyFileError::Unsupported);
     }
@@ -537,9 +538,11 @@ pub(crate) fn decrypt(
     let params = payload_params(&fields.payload)?;
     // 8.
     let plaintext = open(password, &fields.payload, params)?;
-    // 9.
+    // 9. A valid `AccountKeys` whose public keys are its secret keys times DART's generators.
+    // (`keys` is zeroized on drop if the check fails.)
     let mut keys =
         NativeAccountKeys::decode_all(&mut &plaintext[..]).map_err(|_| KeyFileError::Corrupted)?;
+    check_key_consistency(&keys).map_err(|_| KeyFileError::Corrupted)?;
     // 10.
     if plaintext[64..96] != fields.public_account || plaintext[0..32] != fields.public_encryption {
         keys.zeroize();
@@ -686,7 +689,8 @@ pub fn encrypt_key_file(
 /// * "Invalid key file: ..." if the file is malformed.
 /// * "Key file public keys don't match its encrypted keys" if the clear-text public keys were
 ///   changed.
-/// * "Corrupted key file: ..." if the decrypted data isn't valid account keys.
+/// * "Corrupted key file: ..." if the decrypted data isn't valid account keys, or its public keys
+///   don't match its secret keys.
 ///
 /// # Example
 /// ```javascript
@@ -700,6 +704,7 @@ pub fn decrypt_key_file(json: String, password: String) -> Result<DecryptedKeyFi
     Ok(DecryptedKeyFile {
         name: fields.name,
         derivation_path: fields.derivation_path,
+        created: fields.created,
         keys: AccountKeys { inner },
     })
 }
@@ -712,6 +717,7 @@ pub fn decrypt_key_file(json: String, password: String) -> Result<DecryptedKeyFi
 pub struct DecryptedKeyFile {
     name: String,
     derivation_path: Option<String>,
+    created: u64,
     keys: AccountKeys,
 }
 
@@ -727,6 +733,16 @@ impl DecryptedKeyFile {
     #[wasm_bindgen(js_name = derivationPath)]
     pub fn derivation_path(&self) -> Option<String> {
         self.derivation_path.clone()
+    }
+
+    /// When the file was written (`meta.created`), in Unix milliseconds. Informational only: a
+    /// host that re-encrypts the keys, for example to change the password, can keep it.
+    ///
+    /// Always an integer from 0 to 2^53 - 1, so it is exact as a JavaScript number.
+    #[wasm_bindgen(js_name = created)]
+    pub fn created(&self) -> f64 {
+        // At most 2^53 - 1 (section 5.3), so the conversion is exact.
+        self.created as f64
     }
 
     /// The account keys.
@@ -932,6 +948,37 @@ mod tests {
                 err.message()
             );
         }
+    }
+
+    /// Section 5: a duplicate member name. This reader (serde_json) keeps the last occurrence.
+    #[wasm_bindgen_test]
+    fn duplicate_member_uses_the_last_occurrence() {
+        let v = &vectors().valid[0];
+        let text = v.file.to_string();
+        // A leading `"name": "Decoy"` before the real one.
+        let duplicated = text.replacen('{', "{\"name\":\"Decoy\",", 1);
+        assert!(duplicated.matches("\"name\"").count() == 2);
+        let fields = parse(&duplicated).unwrap_or_else(|e| panic!("{}", e.message()));
+        assert_eq!(json!(fields.name), v.file["name"]);
+        // And the other way round.
+        let duplicated = text.replacen('{', "{\"version\":2,", 1);
+        assert!(parse(&duplicated).is_ok(), "the last `version`, 1, is used");
+        let last_bad = format!("{},\"version\":2}}", &text[..text.len() - 1]);
+        assert_eq!(parse(&last_bad).err(), Some(KeyFileError::Unsupported));
+    }
+
+    /// Section 5: a string that isn't valid Unicode (a lone surrogate escape) is rejected.
+    #[wasm_bindgen_test]
+    fn lone_surrogate_escape_rejected() {
+        let v = &vectors().valid[0];
+        let mut file = v.file.clone();
+        file["name"] = json!("PLACEHOLDER");
+        let text = file.to_string().replace("PLACEHOLDER", "\\ud800");
+        assert!(text.contains("\"\\ud800\""));
+        assert!(matches!(parse(&text), Err(KeyFileError::Invalid(_))));
+        // A valid surrogate pair is fine.
+        let text = file.to_string().replace("PLACEHOLDER", "\\ud83d\\udd11");
+        assert_eq!(parse(&text).unwrap().name, "\u{1f511}");
     }
 
     /// Prints `tests/vectors/key-file-v1.json`. Native only; run it, then save the output:
@@ -1446,6 +1493,34 @@ mod tests {
                 "corrupted",
                 "`enc.secret` is not below the Pallas group order",
                 sealed(bad_scalar),
+                pw,
+            );
+            // Decodable, but inconsistent (section 3.2); `public` matches the plaintext.
+            let mut flipped = plaintext;
+            flipped[96] ^= 0x01;
+            t.add(
+                9,
+                "corrupted",
+                "`acct.secret` has a flipped bit: a valid scalar that doesn't match `acct.public`",
+                sealed(flipped),
+                pw,
+            );
+            let mut flipped = plaintext;
+            flipped[32] ^= 0x01;
+            t.add(
+                9,
+                "corrupted",
+                "`enc.secret` has a flipped bit: a valid scalar that doesn't match `enc.public`",
+                sealed(flipped),
+                pw,
+            );
+            let mut not_a_point = plaintext;
+            not_a_point[0..32].fill(0xff);
+            t.add(
+                9,
+                "corrupted",
+                "`enc.public` (and `public.encryption`) is 32 0xff bytes, not a Pallas point",
+                sealed(not_a_point),
                 pw,
             );
 

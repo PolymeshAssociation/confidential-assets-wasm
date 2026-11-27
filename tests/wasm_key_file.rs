@@ -107,6 +107,7 @@ fn key_file_round_trip() {
     assert_eq!(value["meta"]["derivationPath"], path);
     let created = value["meta"]["created"].as_u64().unwrap();
     assert!(created > 1_700_000_000_000, "meta.created is Date.now()");
+    assert_eq!(opened.created(), created as f64);
 
     // The payload (section 6.4): 212 bytes, written with N = 2^17, p = 1, r = 8.
     let encoded = value["encoded"].as_str().unwrap();
@@ -383,6 +384,48 @@ fn malformed_files_rejected() {
     for (what, json) in cases {
         let err = decrypt_err(&json, PASSWORD);
         assert!(err.starts_with("Invalid key file"), "{}: {}", what, err);
+    }
+}
+
+/// `DecryptedKeyFile.created()` is `meta.created`, exactly, across the whole range.
+#[wasm_bindgen_test]
+fn created_is_meta_created() {
+    let file = encrypt(&keys(0), None);
+    for created in [0u64, 1764201600000, (1 << 53) - 1] {
+        let changed = edit_json(&file, |v| v["meta"]["created"] = json!(created));
+        let opened = decrypt_key_file(changed, PASSWORD.to_string()).unwrap();
+        assert_eq!(opened.created(), created as f64, "created {}", created);
+    }
+    // `1.0` is the same number as `1`.
+    let float = edit_json(&file, |v| v["meta"]["created"] = json!(1.0));
+    assert_eq!(
+        decrypt_key_file(float, PASSWORD.to_string())
+            .unwrap()
+            .created(),
+        1.0
+    );
+}
+
+/// The plaintext's public keys must match its secret keys (section 3.2, step 9), even when the
+/// clear-text `public` member matches the plaintext.
+#[wasm_bindgen_test]
+fn inconsistent_plaintext_rejected() {
+    let vectors: Value = serde_json::from_str(include_str!("vectors/key-file-v1.json")).unwrap();
+    let inconsistent: Vec<&Value> = vectors["invalid"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|v| v["step"] == 9 && v["description"].as_str().unwrap().contains("flipped bit"))
+        .collect();
+    assert_eq!(inconsistent.len(), 2);
+    for v in inconsistent {
+        let err = decrypt_err(v["file"].as_str().unwrap(), v["password"].as_str().unwrap());
+        assert!(
+            err.starts_with("Corrupted key file"),
+            "{}: {}",
+            v["description"],
+            err
+        );
     }
 }
 

@@ -203,7 +203,7 @@ Generates a random BIP-39 mnemonic (English wordlist) of 12, 15, 18, 21 or 24 wo
 Represents an account's private keys. Get them from `MasterSeed.deriveAccountKeys`; there is no constructor.
 
 - `toSecretKeyHex(): string` - The private key (`0x` + SCALE `AccountKeys`). Treat it like a seed.
-- `AccountKeys.fromSecretKeyHex(hex: string)` - Restore keys from `toSecretKeyHex()` output
+- `AccountKeys.fromSecretKeyHex(hex: string)` - Restore keys from `toSecretKeyHex()` output. Rejects keys whose public keys don't match their secret keys
 - `publicKeys(): AccountPublicKeys` - Get corresponding public keys
 - `encryptionKeyPair(): EncryptionKeyPair` - Get the encryption key pair, used to decrypt legs as an auditor or mediator
 - `registerAccountProof(did)` - Generate an `AccountRegistrationProof`

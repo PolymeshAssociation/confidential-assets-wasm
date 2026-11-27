@@ -75,6 +75,73 @@ fn nfkd(s: &str) -> Zeroizing<String> {
     Zeroizing::new(cow.into_owned())
 }
 
+/// Why an `AccountKeys` isn't internally consistent (`docs/KEY_FILE_FORMAT.md` section 3.2).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum KeyConsistencyError {
+    /// A public key isn't a valid compressed Pallas point.
+    InvalidPublicKey,
+    /// A secret key is zero.
+    ZeroSecretKey,
+    /// A public key isn't its secret key times its generator.
+    Mismatch,
+}
+
+impl KeyConsistencyError {
+    pub(crate) fn message(self) -> &'static str {
+        match self {
+            Self::InvalidPublicKey => "a public key is not a valid Pallas point",
+            Self::ZeroSecretKey => "a secret key is zero",
+            Self::Mismatch => "the public keys don't match the secret keys",
+        }
+    }
+}
+
+/// Checks that `keys` is internally consistent (`docs/KEY_FILE_FORMAT.md` section 3.2): both
+/// public keys are valid points, both secret keys are non-zero, `acct.public = acct.secret ·
+/// sig_key_gen` and `enc.public = enc.secret · enc_key_gen`, with DART's generators.
+pub(crate) fn check_key_consistency(keys: &NativeAccountKeys) -> Result<(), KeyConsistencyError> {
+    use ark_ec::CurveGroup as _;
+    use ark_serialize::CanonicalDeserialize as _;
+    use polymesh_dart::{dart_gens, PallasScalar};
+
+    let enc_public = keys
+        .enc
+        .public
+        .get_affine()
+        .map_err(|_| KeyConsistencyError::InvalidPublicKey)?;
+    let acct_public = keys
+        .acct
+        .public
+        .get_affine()
+        .map_err(|_| KeyConsistencyError::InvalidPublicKey)?;
+
+    // The secret scalars, read back from the SCALE encoding (section 3.1): `enc.secret` at
+    // bytes 32..64 and `acct.secret` at 96..128.
+    let encoded = Zeroizing::new(keys.encode());
+    let scalar_at = |at: usize| {
+        encoded
+            .get(at..at + 32)
+            .and_then(|bytes| PallasScalar::deserialize_compressed(bytes).ok())
+            .map(Zeroizing::new)
+            .ok_or(KeyConsistencyError::Mismatch)
+    };
+    let enc_secret = scalar_at(32)?;
+    let acct_secret = scalar_at(96)?;
+    if *enc_secret == PallasScalar::from(0u8) || *acct_secret == PallasScalar::from(0u8) {
+        return Err(KeyConsistencyError::ZeroSecretKey);
+    }
+
+    let gens = dart_gens();
+    // By reference, so no unzeroized copy of a scalar is made.
+    let enc_ok = (gens.enc_key_gen() * &*enc_secret).into_affine() == enc_public;
+    let acct_ok = (gens.sig_key_gen() * &*acct_secret).into_affine() == acct_public;
+    if enc_ok && acct_ok {
+        Ok(())
+    } else {
+        Err(KeyConsistencyError::Mismatch)
+    }
+}
+
 /// `0x` + the lowercase hex of `bytes`, without leaving an unzeroized intermediate copy.
 fn secret_to_hex(bytes: &[u8]) -> String {
     let encoded = Zeroizing::new(hex::encode(bytes));
@@ -248,6 +315,8 @@ impl AccountKeys {
     /// # Errors
     /// * Throws an error if the hex is invalid, or isn't exactly one SCALE-encoded `AccountKeys`
     ///   (trailing bytes are rejected).
+    /// * Throws an error if the keys aren't consistent: a public key that isn't a valid point, a
+    ///   zero secret key, or a public key that doesn't match its secret key.
     #[wasm_bindgen(js_name = fromSecretKeyHex)]
     pub fn from_secret_key_hex(hex: String) -> Result<AccountKeys, JsValue> {
         let hex = Zeroizing::new(hex);
@@ -261,6 +330,9 @@ impl AccountKeys {
         );
         let inner = NativeAccountKeys::decode_all(&mut &bytes[..])
             .map_err(|e| JsValue::from_str(&format!("Invalid secret key: {}", e)))?;
+        // `inner` is zeroized on drop if this fails.
+        check_key_consistency(&inner)
+            .map_err(|e| JsValue::from_str(&format!("Invalid secret key: {}", e.message())))?;
         Ok(AccountKeys { inner })
     }
 

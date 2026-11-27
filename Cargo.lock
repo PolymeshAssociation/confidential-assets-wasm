@@ -3551,6 +3551,10 @@ source = "git+https://github.com/PolymeshAssociation/polymesh-dart?tag=dart-v1.0
 name = "polymesh-dart-wasm"
 version = "0.1.0"
 dependencies = [
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-pallas",
+ "ark-serialize 0.5.0",
  "async-trait",
  "base64 0.22.1",
  "bip39",
@@ -3560,9 +3564,11 @@ dependencies = [
  "futures-util",
  "getrandom 0.2.17",
  "hex",
+ "hkdf",
  "js-sys",
  "log",
  "parity-scale-codec",
+ "pbkdf2",
  "polymesh-api",
  "polymesh-api-client",
  "polymesh-dart",
@@ -3571,8 +3577,10 @@ dependencies = [
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
+ "sha2 0.10.9",
  "thiserror 1.0.69",
  "tokio",
+ "unicode-normalization",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",

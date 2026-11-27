@@ -132,6 +132,7 @@ async function main () {
     assert.equal(opened.accountKeys().toSecretKeyHex(), secretHex, `(a) keys, password ${i}`);
     assert.equal(opened.name(), `polkadot.js ${i}`);
     assert.equal(opened.derivationPath(), `m/44'/595'/${i}'/0/0`);
+    assert.equal(opened.created(), pjsFile.meta.created);
     assert.throws(
       () => dart.decryptKeyFile(JSON.stringify(pjsFile), password + 'x'),
       (e) => e === 'Invalid password or corrupted key file'
