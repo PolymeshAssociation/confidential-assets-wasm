@@ -137,16 +137,16 @@ pub fn bytes_to_jsvalue(bytes: &[u8]) -> JsValue {
 /// Convert `JsValue` to `Balance`
 ///
 /// Accepts:
-/// - JavaScript number (e.g., `1000`)
+/// - JavaScript number up to `Number.MAX_SAFE_INTEGER` (e.g., `1000`)
 /// - JavaScript BigInt (e.g., `1000n`)
 /// - Decimal string (e.g., `"1000"`)
 /// - Hex string with 0x prefix (e.g., `"0x3e8"`)
 pub fn jsvalue_to_balance(value: &JsValue) -> Result<Balance, JsValue> {
     // Try as number first
     if let Some(num) = value.as_f64() {
-        if num < 0.0 || num > u64::MAX as f64 || num.fract() != 0.0 {
+        if num < 0.0 || num > js_sys::Number::MAX_SAFE_INTEGER || num.fract() != 0.0 {
             return Err(JsValue::from_str(
-                "Balance number must be a non-negative integer within u64 range",
+                "Balance number must be a non-negative integer no greater than Number.MAX_SAFE_INTEGER. Use a BigInt for larger values",
             ));
         }
         return Ok(num as u64);
@@ -155,9 +155,6 @@ pub fn jsvalue_to_balance(value: &JsValue) -> Result<Balance, JsValue> {
     // Try as BigInt
     if let Ok(bigint) = js_sys::BigInt::new(value) {
         let bigint_str = format!("{}", bigint);
-
-        log::info!("Convert JS BigInt to string: '{bigint_str}'");
-
         return bigint_str
             .parse::<u64>()
             .map_err(|e| JsValue::from_str(&format!("BigInt out of range for u64: {}", e)));
@@ -184,17 +181,31 @@ pub fn jsvalue_to_balance(value: &JsValue) -> Result<Balance, JsValue> {
     ))
 }
 
-/// Convert `Balance` to `JsValue`
+/// Convert `Balance` to `JsValue`. Returns a number up to `Number.MAX_SAFE_INTEGER` and a `BigInt`
+/// above it.
 pub fn balance_to_jsvalue(balance: Balance) -> JsValue {
-    JsValue::from_f64(balance as f64)
+    if balance <= js_sys::Number::MAX_SAFE_INTEGER as u64 {
+        JsValue::from_f64(balance as f64)
+    } else {
+        js_sys::BigInt::from(balance).into()
+    }
 }
 
-/// Initialize the WASM module. This should be called once when loading the module.
-/// It sets up panic hooks for better error messages in the browser console.
+/// Initialize the WASM module: sets up the console logger and the panic hook for better
+/// error messages in the browser console.
+///
+/// It runs automatically when the module loads (`#[wasm_bindgen(start)]`) and is also
+/// exported, so callers may call it again. It is idempotent: later calls do nothing.
+/// Without this guard a second call re-registered the global logger, and `wasm_logger`
+/// reported "attempted to set a logger after the logging system was already initialized"
+/// with `console.error`.
 #[wasm_bindgen(start)]
 pub fn init() {
-    wasm_logger::init(wasm_logger::Config::default());
-    utils::set_panic_hook();
+    static INIT: std::sync::Once = std::sync::Once::new();
+    INIT.call_once(|| {
+        wasm_logger::init(wasm_logger::Config::default());
+        utils::set_panic_hook();
+    });
 }
 
 /// Get the version of the polymesh-dart-wasm library

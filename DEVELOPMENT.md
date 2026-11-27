@@ -108,6 +108,8 @@ cargo install wasm-pack
 rustup target add wasm32-unknown-unknown
 ```
 
+See [Testing](README.md#testing) in the README for running the browser tests and the examples against a local chain.
+
 ### Build Commands
 
 #### Build for all targets (recommended)
@@ -192,24 +194,19 @@ async function main() {
 
   // 3. Query asset state from chain
   const assetId = 1;
-  const assetDetails = await api.query.confidentialAssets.dartAssetDetails(assetId);
-  const assetState = new AssetState(
-    assetId,
-    assetDetails.mediators,      // Automatically converted from chain format
-    assetDetails.auditors
-  );
+  const assetKeys = await api.query.confidentialAssets.keys(assetId);
+  const assetState = new AssetState(assetId, assetKeys.unwrap().toU8a());
 
   // 4. Generate proof (pure computation, no chain needed)
   const accountDid = '0x1234...'; // Your account DID
   const registration = dartKeys.registerAccountAssetProof(assetId, accountDid);
-  const proof = registration.getProof();
 
   // 5. Submit using Polkadot.js
   const keyring = new Keyring({ type: 'sr25519' });
   const pair = keyring.addFromUri('//Alice');
   
-  const extrinsic = api.tx.confidentialAssets.registerAccountAsset(
-    proof.toBytes()
+  const extrinsic = api.tx.confidentialAssets.registerAccountAssets(
+    registration.getBatchedProofBytes()
   );
   
   const hash = await extrinsic.signAndSend(pair);
@@ -236,7 +233,7 @@ main().catch(console.error);
 
 The `PolymeshClient` provides convenient wrappers for Polymesh-specific operations. It's best used for rapid testing and development.
 
-**⚠️ Important:** PolymeshClient is NOT included in the default build. You must build with the special script:
+**Important:** PolymeshClient is NOT included in the default build. You must build with the special script:
 
 ```bash
 ./build_with_rust_client.sh
@@ -259,12 +256,18 @@ async function main() {
 
   // 2. Create a signer for submitting transactions
   const issuer = client.newSigner("//TestIssuer");
-  const issuerDid = await issuer.identity();
+  let issuerDid = await issuer.identity();
   
   if (!issuerDid) {
     // Onboard new account
     await client.onboardSigner(issuer);
+    issuerDid = await issuer.identity();
   }
+
+  // Development chains only: add the DART role claims (Alice is the trusted claim issuer)
+  await client.onboardConfidentialRoles(issuer, ["AssetCreator"]);
+  // Other chains: the trusted claim issuer signs
+  // await trustedIssuer.addConfidentialRoleClaims(issuerDid, ["AssetCreator"]);
 
   // 3. Generate DART keys
   const dartKeys = new AccountKeys(generateRandomSeed());
@@ -279,17 +282,19 @@ async function main() {
   const accountProof = dartKeys.registerAccountProof(issuerDid);
   await issuer.registerAccount(accountProof);
 
-  // 5. Create asset and register account for asset
+  // 5. Create asset and register account for asset.
+  // Auditors and mediators need the "Auditor" / "Mediator" role claims.
   const mediators = [];
-  const auditors = [mediatorEncryptionKey];
-  const assetId = await issuer.createAsset("TestAsset", "TST", 2);
+  const auditors = [mediatorEncryptionPublicKey];
+  const created = await issuer.createAsset("TestAsset", "TST", 2, mediators, auditors, "metadata");
+  const assetId = created.assetState().assetId();
   const registration = dartKeys.registerAccountAssetProof(assetId, issuerDid);
   
-  const leafIndex = await issuer.registerAccountAsset(registration.getProof());
+  const result = await issuer.registerAccountAsset(registration.getProof());
 
   // 6. Track state
   const accountState = registration.getAccountAssetState();
-  accountState.commitPendingState(leafIndex);
+  accountState.commitPendingState(result.leafIndex());
 }
 
 main().catch(console.error);
@@ -451,8 +456,11 @@ All WASM types provide serialization methods for flexibility:
 
 ```typescript
 // SCALE encoding (compact binary format - most efficient)
-const bytes: Uint8Array = accountKeys.toBytes();
-const restoredKeys = AccountKeys.fromBytes(bytes);
+const bytes: Uint8Array = accountAssetState.toBytes();
+const restoredState = AccountAssetState.fromBytes(bytes);
+
+// AccountKeys has no byte export. Persist the seed and recreate the keys.
+const restoredKeys = new AccountKeys(seed);
 
 // Hex encoding (for display/storage/transmission)
 const hex: string = proof.toHex();

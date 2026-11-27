@@ -1,4 +1,4 @@
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeAll, Encode};
 use polymesh_dart::{
     curve_tree::get_account_curve_tree_parameters,
     AccountAssetRegistrationProof as NativeAccountAssetRegistrationProof,
@@ -33,19 +33,24 @@ impl MasterSeed {
     /// Creates a new MasterSeed from a hexadecimal seed string.
     ///
     /// # Arguments
-    /// * `seed` - A seed phrase or "0x"-prefixed hexadecimal string used to derive the master seed.
+    /// * `seed` - A "0x"-prefixed hexadecimal string, or else a string whose raw bytes are used.
+    ///   Must decode to at least 32 bytes.
     ///
     /// # Returns
     /// A new `MasterSeed` object containing the generated seed.
     ///
+    /// # Errors
+    /// * Throws an error if the hex is invalid or the seed is shorter than 32 bytes.
+    ///
     /// # Example
     /// ```javascript
-    /// const masterSeed = new MasterSeed("my-secure-seed-phrase");
+    /// const masterSeed = new MasterSeed("0x" + generateRandomSeed());
     /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(seed: &str) -> Result<MasterSeed, JsValue> {
         Ok(MasterSeed {
-            inner: NativeMasterSeed::from_seed(seed),
+            inner: NativeMasterSeed::from_seed(seed)
+                .map_err(|e| JsValue::from_str(&format!("Invalid master seed: {}", e)))?,
         })
     }
 
@@ -289,6 +294,7 @@ impl AccountKeys {
             0,
             &did.0[..],
             &params,
+            None,
         )
         .map_err(|e| {
             JsValue::from_str(&format!(
@@ -336,7 +342,13 @@ impl AccountKeys {
 
         // Decrypt leg.
         let (leg, leg_role) = leg_enc
-            .try_decrypt_with_key(&self.inner.enc, None, None)
+            .try_decrypt_with_key(
+                &self.inner.enc,
+                None,
+                Some(&self.inner.acct.public),
+                None,
+                None,
+            )
             .map_err(|e| JsValue::from_str(&format!("Failed to decrypt settlement leg: {}", e)))?;
 
         // Verify asset id matches.
@@ -564,12 +576,13 @@ impl AccountPublicKeys {
         if bytes_array.length() > 0 {
             let bytes_vec = bytes_array.to_vec();
             if !bytes_vec.is_empty() {
-                let native = NativeAccountPublicKeys::decode(&mut &bytes_vec[..]).map_err(|e| {
-                    JsValue::from_str(&format!(
-                        "Failed to decode account public keys from Uint8Array: {}",
-                        e
-                    ))
-                })?;
+                let native =
+                    NativeAccountPublicKeys::decode_all(&mut &bytes_vec[..]).map_err(|e| {
+                        JsValue::from_str(&format!(
+                            "Failed to decode account public keys from Uint8Array: {}",
+                            e
+                        ))
+                    })?;
                 return Ok(AccountPublicKeys::from_native(native));
             }
         }
@@ -614,7 +627,7 @@ impl AccountPublicKeys {
     /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<AccountPublicKeys, JsValue> {
-        let inner = NativeAccountPublicKeys::decode(&mut &bytes[..])
+        let inner = NativeAccountPublicKeys::decode_all(&mut &bytes[..])
             .map_err(|e| JsValue::from_str(&format!("Failed to decode public keys: {}", e)))?;
         Ok(AccountPublicKeys::from_native(inner))
     }
@@ -742,9 +755,9 @@ impl AccountPublicKey {
     /// const key2 = new AccountPublicKey(new Uint8Array(32));
     ///
     /// // From Polkadot.js Codec
-    /// const assetDetail = await api.query.confidentialAssets.dartAssetDetails(assetId);
-    /// const auditor = assetDetail.auditors[0]; // Auditor key from chain storage
-    /// const key4 = new AccountPublicKey(auditor); // Automatically calls toU8a()
+    /// const assetKeys = (await api.query.confidentialAssets.keys(assetId)).unwrap();
+    /// const mediator = [...assetKeys.mediators][0]; // Mediator key from chain storage
+    /// const key4 = new AccountPublicKey(mediator); // Automatically calls toU8a()
     /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(js_value: JsValue) -> Result<AccountPublicKey, JsValue> {
@@ -765,7 +778,7 @@ impl AccountPublicKey {
         if bytes_array.length() > 0 {
             let bytes_vec = bytes_array.to_vec();
             if !bytes_vec.is_empty() {
-                return NativeAccountPublicKey::decode(&mut &bytes_vec[..])
+                return NativeAccountPublicKey::decode_all(&mut &bytes_vec[..])
                     .map(|key| AccountPublicKey { inner: key })
                     .map_err(|e| {
                         JsValue::from_str(&format!(
@@ -785,7 +798,7 @@ impl AccountPublicKey {
                     let bytes_array = js_sys::Uint8Array::new(&bytes_js);
                     if bytes_array.length() > 0 {
                         let bytes_vec = bytes_array.to_vec();
-                        return NativeAccountPublicKey::decode(&mut &bytes_vec[..])
+                        return NativeAccountPublicKey::decode_all(&mut &bytes_vec[..])
                             .map(|key| AccountPublicKey { inner: key })
                             .map_err(|e| {
                                 JsValue::from_str(&format!(
@@ -834,7 +847,7 @@ impl AccountPublicKey {
     /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<AccountPublicKey, JsValue> {
-        let inner = NativeAccountPublicKey::decode(&mut &bytes[..]).map_err(|e| {
+        let inner = NativeAccountPublicKey::decode_all(&mut &bytes[..]).map_err(|e| {
             JsValue::from_str(&format!("Failed to decode account public key: {}", e))
         })?;
         Ok(AccountPublicKey { inner })
@@ -898,7 +911,10 @@ impl AccountPublicKey {
 /// const encKey = new EncryptionPublicKey(uint8Array);
 ///
 /// // Use in AssetState
-/// const assetState = new AssetState(assetId, [mediatorEncKey], [auditorEncKey]);
+/// const assetState = new AssetState(assetId, {
+///     encKeys: [auditorEncKey.toJs(), mediatorEncKey.toJs()],
+///     mediators: [mediatorAccountKey.toJs()],
+/// });
 /// ```
 #[wasm_bindgen]
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
@@ -940,9 +956,9 @@ impl EncryptionPublicKey {
     /// const key2 = new EncryptionPublicKey(new Uint8Array(32));
     ///
     /// // From Polkadot.js Codec
-    /// const assetDetail = await api.query.confidentialAssets.dartAssetDetails(assetId);
-    /// const mediator = assetDetail.mediators[0]; // Mediator key from chain storage
-    /// const key4 = new EncryptionPublicKey(mediator); // Automatically calls toU8a()
+    /// const assetKeys = (await api.query.confidentialAssets.keys(assetId)).unwrap();
+    /// const encKey = [...assetKeys.encKeys][0]; // Auditor or mediator key from chain storage
+    /// const key4 = new EncryptionPublicKey(encKey); // Automatically calls toU8a()
     /// ```
     #[wasm_bindgen(constructor)]
     pub fn new(js_value: JsValue) -> Result<EncryptionPublicKey, JsValue> {
@@ -963,7 +979,7 @@ impl EncryptionPublicKey {
         if bytes_array.length() > 0 {
             let bytes_vec = bytes_array.to_vec();
             if !bytes_vec.is_empty() {
-                return NativeEncryptionPublicKey::decode(&mut &bytes_vec[..])
+                return NativeEncryptionPublicKey::decode_all(&mut &bytes_vec[..])
                     .map(|key| EncryptionPublicKey { inner: key })
                     .map_err(|e| {
                         JsValue::from_str(&format!(
@@ -983,7 +999,7 @@ impl EncryptionPublicKey {
                     let bytes_array = js_sys::Uint8Array::new(&bytes_js);
                     if bytes_array.length() > 0 {
                         let bytes_vec = bytes_array.to_vec();
-                        return NativeEncryptionPublicKey::decode(&mut &bytes_vec[..])
+                        return NativeEncryptionPublicKey::decode_all(&mut &bytes_vec[..])
                             .map(|key| EncryptionPublicKey { inner: key })
                             .map_err(|e| {
                                 JsValue::from_str(&format!(
@@ -1032,7 +1048,7 @@ impl EncryptionPublicKey {
     /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<EncryptionPublicKey, JsValue> {
-        let inner = NativeEncryptionPublicKey::decode(&mut &bytes[..]).map_err(|e| {
+        let inner = NativeEncryptionPublicKey::decode_all(&mut &bytes[..]).map_err(|e| {
             JsValue::from_str(&format!("Failed to decode encryption public key: {}", e))
         })?;
         Ok(EncryptionPublicKey { inner })

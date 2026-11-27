@@ -187,7 +187,7 @@ impl AccountAssetState {
     /// Gets the current confidential balance for this account asset.
     ///
     /// # Returns
-    /// The balance as a `bigint`.
+    /// The balance as a number up to `Number.MAX_SAFE_INTEGER`, and as a `bigint` above it.
     ///
     /// # Example
     /// ```javascript
@@ -468,6 +468,7 @@ impl AccountAssetState {
             &keys,
             &leg_ref,
             &leg_enc,
+            leg.amount,
             &mut self.inner,
             &path.path,
         )
@@ -658,6 +659,7 @@ impl AccountAssetState {
             &keys,
             &leg_ref,
             &leg_enc,
+            leg.amount,
             &mut self.inner,
             &path.path,
         )
@@ -853,7 +855,7 @@ impl AccountState {
     /// Gets the confidential balance for this account.
     ///
     /// # Returns
-    /// The balance as a `bigint`.
+    /// The balance as a number up to `Number.MAX_SAFE_INTEGER`, and as a `bigint` above it.
     ///
     /// # Example
     /// ```javascript
