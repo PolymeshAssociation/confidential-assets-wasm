@@ -1,0 +1,769 @@
+{
+  "description": "DART key file version 1 reference vectors (docs/KEY_FILE_FORMAT.md, section 11). Each `valid` file MUST open with `password` (whose UTF-8 bytes are `passwordHex`) to the 128-byte plaintext `secretKeyHex`, the keys of the `keys` entry of tests/vectors/derivation-v1.json; encrypting `secretKeyHex` with `salt`, `nonce` and the `scrypt` parameters MUST reproduce `encoded` byte for byte. Each `invalid` file (JSON text) MUST be rejected, at step `step` of the reader procedure (section 7); `error` is the class of error: invalid, unsupported, password, corrupted or publicKeyMismatch.",
+  "valid": [
+    {
+      "description": "Writer parameters, with a derivation path",
+      "password": "correct horse battery staple",
+      "passwordHex": "0x636f727265637420686f727365206261747465727920737461706c65",
+      "keys": {
+        "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+        "passphrase": "",
+        "account": 0
+      },
+      "secretKeyHex": "0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e3278e9cadcf08332f5245ec3ebdf6dd5c002a4bf6106fae9c654587f92762baa421b97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326d09ef2abfefde27d7b4c8fca90a2fff6088b5be6297fd859a9d31fbc4cb6fc19",
+      "salt": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "nonce": "0xa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+      "scrypt": {
+        "N": 131072,
+        "p": 1,
+        "r": 8
+      },
+      "encoded": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=",
+      "file": {
+        "encoded": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=",
+        "encoding": {
+          "content": [
+            "dart-account-keys",
+            "scale-v1"
+          ],
+          "type": [
+            "scrypt",
+            "xsalsa20-poly1305"
+          ],
+          "version": "3"
+        },
+        "meta": {
+          "created": 1764201600000,
+          "derivationPath": "m/44'/595'/0'/0/0"
+        },
+        "name": "Treasury",
+        "public": {
+          "account": "0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326",
+          "encryption": "0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327"
+        },
+        "type": "dart-key-file",
+        "version": 1
+      }
+    },
+    {
+      "description": "A hex-looking password is its UTF-8 bytes (30 78 31 32 33 34), not hex-decoded; empty name; no derivation path",
+      "password": "0x1234",
+      "passwordHex": "0x307831323334",
+      "keys": {
+        "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+        "passphrase": "TREZOR",
+        "account": 1
+      },
+      "secretKeyHex": "0xe96b8fbc11d3bf76a7178967805321d8b09ed012f0fe1a9b9d6cfac4eaca0f9a685369e1833b0f56e6c7c06ba172a0c85e92348b6ca638a8eef9c130e0492537456f88c907773f4bf3543e8385bb30485ea2358936dd9a0dc96a1ce622191bb423b40ef5f2ba71525d6bfab7c072a76ecef7f5c81cccc37f483c8207ea975a22",
+      "salt": "0x202122232425262728292a2b2c2d2e2f303132333435363738393a3b3c3d3e3f",
+      "nonce": "0xb8b9babbbcbdbebfc0c1c2c3c4c5c6c7c8c9cacbcccdcecf",
+      "scrypt": {
+        "N": 131072,
+        "p": 1,
+        "r": 8
+      },
+      "encoded": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8AAAIAAQAAAAgAAAC4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs+No1fa1u5W4Vw8tJNK4pTdrVqiBwBnwdLKJCKkSN7ahbUXKfFQaS9uDMDSk+5mQGpVh03QD3HVGC2q84uBixcMTC1XOb1oFekzIYJ3maoJ0x22i6LmDzNRBiD1ypi76K4CkEZMqDY1QwfPPjTvDyyW0ZOt4tlqFKJVoihMtfC/QmZCzW4aiUMg9XoOWj3C790=",
+      "file": {
+        "encoded": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8AAAIAAQAAAAgAAAC4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs+No1fa1u5W4Vw8tJNK4pTdrVqiBwBnwdLKJCKkSN7ahbUXKfFQaS9uDMDSk+5mQGpVh03QD3HVGC2q84uBixcMTC1XOb1oFekzIYJ3maoJ0x22i6LmDzNRBiD1ypi76K4CkEZMqDY1QwfPPjTvDyyW0ZOt4tlqFKJVoihMtfC/QmZCzW4aiUMg9XoOWj3C790=",
+        "encoding": {
+          "content": [
+            "dart-account-keys",
+            "scale-v1"
+          ],
+          "type": [
+            "scrypt",
+            "xsalsa20-poly1305"
+          ],
+          "version": "3"
+        },
+        "meta": {
+          "created": 1764201600001
+        },
+        "name": "",
+        "public": {
+          "account": "0x456f88c907773f4bf3543e8385bb30485ea2358936dd9a0dc96a1ce622191bb4",
+          "encryption": "0xe96b8fbc11d3bf76a7178967805321d8b09ed012f0fe1a9b9d6cfac4eaca0f9a"
+        },
+        "type": "dart-key-file",
+        "version": 1
+      }
+    },
+    {
+      "description": "A non-ASCII password is its UTF-8 bytes without normalisation (it holds a decomposed a + U+0301 and the ligature U+FB01); the largest account; created = 0",
+      "password": "pásswörd ﬁ 🔑",
+      "passwordHex": "0x7061cc81737377c3b6726420efac8120f09f9491",
+      "keys": {
+        "mnemonic": "legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth useful legal winner thank year wave sausage worth title",
+        "passphrase": "TREZOR",
+        "account": 2147483647
+      },
+      "secretKeyHex": "0x443b904998c61e4a4307f9a256af72b9133843dceedfbe680c8a41ef05307a11bdb4e671e30815938200869ce56ef3df5d5e28d51dcfc16997390de5ba0f1222fff24342761056667cdaffbacdfccb9f81fbc552e86030455c93c6b4dc39359abf65b773770eb8111b6905b99f696c12c17b5946667146d2bc8f65a0e906e73a",
+      "salt": "0x404142434445464748494a4b4c4d4e4f505152535455565758595a5b5c5d5e5f",
+      "nonce": "0xd0d1d2d3d4d5d6d7d8d9dadbdcdddedfe0e1e2e3e4e5e6e7",
+      "scrypt": {
+        "N": 131072,
+        "p": 1,
+        "r": 8
+      },
+      "encoded": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8AAAIAAQAAAAgAAADQ0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5udIaWYzFZf1eE3/J0MQjzeEoUMsawApn+4Rh6CN3rCZvr6UVtpElp9cy2a0v/0LKQP7cSGiQE6r2fOUztZMFtTlV0bw3kRFHq+T/4Iz312vVeYbqz2RI1KuWcXYlKrmQCimrImH6Tt1FRlueP6InPrnM5SiFw/7iLw3i2tevVTgRkqAcEFPcM94x1Z1f53fgy8=",
+      "file": {
+        "encoded": "QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8AAAIAAQAAAAgAAADQ0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5udIaWYzFZf1eE3/J0MQjzeEoUMsawApn+4Rh6CN3rCZvr6UVtpElp9cy2a0v/0LKQP7cSGiQE6r2fOUztZMFtTlV0bw3kRFHq+T/4Iz312vVeYbqz2RI1KuWcXYlKrmQCimrImH6Tt1FRlueP6InPrnM5SiFw/7iLw3i2tevVTgRkqAcEFPcM94x1Z1f53fgy8=",
+        "encoding": {
+          "content": [
+            "dart-account-keys",
+            "scale-v1"
+          ],
+          "type": [
+            "scrypt",
+            "xsalsa20-poly1305"
+          ],
+          "version": "3"
+        },
+        "meta": {
+          "created": 0,
+          "derivationPath": "m/44'/595'/2147483647'/0/0"
+        },
+        "name": "Größe ✓ \"quoted\"",
+        "public": {
+          "account": "0xfff24342761056667cdaffbacdfccb9f81fbc552e86030455c93c6b4dc39359a",
+          "encryption": "0x443b904998c61e4a4307f9a256af72b9133843dceedfbe680c8a41ef05307a11"
+        },
+        "type": "dart-key-file",
+        "version": 1
+      }
+    },
+    {
+      "description": "Reader-accepted parameters N = 2^15, p = 3, r = 8; created = 2^53 - 1",
+      "password": "correct horse battery staple",
+      "passwordHex": "0x636f727265637420686f727365206261747465727920737461706c65",
+      "keys": {
+        "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+        "passphrase": "",
+        "account": 1
+      },
+      "secretKeyHex": "0xee6738be6a15a3ccc89624183b1dadeab02d6fb4746fe0b676cb876db190a41a1b79d9e192339a9455fb94ed4c3913aabb7759e18809910959c27e8c75ebfc03991780ddfb3e841f7c8b922657f4f7a4cf6b535fea69a4bc9a6652b2d4880e2cb6e142b104be8338c3be3cdf7230d6e53dc2e139636296962b1edab6968edb0e",
+      "salt": "0x606162636465666768696a6b6c6d6e6f707172737475767778797a7b7c7d7e7f",
+      "nonce": "0xe8e9eaebecedeeeff0f1f2f3f4f5f6f7f8f9fafbfcfdfeff",
+      "scrypt": {
+        "N": 32768,
+        "p": 3,
+        "r": 8
+      },
+      "encoded": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8AgAAAAwAAAAgAAADo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v98uJBqpsiKaFwq0pOB82kqxslF9hJi27GnAjEl36adnjcWgslUPwwDSXPZ/c51Izy6/Z9Mo5OClG89eQkpTMEXeL/mhD3yQE5L9IBsIvx5unw8+cJYWO5UZJ6kLAuPHRM55pVZTSJgJwdUEqPXicqdVKn1zVTnprjX7uVL7lxft1WBuorjWHE9N8D1hUIEWwM=",
+      "file": {
+        "encoded": "YGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn8AgAAAAwAAAAgAAADo6err7O3u7/Dx8vP09fb3+Pn6+/z9/v98uJBqpsiKaFwq0pOB82kqxslF9hJi27GnAjEl36adnjcWgslUPwwDSXPZ/c51Izy6/Z9Mo5OClG89eQkpTMEXeL/mhD3yQE5L9IBsIvx5unw8+cJYWO5UZJ6kLAuPHRM55pVZTSJgJwdUEqPXicqdVKn1zVTnprjX7uVL7lxft1WBuorjWHE9N8D1hUIEWwM=",
+        "encoding": {
+          "content": [
+            "dart-account-keys",
+            "scale-v1"
+          ],
+          "type": [
+            "scrypt",
+            "xsalsa20-poly1305"
+          ],
+          "version": "3"
+        },
+        "meta": {
+          "created": 9007199254740991,
+          "derivationPath": "m/44'/595'/1'/0/0"
+        },
+        "name": "N=2^15 p=3",
+        "public": {
+          "account": "0x991780ddfb3e841f7c8b922657f4f7a4cf6b535fea69a4bc9a6652b2d4880e2c",
+          "encryption": "0xee6738be6a15a3ccc89624183b1dadeab02d6fb4746fe0b676cb876db190a41a"
+        },
+        "type": "dart-key-file",
+        "version": 1
+      }
+    },
+    {
+      "description": "Reader-accepted parameters N = 2^15, p = 1, r = 8",
+      "password": "correct horse battery staple",
+      "passwordHex": "0x636f727265637420686f727365206261747465727920737461706c65",
+      "keys": {
+        "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+        "passphrase": "",
+        "account": 2147483647
+      },
+      "secretKeyHex": "0x4c86ce2a0dbf7079b95ab9f3ca38f35e447bf4f71fe75eb2939ba517d7dbd2019112f108cfab82b4e38c006cae1302d42e2f73fde15303844996bf86b97d09005fdf2e5e20fdc2dc20358f5134453a85bff12e7d922c48ba3132343931ac28b183338d494eeea3ccb87edeb8fda47dad416679ab820d3354282c12d051390c29",
+      "salt": "0x808182838485868788898a8b8c8d8e8f909192939495969798999a9b9c9d9e9f",
+      "nonce": "0x000102030405060708090a0b0c0d0e0f1011121314151617",
+      "scrypt": {
+        "N": 32768,
+        "p": 1,
+        "r": 8
+      },
+      "encoded": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8AgAAAAQAAAAgAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFheLZ4zvisp3zUOdH5Ld9WcRfUYljiu7uWIub6FwMiCOMTfbJiPp3xOEZMKx7V1DlKlMuqhj9FTO2Hr3nqSfSzfOEgb+4YaFmH/7tcxy4fs8DXKPYwLxaC8vZPpyGHbxNceg/nkqJnxfU3CrSEKEH65X9ESoQ1kL/i0xb7eQxwVmyPV0vE2i+mPzbLTByskG3i4=",
+      "file": {
+        "encoded": "gIGCg4SFhoeIiYqLjI2Oj5CRkpOUlZaXmJmam5ydnp8AgAAAAQAAAAgAAAAAAQIDBAUGBwgJCgsMDQ4PEBESExQVFheLZ4zvisp3zUOdH5Ld9WcRfUYljiu7uWIub6FwMiCOMTfbJiPp3xOEZMKx7V1DlKlMuqhj9FTO2Hr3nqSfSzfOEgb+4YaFmH/7tcxy4fs8DXKPYwLxaC8vZPpyGHbxNceg/nkqJnxfU3CrSEKEH65X9ESoQ1kL/i0xb7eQxwVmyPV0vE2i+mPzbLTByskG3i4=",
+        "encoding": {
+          "content": [
+            "dart-account-keys",
+            "scale-v1"
+          ],
+          "type": [
+            "scrypt",
+            "xsalsa20-poly1305"
+          ],
+          "version": "3"
+        },
+        "meta": {
+          "created": 1764201600003,
+          "derivationPath": "m/44'/595'/2147483647'/0/0"
+        },
+        "name": "N=2^15 p=1",
+        "public": {
+          "account": "0x5fdf2e5e20fdc2dc20358f5134453a85bff12e7d922c48ba3132343931ac28b1",
+          "encryption": "0x4c86ce2a0dbf7079b95ab9f3ca38f35e447bf4f71fe75eb2939ba517d7dbd201"
+        },
+        "type": "dart-key-file",
+        "version": 1
+      }
+    },
+    {
+      "description": "Reader-accepted parameters N = 2^16, p = 2, r = 8",
+      "password": "correct horse battery staple",
+      "passwordHex": "0x636f727265637420686f727365206261747465727920737461706c65",
+      "keys": {
+        "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+        "passphrase": "TREZOR",
+        "account": 0
+      },
+      "secretKeyHex": "0xfa5952aa85a449a946b51ae88794438a14bceca1a2ec5ac35ebafa2d7c35fc8a64763cb83b900c17c8acee3289aa910a1b27df0d3119a8a33040454ca4146a22aee05c233ec6c37f2a3844de64e79e50979f7abdda04304ce188eefb43f57b2f0e014cb27d64bd6a10d4d316966de6d70963d622cc24bac453842d15c73fdc3f",
+      "salt": "0xa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
+      "nonce": "0x18191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f",
+      "scrypt": {
+        "N": 65536,
+        "p": 2,
+        "r": 8
+      },
+      "encoded": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8AAAEAAgAAAAgAAAAYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8bDnBHPNch4Xm1FNOLulDY/ns0uDhSysfCrYBy9Z1HPK2O44VOKacarFSZu2FApBp/g+fpRLVi3Rx9v06xrDfSwoY7Dy7kDapPRj1lBHS4mTAOFc05Kw4km6GlZ+wiQtBjEm/me+F9aDPeRYTlMbsAvdmJoLsy503bjXZ0Rn+AvI+2HHt2IJamdOXhcBsingA=",
+      "file": {
+        "encoded": "oKGio6SlpqeoqaqrrK2ur7CxsrO0tba3uLm6u7y9vr8AAAEAAgAAAAgAAAAYGRobHB0eHyAhIiMkJSYnKCkqKywtLi8bDnBHPNch4Xm1FNOLulDY/ns0uDhSysfCrYBy9Z1HPK2O44VOKacarFSZu2FApBp/g+fpRLVi3Rx9v06xrDfSwoY7Dy7kDapPRj1lBHS4mTAOFc05Kw4km6GlZ+wiQtBjEm/me+F9aDPeRYTlMbsAvdmJoLsy503bjXZ0Rn+AvI+2HHt2IJamdOXhcBsingA=",
+        "encoding": {
+          "content": [
+            "dart-account-keys",
+            "scale-v1"
+          ],
+          "type": [
+            "scrypt",
+            "xsalsa20-poly1305"
+          ],
+          "version": "3"
+        },
+        "meta": {
+          "created": 1764201600004,
+          "derivationPath": "m/44'/595'/0'/0/0"
+        },
+        "name": "N=2^16 p=2",
+        "public": {
+          "account": "0xaee05c233ec6c37f2a3844de64e79e50979f7abdda04304ce188eefb43f57b2f",
+          "encryption": "0xfa5952aa85a449a946b51ae88794438a14bceca1a2ec5ac35ebafa2d7c35fc8a"
+        },
+        "type": "dart-key-file",
+        "version": 1
+      }
+    },
+    {
+      "description": "Unknown meta members are ignored",
+      "password": "correct horse battery staple",
+      "passwordHex": "0x636f727265637420686f727365206261747465727920737461706c65",
+      "keys": {
+        "mnemonic": "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about",
+        "passphrase": "",
+        "account": 0
+      },
+      "secretKeyHex": "0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e3278e9cadcf08332f5245ec3ebdf6dd5c002a4bf6106fae9c654587f92762baa421b97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326d09ef2abfefde27d7b4c8fca90a2fff6088b5be6297fd859a9d31fbc4cb6fc19",
+      "salt": "0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "nonce": "0xa0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7",
+      "scrypt": {
+        "N": 131072,
+        "p": 1,
+        "r": 8
+      },
+      "encoded": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=",
+      "file": {
+        "encoded": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=",
+        "encoding": {
+          "content": [
+            "dart-account-keys",
+            "scale-v1"
+          ],
+          "type": [
+            "scrypt",
+            "xsalsa20-poly1305"
+          ],
+          "version": "3"
+        },
+        "meta": {
+          "app": {
+            "colour": "red",
+            "tags": [
+              1,
+              2
+            ]
+          },
+          "created": 1764201600000,
+          "derivationPath": "m/44'/595'/0'/0/0"
+        },
+        "name": "Treasury",
+        "public": {
+          "account": "0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326",
+          "encryption": "0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327"
+        },
+        "type": "dart-key-file",
+        "version": 1
+      }
+    }
+  ],
+  "invalid": [
+    {
+      "description": "Not JSON",
+      "step": 1,
+      "password": "correct horse battery staple",
+      "file": "dart-key-file",
+      "error": "invalid"
+    },
+    {
+      "description": "The top-level value is an array",
+      "step": 1,
+      "password": "correct horse battery staple",
+      "file": "[]",
+      "error": "invalid"
+    },
+    {
+      "description": "The top-level value is a string",
+      "step": 1,
+      "password": "correct horse battery staple",
+      "file": "\"dart-key-file\"",
+      "error": "invalid"
+    },
+    {
+      "description": "Trailing characters after the object",
+      "step": 1,
+      "password": "correct horse battery staple",
+      "file": "{\"encoded\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\"encoding\":{\"content\":[\"dart-account-keys\",\"scale-v1\"],\"type\":[\"scrypt\",\"xsalsa20-poly1305\"],\"version\":\"3\"},\"meta\":{\"created\":1764201600000,\"derivationPath\":\"m/44'/595'/0'/0/0\"},\"name\":\"Treasury\",\"public\":{\"account\":\"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\"encryption\":\"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"},\"type\":\"dart-key-file\",\"version\":1} x",
+      "error": "invalid"
+    },
+    {
+      "description": "`type` missing",
+      "step": 2,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"version\": 1\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "`type` has another value",
+      "step": 2,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"Dart-Key-File\",\n  \"version\": 1\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "A polkadot.js account file",
+      "step": 2,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"address\": \"5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY\",\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"pkcs8\",\n      \"sr25519\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"name\": \"Alice\"\n  }\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "`version` is 2",
+      "step": 3,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 2\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "`version` is the string \"1\"",
+      "step": 3,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": \"1\"\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "`version` missing",
+      "step": 3,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\"\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "`version` 2 is rejected before `encoded` is looked at",
+      "step": 3,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"not base64\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 2\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "Reserved `dart-mnemonic` content",
+      "step": 4,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-mnemonic\",\n      \"bip39-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "`encoding.content` in the wrong order",
+      "step": 4,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"scale-v1\",\n      \"dart-account-keys\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "An unencrypted polkadot.js payload: `encoding.type` is [\"none\"]",
+      "step": 4,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"none\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "`encoding.version` is \"2\"",
+      "step": 4,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"2\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "`encoding.version` is the number 3",
+      "step": 4,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": 3\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "`encoding` missing",
+      "step": 4,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "`name` missing",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`name` is not a string",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": null,\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "An unknown top-level member",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"extra\": true,\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`public` missing",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "An unknown `public` member",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\",\n    \"extra\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "An unknown `encoding` member",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"extra\": \"x\",\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`public.account` in upper-case hex",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xB97044F2E52C45BD0B54004A08047F724063D29E7A5AA0B0C699B412662F5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`public.encryption` without the 0x prefix",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"dd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`public.account` of 31 bytes",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f53\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`encoded` is not a string",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": null,\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`meta` missing",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`meta.created` missing",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`meta.created` negative",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": -1,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`meta.created` fractional",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1.5,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`meta.created` above 2^53 - 1",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 9007199254740992,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`meta.created` is a string",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": \"1764201600000\",\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`meta.derivationPath` account 2147483648 is out of range",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/2147483648'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`meta.derivationPath` account with a leading zero",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/00'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`meta.derivationPath` with another coin type",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/60'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`meta.derivationPath` is not a string",
+      "step": 5,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": 0\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`encoded` with non-zero padding bits",
+      "step": 6,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5t=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`encoded` without its `=` padding",
+      "step": 6,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`encoded` with a line break",
+      "step": 6,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqus\\nra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`encoded` with a trailing space",
+      "step": 6,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s= \",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`encoded` in the URL-safe alphabet",
+      "step": 6,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"-_ECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "`encoded` as hex",
+      "step": 6,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"0x000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f000002000100000008000000a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7fdc04ad12a42b0151e2b83bd51438be40bec40424bec398a50d7baa2544f69577167e568e5da65cc1e5c7da5d620304bada60a5d907ee71eae2ac00ecc1086a39b7c8c57a328acb4ec7199fe784f6bf1cf208d51314a61ac3fbcd52f91214c346d8cff537cc7a58be1f7fe683e486cad2fbe58d8133bf03aa97f8b66a806bca477d3bafb04ac0f8f121430ce4521c39b\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "A 211-byte payload",
+      "step": 6,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhww==\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "A 213-byte payload",
+      "step": 6,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5sA\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "invalid"
+    },
+    {
+      "description": "N = 2^20, p = 1, r = 8, refused before running scrypt",
+      "step": 7,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AABAAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "N = 2^14, p = 5, r = 8 (a polkadot.js ALLOWED_PARAMS preset that fails its safe-limit check)",
+      "step": 7,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AQAAABQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "N = 2^13, p = 10, r = 8 (likewise)",
+      "step": 7,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AIAAACgAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "N = 2^17, p = 1, r = 16",
+      "step": 7,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAABAAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "N = 2^17, p = 0, r = 8",
+      "step": 7,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAAAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "Unsupported parameters are reported before a wrong password",
+      "step": 7,
+      "password": "wrong password",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAQAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "unsupported"
+    },
+    {
+      "description": "A wrong password",
+      "step": 8,
+      "password": "correct horse battery staple ",
+      "file": "{\"encoded\":\"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\"encoding\":{\"content\":[\"dart-account-keys\",\"scale-v1\"],\"type\":[\"scrypt\",\"xsalsa20-poly1305\"],\"version\":\"3\"},\"meta\":{\"created\":1764201600000,\"derivationPath\":\"m/44'/595'/0'/0/0\"},\"name\":\"Treasury\",\"public\":{\"account\":\"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\"encryption\":\"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"},\"type\":\"dart-key-file\",\"version\":1}",
+      "error": "password"
+    },
+    {
+      "description": "The bytes 12 34, which polkadot.js would hex-decode the string password \"0x1234\" to",
+      "step": 8,
+      "password": "\u00124",
+      "file": "{\n  \"encoded\": \"ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8AAAIAAQAAAAgAAAC4ubq7vL2+v8DBwsPExcbHyMnKy8zNzs+No1fa1u5W4Vw8tJNK4pTdrVqiBwBnwdLKJCKkSN7ahbUXKfFQaS9uDMDSk+5mQGpVh03QD3HVGC2q84uBixcMTC1XOb1oFekzIYJ3maoJ0x22i6LmDzNRBiD1ypi76K4CkEZMqDY1QwfPPjTvDyyW0ZOt4tlqFKJVoihMtfC/QmZCzW4aiUMg9XoOWj3C790=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600001\n  },\n  \"name\": \"\",\n  \"public\": {\n    \"account\": \"0x456f88c907773f4bf3543e8385bb30485ea2358936dd9a0dc96a1ce622191bb4\",\n    \"encryption\": \"0xe96b8fbc11d3bf76a7178967805321d8b09ed012f0fe1a9b9d6cfac4eaca0f9a\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "password"
+    },
+    {
+      "description": "The NFC form of a decomposed password",
+      "step": 8,
+      "password": "pásswörd ﬁ 🔑",
+      "file": "{\n  \"encoded\": \"QEFCQ0RFRkdISUpLTE1OT1BRUlNUVVZXWFlaW1xdXl8AAAIAAQAAAAgAAADQ0dLT1NXW19jZ2tvc3d7f4OHi4+Tl5udIaWYzFZf1eE3/J0MQjzeEoUMsawApn+4Rh6CN3rCZvr6UVtpElp9cy2a0v/0LKQP7cSGiQE6r2fOUztZMFtTlV0bw3kRFHq+T/4Iz312vVeYbqz2RI1KuWcXYlKrmQCimrImH6Tt1FRlueP6InPrnM5SiFw/7iLw3i2tevVTgRkqAcEFPcM94x1Z1f53fgy8=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 0,\n    \"derivationPath\": \"m/44'/595'/2147483647'/0/0\"\n  },\n  \"name\": \"Größe ✓ \\\"quoted\\\"\",\n  \"public\": {\n    \"account\": \"0xfff24342761056667cdaffbacdfccb9f81fbc552e86030455c93c6b4dc39359a\",\n    \"encryption\": \"0x443b904998c61e4a4307f9a256af72b9133843dceedfbe680c8a41ef05307a11\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "password"
+    },
+    {
+      "description": "A modified salt",
+      "step": 8,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AQECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "password"
+    },
+    {
+      "description": "A modified nonce",
+      "step": 8,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWnp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "password"
+    },
+    {
+      "description": "A modified tag",
+      "step": 8,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wEvRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "password"
+    },
+    {
+      "description": "A modified ciphertext",
+      "step": 8,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhwxs=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "password"
+    },
+    {
+      "description": "A wrong password is reported before mismatched public keys",
+      "step": 8,
+      "password": "wrong password",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "password"
+    },
+    {
+      "description": "`acct.secret` is not below the Pallas group order",
+      "step": 9,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"type\": \"dart-key-file\",\n  \"version\": 1,\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1treAGKC82t6lnaldEbzIG8YTC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytAN9VjBI57bgtzPtTx1u8rYCnHuLSLCgpRDjQjfZowH0=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000\n  }\n}",
+      "error": "corrupted"
+    },
+    {
+      "description": "`enc.secret` is not below the Pallas group order",
+      "step": 9,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"type\": \"dart-key-file\",\n  \"version\": 1,\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trcZn5pbnDk0Ol8ntZ9jVRhQC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEvcxVhtZ7I3sxQ5AUzFMiVcTsiFuDN5zy5WCZ8m5QowL88gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000\n  }\n}",
+      "error": "corrupted"
+    },
+    {
+      "description": "`public.account` is another account's",
+      "step": 10,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0x991780ddfb3e841f7c8b922657f4f7a4cf6b535fea69a4bc9a6652b2d4880e2c\",\n    \"encryption\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "publicKeyMismatch"
+    },
+    {
+      "description": "`public.encryption` is another account's",
+      "step": 10,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\",\n    \"encryption\": \"0xee6738be6a15a3ccc89624183b1dadeab02d6fb4746fe0b676cb876db190a41a\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "publicKeyMismatch"
+    },
+    {
+      "description": "`public.account` and `public.encryption` swapped",
+      "step": 10,
+      "password": "correct horse battery staple",
+      "file": "{\n  \"encoded\": \"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8AAAIAAQAAAAgAAACgoaKjpKWmp6ipqqusra6vsLGys7S1trf9wErRKkKwFR4rg71RQ4vkC+xAQkvsOYpQ17qiVE9pV3Fn5Wjl2mXMHlx9pdYgMEutpgpdkH7nHq4qwA7MEIajm3yMV6MorLTscZn+eE9r8c8gjVExSmGsP7zVL5EhTDRtjP9TfMeli+H3/mg+SGytL75Y2BM78Dqpf4tmqAa8pHfTuvsErA+PEhQwzkUhw5s=\",\n  \"encoding\": {\n    \"content\": [\n      \"dart-account-keys\",\n      \"scale-v1\"\n    ],\n    \"type\": [\n      \"scrypt\",\n      \"xsalsa20-poly1305\"\n    ],\n    \"version\": \"3\"\n  },\n  \"meta\": {\n    \"created\": 1764201600000,\n    \"derivationPath\": \"m/44'/595'/0'/0/0\"\n  },\n  \"name\": \"Treasury\",\n  \"public\": {\n    \"account\": \"0xdd921243737eaad9594c14748b1c2ee36846294bc7753db187adaefaabf1e327\",\n    \"encryption\": \"0xb97044f2e52c45bd0b54004a08047f724063d29e7a5aa0b0c699b412662f5326\"\n  },\n  \"type\": \"dart-key-file\",\n  \"version\": 1\n}",
+      "error": "publicKeyMismatch"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "name": "dart-key-file-interop",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Checks that DART key files interoperate with polkadot.js jsonEncrypt/jsonDecrypt and match the JSON Schema.",
+  "type": "module",
+  "scripts": {
+    "test": "node interop.mjs"
+  },
+  "devDependencies": {
+    "@polkadot/util": "13.5.9",
+    "@polkadot/util-crypto": "13.5.9",
+    "ajv": "8.17.1"
+  }
+}
