@@ -1,4 +1,4 @@
-use codec::{Decode, Encode};
+use codec::{Decode, DecodeAll, Encode};
 use polymesh_dart::{AssetId, AssetKeys as NativeAssetKeys, AssetState as NativeAssetState};
 use wasm_bindgen::prelude::*;
 
@@ -22,7 +22,7 @@ fn convert_chain_asset_keys(keys: JsValue) -> Result<NativeAssetKeys, JsValue> {
     if bytes.is_empty() {
         return Err(JsValue::from_str("Asset keys bytes are empty"));
     }
-    NativeAssetKeys::decode(&mut &bytes[..])
+    NativeAssetKeys::decode_all(&mut &bytes[..])
         .map_err(|e| JsValue::from_str(&format!("Failed to decode asset keys from bytes: {}", e)))
 }
 
@@ -56,35 +56,42 @@ pub struct AssetState {
 
 #[wasm_bindgen]
 impl AssetState {
-    /// Creates a new asset state from the chain's `confidentialAssets.keys(assetId)` value. `frozen` is `false`.
+    /// Creates a new asset state from the chain's `confidentialAssets.keys(assetId)` and
+    /// `confidentialAssets.assetFrozen(assetId)` values.
     ///
     /// # Arguments
     /// * `asset_id` - The unique identifier for this confidential asset (as a number).
     /// * `asset_keys` - Either the SCALE-encoded `AssetKeys` as a `Uint8Array` or hex string, or an object
     ///   `{ encKeys, mediators }` where `encKeys` are the auditor and mediator encryption public keys
     ///   and `mediators` are the mediator account public keys, each as a hex string.
+    /// * `frozen` - Whether the asset is frozen. Defaults to `false`.
     ///
     /// # Returns
     /// A new `AssetState` object.
     ///
     /// # Errors
-    /// * Throws an error if any key cannot be decoded or is invalid.
+    /// * Throws an error if any key cannot be decoded or is invalid, or the bytes have trailing data.
     ///
     /// # Examples
     /// ```javascript
     /// // From Polkadot.js chain data (recommended)
     /// const assetKeys = await api.query.confidentialAssets.keys(assetId);
-    /// const assetState = new AssetState(assetId, assetKeys.unwrap().toU8a());
+    /// const frozen = await api.query.confidentialAssets.assetFrozen(assetId);
+    /// const assetState = new AssetState(assetId, assetKeys.unwrap().toU8a(), frozen.isSome);
     ///
     /// // Use in settlement legs
     /// const leg = new LegBuilder(senderKeys, receiverKeys, assetState, amount);
     /// ```
     #[wasm_bindgen(constructor)]
-    pub fn new(asset_id: AssetId, asset_keys: JsValue) -> Result<AssetState, JsValue> {
+    pub fn new(
+        asset_id: AssetId,
+        asset_keys: JsValue,
+        frozen: Option<bool>,
+    ) -> Result<AssetState, JsValue> {
         Ok(AssetState {
             inner: NativeAssetState {
                 asset_id,
-                frozen: false,
+                frozen: frozen.unwrap_or(false),
                 keys: convert_chain_asset_keys(asset_keys)?,
             },
         })
@@ -125,7 +132,7 @@ impl AssetState {
     /// ```
     #[wasm_bindgen(js_name = fromBytes)]
     pub fn from_bytes(bytes: &[u8]) -> Result<AssetState, JsValue> {
-        let inner = NativeAssetState::decode(&mut &bytes[..])
+        let inner = NativeAssetState::decode_all(&mut &bytes[..])
             .map_err(|e| JsValue::from_str(&format!("Failed to decode asset state: {}", e)))?;
         Ok(AssetState { inner })
     }

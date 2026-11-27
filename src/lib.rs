@@ -181,9 +181,14 @@ pub fn jsvalue_to_balance(value: &JsValue) -> Result<Balance, JsValue> {
     ))
 }
 
-/// Convert `Balance` to `JsValue`
+/// Convert `Balance` to `JsValue`. Returns a number up to `Number.MAX_SAFE_INTEGER` and a `BigInt`
+/// above it.
 pub fn balance_to_jsvalue(balance: Balance) -> JsValue {
-    JsValue::from_f64(balance as f64)
+    if balance <= js_sys::Number::MAX_SAFE_INTEGER as u64 {
+        JsValue::from_f64(balance as f64)
+    } else {
+        js_sys::BigInt::from(balance).into()
+    }
 }
 
 /// Initialize the WASM module: sets up the console logger and the panic hook for better

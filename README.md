@@ -4,7 +4,7 @@ WebAssembly bindings for Polymesh DART (Decentralized, Anonymous and Regulation-
 
 This package provides JavaScript/TypeScript bindings for the Polymesh DART protocol, enabling privacy-preserving asset transfers with zero-knowledge proofs in web browsers and Node.js environments.
 
-This release targets [`polymesh-dart` `dart-v1.0.0`](https://github.com/PolymeshAssociation/polymesh-dart/tree/dart-v1.0.0) and a chain running the DART v1 confidential-assets pallet. See [MIGRATION.md](MIGRATION.md) for the changes from the DART v0.1 release.
+This release targets [`polymesh-dart` `dart-v1.0.1`](https://github.com/PolymeshAssociation/polymesh-dart/tree/dart-v1.0.1) and a chain running the DART v1 confidential-assets pallet. See [MIGRATION.md](MIGRATION.md) for the changes from the DART v0.1 release.
 
 ## Features
 
@@ -238,7 +238,7 @@ Represents the confidential state of an account for a specific asset.
 - `fromBytes(bytes: Uint8Array)` - Import from SCALE-encoded bytes
 - `toBytes(): Uint8Array` - Export as SCALE-encoded bytes
 - `assetId(): number` - Get the asset ID
-- `balance()` - Get current balance
+- `balance(): number | bigint` - Get current balance. A `bigint` above `Number.MAX_SAFE_INTEGER`
 - `leafIndex(): bigint` - Get the leaf index in the account tree (after committing)
 - `hasPendingState(): boolean` - Whether a generated proof's state change is not yet committed
 - `commitPendingState(leafIndex: bigint)` - Commit pending state after on-chain transaction
@@ -250,7 +250,7 @@ Represents account commitment stored in the account tree.
 - `fromBytes(bytes: Uint8Array)` - Import from SCALE-encoded bytes
 - `toBytes(): Uint8Array` - Export as SCALE-encoded bytes
 - `assetId(): number` - Get asset ID
-- `balance()` - Get balance
+- `balance(): number | bigint` - Get balance. A `bigint` above `Number.MAX_SAFE_INTEGER`
 - `counter(): bigint` - Get transaction counter
 
 ### Asset Management
@@ -258,9 +258,9 @@ Represents account commitment stored in the account tree.
 #### `AssetState`
 Represents a confidential asset's state, including mediators and auditors.
 
-- `new AssetState(assetId: number, keys)` - Create from the chain's `confidentialAssets.keys(assetId)` value
+- `new AssetState(assetId: number, keys, frozen?: boolean)` - Create from the chain's `confidentialAssets.keys(assetId)` and `confidentialAssets.assetFrozen(assetId)` values
   - `keys` is the SCALE bytes of that value (`Uint8Array` or hex string), or an object `{ encKeys: [...], mediators: [...] }` of hex strings or bytes, where `encKeys` are the auditor and mediator encryption public keys and `mediators` are the mediators' account public keys
-  - `isFrozen()` is `false`. Use `PolymeshClient.getAssetState(assetId)` to also read the frozen status
+  - `frozen` defaults to `false`. `PolymeshClient.getAssetState(assetId)` reads it from the chain
 - `fromBytes(bytes: Uint8Array)` - Import from SCALE-encoded bytes
 - `toBytes(): Uint8Array` - Export as SCALE-encoded bytes
 - `assetId(): number` - Get asset ID
@@ -314,13 +314,14 @@ All proof types support:
 - `fromBytes(bytes: Uint8Array)` - Import from bytes
 - `toBytes(): Uint8Array` - Export as bytes
 
-All except `AccountRegistrationProof` also support:
+All except `AccountRegistrationProof`, `BatchedAccountAssetRegistrationProof` and `SettlementProof` also support:
 - `fromHex(hex: string)` - Import from hex
 - `toHex(): string` - Export as hex
 
 Available proofs:
 - `AccountRegistrationProof` - Register account keys on-chain
 - `AccountAssetRegistrationProof` - Register account for a specific asset
+- `BatchedAccountAssetRegistrationProof` - Register accounts for assets in one batch
 - `AssetMintingProof` - Mint tokens of a confidential asset
 - `SenderAffirmationProof` - Sender affirmation for a settlement leg
 - `ReceiverAffirmationProof` - Receiver affirmation for a settlement leg
@@ -363,7 +364,8 @@ const publicKeys = dartKeys.publicKeys();
 // Query asset state from chain
 const assetId = 1;
 const assetKeys = await api.query.confidentialAssets.keys(assetId);
-const assetState = new AssetState(assetId, assetKeys.unwrap().toU8a());
+const frozen = await api.query.confidentialAssets.assetFrozen(assetId);
+const assetState = new AssetState(assetId, assetKeys.unwrap().toU8a(), frozen.isSome);
 
 // Generate proof for registration
 const accountDid = '0x1234...'; // Your account DID

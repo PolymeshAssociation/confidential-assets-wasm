@@ -346,7 +346,7 @@ impl PolymeshSigner {
     /// * `roles` - Any of `"AssetCreator"`, `"Auditor"` and `"Mediator"`.
     ///
     /// # Errors
-    /// * Throws if `did` is malformed, a role is unknown, or the transaction fails.
+    /// * Throws if `did` is malformed, `roles` is empty, a role is unknown, or the transaction fails.
     ///
     /// # Example
     /// ```javascript
@@ -1506,6 +1506,9 @@ impl AccountStateResult {
 
 /// Map role names to the custom scopes of their default DART claims.
 pub(crate) fn role_claim_scopes(roles: &[String]) -> Result<Vec<Vec<u8>>, JsValue> {
+    if roles.is_empty() {
+        return Err(JsValue::from_str("No confidential roles given"));
+    }
     roles
         .iter()
         .map(|role| match role.as_str() {

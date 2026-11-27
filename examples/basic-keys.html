@@ -147,6 +147,14 @@
         document.getElementById('generateSeed').addEventListener('click', () => {
             try {
                 currentSeed = generateRandomSeed();
+                currentKeys = null;
+                exportedBytes = null;
+                for (const id of ['recreateKeys', 'exportKeys', 'importKeys']) {
+                    document.getElementById(id).disabled = true;
+                }
+                for (const id of ['publicKeys', 'accountPubKey', 'encryptionPubKey', 'keyBytes']) {
+                    updateOutput(id, '');
+                }
                 updateOutput('seed', currentSeed);
                 updateStatus('✓ Random seed generated!', 'success');
                 document.getElementById('createKeys').disabled = false;

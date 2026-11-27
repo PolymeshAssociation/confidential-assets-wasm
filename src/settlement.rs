@@ -1009,14 +1009,30 @@ fn optional_account_public_key(
     let Some(value) = value.filter(|v| !v.is_null_or_undefined()) else {
         return Ok(None);
     };
-    // NOTE: An object with `toBytes()` is taken as an `AccountPublicKey` and does not fall back to
-    // the hex, `Uint8Array` or `Codec` forms.
+    // NOTE: An object with `toBytes()` must be an `AccountPublicKey` instance. Its prototype is
+    // compared with that of a fresh `AccountPublicKey`, since `EncryptionPublicKey` has the same
+    // encoded length.
     if value.is_object() {
         let to_bytes = js_sys::Reflect::get(&value, &JsValue::from_str("toBytes"))?;
         if to_bytes.is_function() {
+            let not_account_public_key = || {
+                JsValue::from_str(
+                    "affirmationKey must be an AccountPublicKey, hex string or Uint8Array",
+                )
+            };
             let bytes = js_sys::Function::from(to_bytes).call0(&value)?;
             let bytes = js_sys::Uint8Array::new(&bytes).to_vec();
-            return AccountPublicKey::from_bytes(&bytes).map(Some);
+            let key = AccountPublicKey::from_bytes(&bytes).map_err(|_| not_account_public_key())?;
+            let reference = JsValue::from(key);
+            let is_instance = js_sys::Object::is(
+                &js_sys::Object::get_prototype_of(&value),
+                &js_sys::Object::get_prototype_of(&reference),
+            );
+            return if is_instance {
+                Ok(Some(key))
+            } else {
+                Err(not_account_public_key())
+            };
         }
     }
     AccountPublicKey::new(value).map(Some)
@@ -1055,7 +1071,7 @@ mod tests {
         }
         js_sys::Reflect::set(&keys, &"encKeys".into(), &enc_keys).unwrap();
         js_sys::Reflect::set(&keys, &"mediators".into(), &mediator_keys).unwrap();
-        AssetState::new(7, keys.into()).unwrap()
+        AssetState::new(7, keys.into(), None).unwrap()
     }
 
     /// Builds `AssetState` 7 with `mediator` as its only mediator.
@@ -1119,8 +1135,8 @@ mod tests {
         let mediator = new_keys();
         let asset = asset_with_mediator(&mediator);
         let hex = format!("0x{}", hex::encode(asset.inner.keys.encode()));
-        assert!(AssetState::new(7, JsValue::from_str(&hex)).is_ok());
-        let empty = AssetState::new(7, js_sys::Uint8Array::new_with_length(0).into());
+        assert!(AssetState::new(7, JsValue::from_str(&hex), None).is_ok());
+        let empty = AssetState::new(7, js_sys::Uint8Array::new_with_length(0).into(), None);
         assert_eq!(
             empty.err().and_then(|e| e.as_string()).as_deref(),
             Some("Asset keys bytes are empty")
@@ -1256,5 +1272,72 @@ mod tests {
             Some(js_sys::BigInt::from(1000u64).into()),
         );
         assert_eq!(ok.unwrap().unwrap().amount, 100);
+    }
+
+    #[wasm_bindgen_test]
+    fn affirmation_key_rejects_other_key_types() {
+        let mediator = new_keys();
+        let leg = encrypted_leg(&mediator, 100);
+        let enc = mediator.encryption_key_pair();
+        let public_keys = mediator.public_keys();
+        for wrong in [
+            JsValue::from(public_keys),
+            JsValue::from(public_keys.encryption_public_key()),
+        ] {
+            assert!(leg
+                .try_decrypt_as_mediator_or_auditor(&enc, None, Some(wrong), None)
+                .is_err());
+        }
+        let legs = SettlementLegsEncrypted {
+            inner: vec![leg.inner.clone()],
+        };
+        assert!(legs
+            .try_decrypt_as_mediator_or_auditor(&enc, Some(public_keys.into()), None)
+            .is_err());
+        assert_eq!(decrypt_as_mediator(&leg, &mediator).role, "Mediator");
+    }
+
+    #[wasm_bindgen_test]
+    fn balance_round_trips_above_max_safe_integer() {
+        let max_safe = js_sys::Number::MAX_SAFE_INTEGER as u64;
+        for balance in [0, 1000, max_safe] {
+            let value = crate::balance_to_jsvalue(balance);
+            assert_eq!(value.as_f64(), Some(balance as f64));
+            assert_eq!(crate::jsvalue_to_balance(&value).unwrap(), balance);
+        }
+        for balance in [max_safe + 1, 1 << 55, u64::MAX] {
+            let value = crate::balance_to_jsvalue(balance);
+            assert!(value.is_bigint());
+            assert_eq!(crate::jsvalue_to_balance(&value).unwrap(), balance);
+        }
+    }
+
+    #[wasm_bindgen_test]
+    fn asset_state_frozen_and_trailing_bytes() {
+        let mediator = new_keys();
+        let asset = asset_with_mediator(&mediator);
+        let keys = asset.inner.keys.encode();
+        assert!(!asset.is_frozen());
+        let frozen = AssetState::new(7, js_sys::Uint8Array::from(&keys[..]).into(), Some(true));
+        assert!(frozen.unwrap().is_frozen());
+
+        let mut padded = keys.clone();
+        padded.push(0);
+        assert!(AssetState::new(7, js_sys::Uint8Array::from(&padded[..]).into(), None).is_err());
+        let mut padded = asset.to_bytes();
+        padded.push(0);
+        assert!(AssetState::from_bytes(&padded).is_err());
+    }
+
+    #[wasm_bindgen_test]
+    fn public_keys_reject_trailing_bytes() {
+        let public_keys = new_keys().public_keys();
+        let mut padded = public_keys.account_public_key().to_bytes();
+        padded.push(0);
+        assert!(AccountPublicKey::from_bytes(&padded).is_err());
+        assert!(AccountPublicKey::new(js_sys::Uint8Array::from(&padded[..]).into()).is_err());
+        let mut padded = public_keys.to_bytes();
+        padded.push(0);
+        assert!(AccountPublicKeys::from_bytes(&padded).is_err());
     }
 }

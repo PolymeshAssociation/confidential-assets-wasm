@@ -56,6 +56,9 @@ pub use signer::*;
 pub struct PolymeshClient {
     pub(crate) api: Api,
     pub(crate) finalize: bool,
+    /// Held while an Alice transaction is submitted and until it is included, so concurrent
+    /// calls take sequential nonces.
+    pub(crate) alice_lock: futures_util::lock::Mutex<()>,
 }
 
 #[wasm_bindgen]
@@ -92,6 +95,7 @@ impl PolymeshClient {
         Ok(PolymeshClient {
             api,
             finalize: true,
+            alice_lock: futures_util::lock::Mutex::new(()),
         })
     }
 
@@ -230,11 +234,13 @@ impl PolymeshClient {
 
     /// Onboard a new signer (CDD + POLYX funding).
     ///
-    /// This is only supported on a development/test chains.
+    /// This is only supported on a development/test chains. Alice transactions from one client
+    /// run one after another. Alice transactions from other clients can still take the same nonce.
     #[wasm_bindgen(js_name = onboardSigner)]
     pub async fn onboard_signer(&self, new_signer: &PolymeshSigner) -> Result<(), JsValue> {
         let account_id = new_signer.signer.account();
         // Use `Alice` to onboard the new signer
+        let _alice_guard = self.alice_lock.lock().await;
         let mut alice = PolymeshSigner::alice(&self.api, self.finalize);
 
         alice
@@ -253,14 +259,16 @@ impl PolymeshClient {
     /// Elsewhere the transaction fails or the claims are ignored. On other chains the trusted
     /// issuer calls `PolymeshSigner.addConfidentialRoleClaims`. If `requiredClaims(Mediator)` is
     /// unset on chain, mediators are checked against `requiredClaims(Auditor)`, so they need the
-    /// `"Auditor"` claim.
+    /// `"Auditor"` claim. Alice transactions from one client run one after another. Alice
+    /// transactions from other clients can still take the same nonce.
     ///
     /// # Arguments
     /// * `signer` - An onboarded signer whose identity receives the claims.
     /// * `roles` - Any of `"AssetCreator"`, `"Auditor"` and `"Mediator"`.
     ///
     /// # Errors
-    /// * Throws if the signer has no identity, a role is unknown, or the transaction fails.
+    /// * Throws if the signer has no identity, `roles` is empty, a role is unknown, or the
+    ///   transaction fails.
     ///
     /// # Example
     /// ```javascript
@@ -277,6 +285,7 @@ impl PolymeshClient {
             JsValue::from_str("Signer has no identity. Call `onboardSigner` first.")
         })?;
         let scopes = signer::role_claim_scopes(&roles)?;
+        let _alice_guard = self.alice_lock.lock().await;
         let mut alice = PolymeshSigner::alice(&self.api, self.finalize);
         alice
             .add_custom_kyc_claims(did, scopes)
